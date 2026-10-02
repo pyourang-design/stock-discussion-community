@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>주식 토론방 - 종목 커뮤니티</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+<!-- 헤더 -->
+<header class="site-header">
+  <div class="container header-inner">
+    <div class="logo">
+      <span class="logo-icon">📈</span>
+      <span class="logo-text">주식 토론방</span>
+    </div>
+    <nav class="main-nav">
+      <a href="index.html" class="active">홈</a>
+      <a href="#" onclick="showPage('hot')">인기토론</a>
+      <a href="#" onclick="showPage('kospi')">KOSPI</a>
+      <a href="#" onclick="showPage('kosdaq')">KOSDAQ</a>
+    </nav>
+    <div class="header-actions">
+      <input class="search-box" type="text" id="searchInput" placeholder="종목명·코드 검색..." oninput="searchStocks()" />
+      <button class="btn-login" onclick="toggleLogin()">로그인</button>
+    </div>
+  </div>
+</header>
+
+<!-- 메인 콘텐츠 -->
+<main class="container main-content">
+
+  <!-- 마켓 인덱스 배너 -->
+  <section class="market-banner">
+    <div class="index-card" id="kospiCard">
+      <span class="idx-name">KOSPI</span>
+      <span class="idx-value" id="kospiVal">2,634.12</span>
+      <span class="idx-change up" id="kospiChg">▲ 18.34 (+0.70%)</span>
+    </div>
+    <div class="index-card" id="kosdaqCard">
+      <span class="idx-name">KOSDAQ</span>
+      <span class="idx-value" id="kosdaqVal">847.56</span>
+      <span class="idx-change up" id="kosdaqChg">▲ 5.21 (+0.62%)</span>
+    </div>
+    <div class="index-card">
+      <span class="idx-name">USD/KRW</span>
+      <span class="idx-value">1,328.50</span>
+      <span class="idx-change down">▼ 2.10 (-0.16%)</span>
+    </div>
+    <div class="index-card">
+      <span class="idx-name">WTI 원유</span>
+      <span class="idx-value">$72.44</span>
+      <span class="idx-change up">▲ 0.88 (+1.23%)</span>
+    </div>
+  </section>
+
+  <!-- 탭 -->
+  <div class="tab-bar" id="tabBar">
+    <button class="tab active" onclick="filterTab('all', this)">전체</button>
+    <button class="tab" onclick="filterTab('kospi', this)">KOSPI</button>
+    <button class="tab" onclick="filterTab('kosdaq', this)">KOSDAQ</button>
+    <button class="tab" onclick="filterTab('hot', this)">🔥 인기</button>
+    <button class="tab" onclick="filterTab('rise', this)">상승</button>
+    <button class="tab" onclick="filterTab('fall', this)">하락</button>
+  </div>
+
+  <!-- 종목 리스트 -->
+  <section class="stock-list" id="stockList"></section>
+
+  <!-- 검색 결과 -->
+  <section class="search-results hidden" id="searchResults"></section>
+
+</main>
+
+<!-- 종목 상세 / 토론방 모달 -->
+<div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+
+    <div class="modal-header">
+      <div>
+        <h2 id="modalStockName"></h2>
+        <span id="modalStockCode" class="stock-code-badge"></span>
+      </div>
+      <div class="modal-price-block">
+        <span class="modal-price" id="modalPrice"></span>
+        <span class="modal-change" id="modalChange"></span>
+      </div>
+    </div>
+
+    <div class="modal-tabs">
+      <button class="tab active" onclick="switchModalTab('discuss', this)">토론</button>
+      <button class="tab" onclick="switchModalTab('info', this)">종목정보</button>
+    </div>
+
+    <!-- 토론탭 -->
+    <div id="discussTab">
+      <div class="write-box">
+        <input id="postNickname" type="text" placeholder="닉네임" maxlength="12" />
+        <textarea id="postContent" placeholder="의견을 남겨보세요..." maxlength="500" rows="3"></textarea>
+        <div class="write-footer">
+          <select id="postSentiment">
+            <option value="neutral">-</option>
+            <option value="up">📈 매수</option>
+            <option value="down">📉 매도</option>
+          </select>
+          <span id="charCount">0/500</span>
+          <button class="btn-submit" onclick="submitPost()">등록</button>
+        </div>
+      </div>
+      <div class="post-list" id="postList"></div>
+    </div>
+
+    <!-- 종목정보 탭 -->
+    <div id="infoTab" class="hidden">
+      <table class="info-table" id="infoTable"></table>
+    </div>
+  </div>
+</div>
+
+<!-- 로그인 드롭다운 -->
+<div class="login-dropdown hidden" id="loginDropdown">
+  <div class="login-box">
+    <h3>로그인</h3>
+    <input type="text" id="loginId" placeholder="아이디" />
+    <input type="password" id="loginPw" placeholder="비밀번호" />
+    <button class="btn-submit full-width" onclick="doLogin()">로그인</button>
+    <p class="login-note">* 데모용: 아무 값이나 입력하세요</p>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="container">
+    <p>⚠️ 본 사이트의 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
+    <p>© 2026 주식 토론방. 데모 프로젝트.</p>
+  </div>
+</footer>
+
+<script src="stocks.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
