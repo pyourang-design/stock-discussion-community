@@ -3,11 +3,13 @@ let currentFilter = 'all';
 let currentStock = null;
 let currentModalTab = 'discuss';
 let loggedInUser = null;
+let samsungLive = false;
 
 // ── 초기화 ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
   renderStocks(STOCKS);
   simulatePriceFlicker();
+  startSamsungRealtime();
   document.getElementById('postContent').addEventListener('input', updateCharCount);
 });
 
@@ -26,19 +28,20 @@ function stockCard(s) {
   const sign = up ? '+' : '';
   const posts = getPostsFor(s.code);
   const postCount = posts.length;
+  const isLive = s.code === '005930';
   return `
-  <div class="stock-card ${s.hot ? 'hot' : ''}" onclick="openModal('${s.code}')">
+  <div class="stock-card ${s.hot ? 'hot' : ''}" data-code="${s.code}" onclick="openModal('${s.code}')">
     <div class="card-left">
       <div class="stock-avatar ${up ? 'up' : 'down'}">${s.name[0]}</div>
       <div class="stock-meta">
-        <div class="stock-name">${s.hot ? '🔥 ' : ''}${s.name}</div>
+        <div class="stock-name">${s.hot ? '🔥 ' : ''}${s.name}${isLive ? ' <span class="live-badge">LIVE</span>' : ''}</div>
         <div class="stock-sub">${s.code} · <span class="badge ${s.market}">${s.market.toUpperCase()}</span></div>
       </div>
     </div>
     <div class="card-right">
-      <div class="stock-price">${s.price.toLocaleString()}원</div>
-      <div class="price-change ${up ? 'up' : 'down'}">${sign}${s.change}%</div>
-      <div class="stock-extra">시총 ${s.cap} · 댓글 ${postCount}</div>
+      <div class="stock-price" id="price-${s.code}">${s.price.toLocaleString()}원</div>
+      <div class="price-change ${up ? 'up' : 'down'}" id="change-${s.code}">${sign}${s.change}%</div>
+      <div class="stock-extra" id="extra-${s.code}">시총 ${s.cap} · 댓글 ${postCount}</div>
     </div>
   </div>`;
 }
@@ -239,31 +242,79 @@ function doLogin() {
   document.getElementById('postNickname').value = id;
 }
 
-// ── 주가 깜빡임 시뮬레이션 ────────────────────────────
+// ── 주가 깜빡임 시뮬레이션 (삼성전자 실시간 연동 시 제외) ──
 function simulatePriceFlicker() {
   setInterval(() => {
     STOCKS.forEach(s => {
+      if (s.code === '005930' && samsungLive) return;
       const delta = (Math.random() - 0.5) * 0.1;
       s.change = Math.round((s.change + delta) * 100) / 100;
       s.price = Math.max(100, Math.round(s.price * (1 + delta / 100)));
     });
     const cards = document.querySelectorAll('.stock-card');
     cards.forEach(card => {
-      const code = card.querySelector('.stock-sub')?.textContent.split(' ')[0];
+      const code = card.dataset.code;
+      if (code === '005930' && samsungLive) return;
       const s = STOCKS.find(x => x.code === code);
       if (!s) return;
-      const priceEl = card.querySelector('.stock-price');
-      const chgEl = card.querySelector('.price-change');
+      const priceEl = document.getElementById(`price-${code}`);
+      const chgEl = document.getElementById(`change-${code}`);
       const avatarEl = card.querySelector('.stock-avatar');
       if (priceEl) priceEl.textContent = s.price.toLocaleString() + '원';
       if (chgEl) {
         const up = s.change >= 0;
         chgEl.textContent = `${up ? '+' : ''}${s.change}%`;
         chgEl.className = 'price-change ' + (up ? 'up' : 'down');
-        if (avatarEl) { avatarEl.className = 'stock-avatar ' + (up ? 'up' : 'down'); }
+        if (avatarEl) avatarEl.className = 'stock-avatar ' + (up ? 'up' : 'down');
       }
     });
   }, 3000);
+}
+
+// ── 삼성전자 실시간 주가 연동 (네이버 금융) ─────────────
+async function startSamsungRealtime() {
+  await fetchSamsungPrice();
+  setInterval(fetchSamsungPrice, 10000);
+}
+
+async function fetchSamsungPrice() {
+  try {
+    const res = await fetch('/api/stock?code=005930');
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.error) return;
+
+    const s = STOCKS.find(x => x.code === '005930');
+    if (!s) return;
+    s.price = data.price;
+    s.change = data.changeRate;
+    samsungLive = true;
+
+    const up = data.changeRate >= 0;
+    const sign = up ? '+' : '';
+
+    const priceEl = document.getElementById('price-005930');
+    const chgEl   = document.getElementById('change-005930');
+    const card     = document.querySelector('[data-code="005930"]');
+    const avatarEl = card?.querySelector('.stock-avatar');
+
+    if (priceEl) priceEl.textContent = data.price.toLocaleString() + '원';
+    if (chgEl) {
+      chgEl.textContent = `${sign}${data.changeRate}%`;
+      chgEl.className = 'price-change ' + (up ? 'up' : 'down');
+    }
+    if (avatarEl) avatarEl.className = 'stock-avatar ' + (up ? 'up' : 'down');
+
+    // 열려있는 모달이 삼성전자면 가격도 갱신
+    if (currentStock?.code === '005930') {
+      document.getElementById('modalPrice').textContent = data.price.toLocaleString() + '원';
+      const mc = document.getElementById('modalChange');
+      mc.textContent = `${sign}${data.changeRate}%`;
+      mc.className = 'modal-change ' + (up ? 'up' : 'down');
+    }
+  } catch (e) {
+    // 장 마감 / 네트워크 오류 시 시뮬레이션 유지
+  }
 }
 
 // ── 키보드 ESC 닫기 ───────────────────────────────────
