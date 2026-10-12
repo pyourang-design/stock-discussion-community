@@ -56,7 +56,7 @@ homepage/
 ## 3. 주요 기능
 
 ### 3-1. 마켓 인덱스 배너
-- KOSPI, KOSDAQ, USD/KRW, WTI 원유 지수 표시
+- KOSPI, KOSDAQ, USD/KRW, 다우·나스닥·S&P500 지수 표시
 
 ### 3-2. 종목 카드 목록
 - 18개 종목 (KOSPI 10개 / KOSDAQ 8개)

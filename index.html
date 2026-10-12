@@ -3,7 +3,24 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>주식 토론방 - 종목 커뮤니티</title>
+  <title>주식 업종 종목 토론방 - 업종별 주식 종목 토론방 · 종목토론방</title>
+  <meta name="naver-site-verification" content="e480cc9e3a203e3a2f702383233efac4c47fade9" />
+  <meta name="google-site-verification" content="-lgSCGXhHqp0NQyqWbt1j8nS7Djxx1irhQeSDmTSMoY" />
+  <meta name="description" content="주식 종목 토론방 - 바이오·반도체·2차전지·로봇·전력·원자력·K뷰티·K컬쳐·조선·방산·자동차·금융 업종별 주요 종목과 국내 투자자가 많이 보유한 미국주식 100 종목토론방. 실시간 주가, 뉴스, 공시, 분석 보고서와 투자자 의견을 한곳에서 확인하세요." />
+  <meta name="keywords" content="주식 종목 토론방, 주식 업종 종목 토론방, 종목토론방, 종목 토론방, 주식 토론방, 주식 커뮤니티, 바이오, 반도체, 2차전지, 로봇, 전력, 원자력, K뷰티, K컬쳐, 조선, 방산, 자동차, 금융, 미국주식, 서학개미, 테슬라, 엔비디아" />
+  <link rel="canonical" href="https://stocksector.vercel.app/" />
+  <link rel="alternate" type="application/rss+xml" title="주식 업종 종목 토론방 RSS" href="https://stocksector.vercel.app/rss.xml" />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="주식 업종 종목 토론방" />
+  <meta property="og:title" content="주식 업종 종목 토론방 - 업종별 주식 종목 토론방" />
+  <meta property="og:description" content="주식 종목 토론방 - 바이오·반도체·2차전지·로봇·전력·원자력·K뷰티·K컬쳐·조선·방산·자동차·금융 업종별 주요 종목과 국내 투자자가 많이 보유한 미국주식 100 종목토론방. 실시간 주가, 뉴스, 공시, 분석 보고서와 투자자 의견을 한곳에서 확인하세요." />
+  <meta property="og:url" content="https://stocksector.vercel.app/" />
+  <meta property="og:locale" content="ko_KR" />
+  <meta name="twitter:card" content="summary" />
+  <meta name="twitter:title" content="주식 업종 종목 토론방" />
+  <meta name="twitter:description" content="주식 종목 토론방 - 바이오·반도체·2차전지·로봇·전력·원자력·K뷰티·K컬쳐·조선·방산·자동차·금융 업종별 주요 종목과 국내 투자자가 많이 보유한 미국주식 100 종목토론방. 실시간 주가, 뉴스, 공시, 분석 보고서와 투자자 의견을 한곳에서 확인하세요." />
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"주식 업종 종목 토론방","alternateName":["주식 종목 토론방","업종별 종목토론방"],"url":"https://stocksector.vercel.app/","inLanguage":"ko-KR"}</script>
+  <script src="/theme.js"></script>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -13,17 +30,18 @@
   <div class="container header-inner">
     <div class="logo">
       <span class="logo-icon">📈</span>
-      <span class="logo-text">주식 토론방</span>
+      <span class="logo-text">주식 업종 종목 토론방</span>
     </div>
     <nav class="main-nav">
-      <a href="index.html" class="active">홈</a>
-      <a href="#" onclick="showPage('hot')">인기토론</a>
-      <a href="#" onclick="showPage('kospi')">KOSPI</a>
-      <a href="#" onclick="showPage('kosdaq')">KOSDAQ</a>
+      <a href="/" class="active">홈</a>
+      <button class="theme-toggle" onclick="toggleTheme()">🌙 다크</button>
     </nav>
     <div class="header-actions">
       <input class="search-box" type="text" id="searchInput" placeholder="종목명·코드 검색..." oninput="searchStocks()" />
-      <button class="btn-login" onclick="toggleLogin()">로그인</button>
+      <button class="btn-feed" onclick="openFeed()">팔로잉</button>
+      <button class="btn-login" id="btnLogin" onclick="toggleLogin()">로그인</button>
+      <button class="btn-signup" id="btnSignup" onclick="toggleSignup()">회원가입</button>
+      <button class="btn-signup hidden" id="btnProfile" onclick="openProfile()">회원정보</button>
     </div>
   </div>
 </header>
@@ -31,45 +49,103 @@
 <!-- 메인 콘텐츠 -->
 <main class="container main-content">
 
-  <!-- 마켓 인덱스 배너 -->
-  <section class="market-banner">
-    <div class="index-card" id="kospiCard">
-      <span class="idx-name">KOSPI</span>
-      <span class="idx-value" id="kospiVal">2,634.12</span>
-      <span class="idx-change up" id="kospiChg">▲ 18.34 (+0.70%)</span>
+  <!-- 사이트 제목·소개 (검색 노출용 H1) -->
+  <section class="hero">
+    <div class="hero-top">
+      <h1>업종별 주식 종목 토론방</h1>
+      <span class="site-stats" id="siteStats"></span>
     </div>
-    <div class="index-card" id="kosdaqCard">
-      <span class="idx-name">KOSDAQ</span>
-      <span class="idx-value" id="kosdaqVal">847.56</span>
-      <span class="idx-change up" id="kosdaqChg">▲ 5.21 (+0.62%)</span>
+    <p>바이오·반도체·2차전지 등 업종별 주요 종목과 미국주식 100, 실시간 시세·뉴스와 투자자 의견을 한곳에서 보는 주식 종목 토론방입니다.</p>
+  </section>
+
+  <!-- 마켓 인덱스 배너: 국내·환율 / 미국 지수 (10초마다 갱신) -->
+  <section class="market-banner" id="marketBanner">
+    <div class="index-card" data-key="KOSPI">
+      <span class="idx-name">KOSPI<span class="idx-status"></span></span>
+      <span class="idx-value">-</span>
+      <span class="idx-change">&nbsp;</span>
     </div>
-    <div class="index-card">
-      <span class="idx-name">USD/KRW</span>
-      <span class="idx-value">1,328.50</span>
-      <span class="idx-change down">▼ 2.10 (-0.16%)</span>
+    <div class="index-card" data-key="KOSDAQ">
+      <span class="idx-name">KOSDAQ<span class="idx-status"></span></span>
+      <span class="idx-value">-</span>
+      <span class="idx-change">&nbsp;</span>
     </div>
-    <div class="index-card">
-      <span class="idx-name">WTI 원유</span>
-      <span class="idx-value">$72.44</span>
-      <span class="idx-change up">▲ 0.88 (+1.23%)</span>
+    <div class="index-card" data-key="USDKRW">
+      <span class="idx-name">USD/KRW<span class="idx-status"></span></span>
+      <span class="idx-value">-</span>
+      <span class="idx-change">&nbsp;</span>
+    </div>
+    <div class="index-card" data-key="DJI">
+      <span class="idx-name">다우존스<span class="idx-status"></span></span>
+      <span class="idx-value">-</span>
+      <span class="idx-change">&nbsp;</span>
+    </div>
+    <div class="index-card" data-key="IXIC">
+      <span class="idx-name">나스닥<span class="idx-status"></span></span>
+      <span class="idx-value">-</span>
+      <span class="idx-change">&nbsp;</span>
+    </div>
+    <div class="index-card" data-key="INX">
+      <span class="idx-name">S&amp;P 500<span class="idx-status"></span></span>
+      <span class="idx-value">-</span>
+      <span class="idx-change">&nbsp;</span>
     </div>
   </section>
 
-  <!-- 탭 -->
-  <div class="tab-bar" id="tabBar">
-    <button class="tab active" onclick="filterTab('all', this)">전체</button>
-    <button class="tab" onclick="filterTab('kospi', this)">KOSPI</button>
-    <button class="tab" onclick="filterTab('kosdaq', this)">KOSDAQ</button>
-    <button class="tab" onclick="filterTab('hot', this)">🔥 인기</button>
-    <button class="tab" onclick="filterTab('rise', this)">상승</button>
-    <button class="tab" onclick="filterTab('fall', this)">하락</button>
-  </div>
+  <!-- 업종 탭 (stocks.js의 SECTORS로 생성) -->
+  <div class="tab-bar" id="tabBar"></div>
+  <p class="tab-note" id="tabNote"></p>
 
   <!-- 종목 리스트 -->
   <section class="stock-list" id="stockList"></section>
 
   <!-- 검색 결과 -->
   <section class="search-results hidden" id="searchResults"></section>
+
+
+  <!-- SEO:START (scripts/seo.mjs로 생성) -->
+  <details class="sector-directory">
+    <summary>전체 주식 종목 토론방 보기 <span>(440개 종목)</span></summary>
+    <div class="dir-grid">
+        <section class="dir-sector">
+          <h3>바이오 종목 토론방 <span>(50)</span></h3>
+          <ul><li><a href="/stock/207940">삼성바이오로직스</a></li><li><a href="/stock/068270">셀트리온</a></li><li><a href="/stock/196170">알테오젠</a></li><li><a href="/stock/0126Z0">삼성에피스홀딩스</a></li><li><a href="/stock/128940">한미약품</a></li><li><a href="/stock/028300">HLB</a></li><li><a href="/stock/326030">SK바이오팜</a></li><li><a href="/stock/000100">유한양행</a></li><li><a href="/stock/000250">삼천당제약</a></li><li><a href="/stock/008930">한미사이언스</a></li><li><a href="/stock/214450">파마리서치</a></li><li><a href="/stock/302440">SK바이오사이언스</a></li><li><a href="/stock/141080">리가켐바이오</a></li><li><a href="/stock/298380">에이비엘바이오</a></li><li><a href="/stock/226950">올릭스</a></li><li><a href="/stock/310210">보로노이</a></li><li><a href="/stock/009420">한올바이오파마</a></li><li><a href="/stock/145020">휴젤</a></li><li><a href="/stock/214370">케어젠</a></li><li><a href="/stock/087010">펩트론</a></li><li><a href="/stock/347850">디앤디파마텍</a></li><li><a href="/stock/237690">에스티팜</a></li><li><a href="/stock/096530">씨젠</a></li><li><a href="/stock/068760">셀트리온제약</a></li><li><a href="/stock/007390">네이처셀</a></li><li><a href="/stock/0009K0">에임드바이오</a></li><li><a href="/stock/006280">녹십자</a></li><li><a href="/stock/039200">오스코텍</a></li><li><a href="/stock/950160">코오롱티슈진</a></li><li><a href="/stock/069620">대웅제약</a></li><li><a href="/stock/950260">인제니아테라퓨틱스(Reg.S)</a></li><li><a href="/stock/195940">HK이노엔</a></li><li><a href="/stock/127120">제이에스링크</a></li><li><a href="/stock/086450">동국제약</a></li><li><a href="/stock/476830">알지노믹스</a></li><li><a href="/stock/476060">온코닉테라퓨틱스</a></li><li><a href="/stock/001060">JW중외제약</a></li><li><a href="/stock/019170">신풍제약</a></li><li><a href="/stock/249420">일동제약</a></li><li><a href="/stock/475830">오름테라퓨틱</a></li><li><a href="/stock/187660">페니트리움바이오</a></li><li><a href="/stock/389470">인벤티지랩</a></li><li><a href="/stock/424870">이뮨온시아</a></li><li><a href="/stock/067080">대화제약</a></li><li><a href="/stock/004310">현대약품</a></li><li><a href="/stock/067290">JW신약</a></li><li><a href="/stock/001360">삼성제약</a></li><li><a href="/stock/166480">코아스템켐온</a></li><li><a href="/stock/308080">바이젠셀</a></li><li><a href="/stock/203400">에이비온</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>반도체 종목 토론방 <span>(50)</span></h3>
+          <ul><li><a href="/stock/005930">삼성전자</a></li><li><a href="/stock/000660">SK하이닉스</a></li><li><a href="/stock/402340">SK스퀘어</a></li><li><a href="/stock/042700">한미반도체</a></li><li><a href="/stock/036930">주성엔지니어링</a></li><li><a href="/stock/007660">이수페타시스</a></li><li><a href="/stock/240810">원익IPS</a></li><li><a href="/stock/039030">이오테크닉스</a></li><li><a href="/stock/058470">리노공업</a></li><li><a href="/stock/000990">DB하이텍</a></li><li><a href="/stock/403870">HPSP</a></li><li><a href="/stock/031980">피에스케이홀딩스</a></li><li><a href="/stock/319660">피에스케이</a></li><li><a href="/stock/095340">ISC</a></li><li><a href="/stock/440110">파두</a></li><li><a href="/stock/084370">유진테크</a></li><li><a href="/stock/067310">하나마이크론</a></li><li><a href="/stock/131290">티에스이</a></li><li><a href="/stock/064760">티씨케이</a></li><li><a href="/stock/357780">솔브레인</a></li><li><a href="/stock/095610">테스</a></li><li><a href="/stock/080220">제주반도체</a></li><li><a href="/stock/005290">동진쎄미켐</a></li><li><a href="/stock/131970">두산테스나</a></li><li><a href="/stock/281820">케이씨텍</a></li><li><a href="/stock/030530">원익홀딩스</a></li><li><a href="/stock/089030">테크윙</a></li><li><a href="/stock/036540">SFA반도체</a></li><li><a href="/stock/420770">기가비스</a></li><li><a href="/stock/089970">브이엠</a></li><li><a href="/stock/183300">코미코</a></li><li><a href="/stock/232140">와이씨</a></li><li><a href="/stock/166090">하나머티리얼즈</a></li><li><a href="/stock/356860">티엘비</a></li><li><a href="/stock/003160">디아이</a></li><li><a href="/stock/252990">샘씨엔에스</a></li><li><a href="/stock/195870">해성디에스</a></li><li><a href="/stock/101490">에스앤에스텍</a></li><li><a href="/stock/083450">GST</a></li><li><a href="/stock/388210">씨엠티엑스</a></li><li><a href="/stock/059090">미코</a></li><li><a href="/stock/490470">세미파이브</a></li><li><a href="/stock/094170">동운아나텍</a></li><li><a href="/stock/033160">엠케이전자</a></li><li><a href="/stock/082270">젬백스</a></li><li><a href="/stock/011930">신성이엔지</a></li><li><a href="/stock/086390">유니테스트</a></li><li><a href="/stock/950250">테라뷰</a></li><li><a href="/stock/059120">아진엑스텍</a></li><li><a href="/stock/0017J0">세미티에스</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>2차전지·로봇 종목 토론방 <span>(52)</span></h3>
+          <ul><li><a href="/stock/373220">LG에너지솔루션</a></li><li><a href="/stock/006400">삼성SDI</a></li><li><a href="/stock/096770">SK이노베이션</a></li><li><a href="/stock/005490">POSCO홀딩스</a></li><li><a href="/stock/010130">고려아연</a></li><li><a href="/stock/051910">LG화학</a></li><li><a href="/stock/003670">포스코퓨처엠</a></li><li><a href="/stock/086520">에코프로</a></li><li><a href="/stock/247540">에코프로비엠</a></li><li><a href="/stock/277810">레인보우로보틱스</a></li><li><a href="/stock/011790">SKC</a></li><li><a href="/stock/066970">엘앤에프</a></li><li><a href="/stock/454910">두산로보틱스</a></li><li><a href="/stock/108490">로보티즈</a></li><li><a href="/stock/357780">솔브레인</a></li><li><a href="/stock/014680">한솔케미칼</a></li><li><a href="/stock/020150">롯데에너지머티리얼즈</a></li><li><a href="/stock/457190">이수스페셜티케미컬</a></li><li><a href="/stock/450080">에코프로머티</a></li><li><a href="/stock/319400">현대무벡스</a></li><li><a href="/stock/058610">에스피지</a></li><li><a href="/stock/078600">대주전자재료</a></li><li><a href="/stock/093370">후성</a></li><li><a href="/stock/005070">코스모신소재</a></li><li><a href="/stock/361610">SK아이이테크놀로지</a></li><li><a href="/stock/437730">삼현</a></li><li><a href="/stock/033790">피노</a></li><li><a href="/stock/065350">신성델타테크</a></li><li><a href="/stock/059090">미코</a></li><li><a href="/stock/160190">하이젠알앤엠</a></li><li><a href="/stock/388720">유일로보틱스</a></li><li><a href="/stock/090710">휴림로봇</a></li><li><a href="/stock/222080">SFA넥셀</a></li><li><a href="/stock/090360">로보스타</a></li><li><a href="/stock/466100">클로봇</a></li><li><a href="/stock/348370">엔켐</a></li><li><a href="/stock/348340">뉴로메카</a></li><li><a href="/stock/056080">유진로봇</a></li><li><a href="/stock/079370">제우스</a></li><li><a href="/stock/477850">마키나락스</a></li><li><a href="/stock/117730">티로보틱스</a></li><li><a href="/stock/455900">엔젤로보틱스</a></li><li><a href="/stock/160980">싸이맥스</a></li><li><a href="/stock/448900">한국피아이엠</a></li><li><a href="/stock/099440">스맥</a></li><li><a href="/stock/061090">세나테크놀로지</a></li><li><a href="/stock/298830">슈어소프트테크</a></li><li><a href="/stock/000490">대동</a></li><li><a href="/stock/439960">코스모로보틱스</a></li><li><a href="/stock/0007C0">아크릴</a></li><li><a href="/stock/059120">아진엑스텍</a></li><li><a href="/stock/008830">대동기어</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>전력·원자력 종목 토론방 <span>(42)</span></h3>
+          <ul><li><a href="/stock/034020">두산에너빌리티</a></li><li><a href="/stock/010120">LS ELECTRIC</a></li><li><a href="/stock/298040">효성중공업</a></li><li><a href="/stock/267260">HD현대일렉트릭</a></li><li><a href="/stock/015760">한국전력</a></li><li><a href="/stock/000720">현대건설</a></li><li><a href="/stock/000500">가온전선</a></li><li><a href="/stock/006260">LS</a></li><li><a href="/stock/047040">대우건설</a></li><li><a href="/stock/062040">산일전기</a></li><li><a href="/stock/001440">대한전선</a></li><li><a href="/stock/052690">한전기술</a></li><li><a href="/stock/103590">일진전기</a></li><li><a href="/stock/022100">포스코DX</a></li><li><a href="/stock/006360">GS건설</a></li><li><a href="/stock/178320">서진시스템</a></li><li><a href="/stock/375500">DL이앤씨</a></li><li><a href="/stock/229640">LS에코에너지</a></li><li><a href="/stock/032820">우리기술</a></li><li><a href="/stock/051600">한전KPS</a></li><li><a href="/stock/083650">비에이치아이</a></li><li><a href="/stock/001820">삼화콘덴서</a></li><li><a href="/stock/060370">LS마린솔루션</a></li><li><a href="/stock/082920">비츠로셀</a></li><li><a href="/stock/006340">대원전선</a></li><li><a href="/stock/119850">지엔씨에너지</a></li><li><a href="/stock/014620">성광벤드</a></li><li><a href="/stock/033100">제룡전기</a></li><li><a href="/stock/044490">태웅</a></li><li><a href="/stock/023160">태광</a></li><li><a href="/stock/100840">SNT에너지</a></li><li><a href="/stock/045100">한양이엔지</a></li><li><a href="/stock/013030">하이록코리아</a></li><li><a href="/stock/130660">한전산업</a></li><li><a href="/stock/006910">보성파워텍</a></li><li><a href="/stock/099440">스맥</a></li><li><a href="/stock/012210">삼미금속</a></li><li><a href="/stock/098070">한텍</a></li><li><a href="/stock/024840">KBI메탈</a></li><li><a href="/stock/053690">한미글로벌</a></li><li><a href="/stock/046120">오르비텍</a></li><li><a href="/stock/007460">에이프로젠</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>K뷰티·컬쳐 종목 토론방 <span>(53)</span></h3>
+          <ul><li><a href="/stock/278470">에이피알</a></li><li><a href="/stock/090430">아모레퍼시픽</a></li><li><a href="/stock/352820">하이브</a></li><li><a href="/stock/051900">LG생활건강</a></li><li><a href="/stock/192820">코스맥스</a></li><li><a href="/stock/161890">한국콜마</a></li><li><a href="/stock/214450">파마리서치</a></li><li><a href="/stock/035250">강원랜드</a></li><li><a href="/stock/004170">신세계</a></li><li><a href="/stock/257720">실리콘투</a></li><li><a href="/stock/145020">휴젤</a></li><li><a href="/stock/483650">달바글로벌</a></li><li><a href="/stock/214370">케어젠</a></li><li><a href="/stock/214150">클래시스</a></li><li><a href="/stock/002790">아모레퍼시픽홀딩스</a></li><li><a href="/stock/069960">현대백화점</a></li><li><a href="/stock/041510">에스엠</a></li><li><a href="/stock/290650">엘앤씨바이오</a></li><li><a href="/stock/008770">호텔신라</a></li><li><a href="/stock/035900">JYP Ent.</a></li><li><a href="/stock/241710">코스메카코리아</a></li><li><a href="/stock/001740">SK네트웍스</a></li><li><a href="/stock/034230">파라다이스</a></li><li><a href="/stock/032350">롯데관광개발</a></li><li><a href="/stock/079160">CJ CGV</a></li><li><a href="/stock/251970">펌텍코리아</a></li><li><a href="/stock/006730">서부T&amp;D</a></li><li><a href="/stock/035760">CJ ENM</a></li><li><a href="/stock/122870">와이지엔터테인먼트</a></li><li><a href="/stock/499790">GS피앤엘</a></li><li><a href="/stock/253450">스튜디오드래곤</a></li><li><a href="/stock/114090">GKL</a></li><li><a href="/stock/086900">메디톡스</a></li><li><a href="/stock/025980">아난티</a></li><li><a href="/stock/039130">하나투어</a></li><li><a href="/stock/018290">브이티</a></li><li><a href="/stock/376300">디어유</a></li><li><a href="/stock/336570">원텍</a></li><li><a href="/stock/031430">신세계인터내셔날</a></li><li><a href="/stock/092730">네오팜</a></li><li><a href="/stock/439090">마녀공장</a></li><li><a href="/stock/419530">SAMG엔터</a></li><li><a href="/stock/256840">한국비엔씨</a></li><li><a href="/stock/475560">더본코리아</a></li><li><a href="/stock/403850">더핑크퐁컴퍼니</a></li><li><a href="/stock/0015N0">아로마티카</a></li><li><a href="/stock/0010S0">와이즈플래닛컴퍼니</a></li><li><a href="/stock/086980">쇼박스</a></li><li><a href="/stock/040300">YTN</a></li><li><a href="/stock/066790">씨씨에스</a></li><li><a href="/stock/900300">오가닉티코스메틱</a></li><li><a href="/stock/226340">본느</a></li><li><a href="/stock/210120">빅텐츠</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>조선·방산 종목 토론방 <span>(46)</span></h3>
+          <ul><li><a href="/stock/012450">한화에어로스페이스</a></li><li><a href="/stock/000270">기아</a></li><li><a href="/stock/329180">HD현대중공업</a></li><li><a href="/stock/042660">한화오션</a></li><li><a href="/stock/009540">HD한국조선해양</a></li><li><a href="/stock/010140">삼성중공업</a></li><li><a href="/stock/272210">한화시스템</a></li><li><a href="/stock/267250">HD현대</a></li><li><a href="/stock/079550">LIG디펜스앤에어로스페이스</a></li><li><a href="/stock/047810">한국항공우주</a></li><li><a href="/stock/003490">대한항공</a></li><li><a href="/stock/064350">현대로템</a></li><li><a href="/stock/443060">HD현대마린솔루션</a></li><li><a href="/stock/000880">한화</a></li><li><a href="/stock/082740">한화엔진</a></li><li><a href="/stock/010170">대한광통신</a></li><li><a href="/stock/032820">우리기술</a></li><li><a href="/stock/103140">풍산</a></li><li><a href="/stock/439260">대한조선</a></li><li><a href="/stock/218410">RFHIC</a></li><li><a href="/stock/437730">삼현</a></li><li><a href="/stock/071970">HD현대마린엔진</a></li><li><a href="/stock/011210">현대위아</a></li><li><a href="/stock/097230">HJ중공업</a></li><li><a href="/stock/347700">스피어</a></li><li><a href="/stock/082920">비츠로셀</a></li><li><a href="/stock/017960">한국카본</a></li><li><a href="/stock/327260">RF머트리얼즈</a></li><li><a href="/stock/077970">STX엔진</a></li><li><a href="/stock/014620">성광벤드</a></li><li><a href="/stock/100090">SK오션플랜트</a></li><li><a href="/stock/044490">태웅</a></li><li><a href="/stock/023160">태광</a></li><li><a href="/stock/005810">풍산홀딩스</a></li><li><a href="/stock/075580">세진중공업</a></li><li><a href="/stock/033500">동성화인텍</a></li><li><a href="/stock/460930">현대힘스</a></li><li><a href="/stock/217590">티엠씨</a></li><li><a href="/stock/266690">덕산넵코어스</a></li><li><a href="/stock/010820">퍼스텍</a></li><li><a href="/stock/012210">삼미금속</a></li><li><a href="/stock/274090">켄코아에어로스페이스</a></li><li><a href="/stock/413630">씨피시스템</a></li><li><a href="/stock/321370">센서뷰</a></li><li><a href="/stock/474170">루미르</a></li><li><a href="/stock/054540">삼영엠텍</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>자동차 종목 토론방 <span>(31)</span></h3>
+          <ul><li><a href="/stock/005380">현대차</a></li><li><a href="/stock/000270">기아</a></li><li><a href="/stock/012330">현대모비스</a></li><li><a href="/stock/161390">한국타이어앤테크놀로지</a></li><li><a href="/stock/018880">한온시스템</a></li><li><a href="/stock/000240">한국앤컴퍼니</a></li><li><a href="/stock/007340">DN오토모티브</a></li><li><a href="/stock/005850">에스엘</a></li><li><a href="/stock/204320">HL만도</a></li><li><a href="/stock/073240">금호타이어</a></li><li><a href="/stock/437730">삼현</a></li><li><a href="/stock/011210">현대위아</a></li><li><a href="/stock/003570">SNT다이내믹스</a></li><li><a href="/stock/004490">세방전지</a></li><li><a href="/stock/036530">SNT홀딩스</a></li><li><a href="/stock/064960">SNT모티브</a></li><li><a href="/stock/002350">넥센타이어</a></li><li><a href="/stock/025540">한국단자</a></li><li><a href="/stock/003620">KG모빌리티</a></li><li><a href="/stock/015750">성우하이텍</a></li><li><a href="/stock/125490">한라캐스트</a></li><li><a href="/stock/010690">화신</a></li><li><a href="/stock/900140">엘브이엠씨홀딩스</a></li><li><a href="/stock/092200">디아이씨</a></li><li><a href="/stock/012860">모베이스전자</a></li><li><a href="/stock/419050">삼기에너지솔루션즈</a></li><li><a href="/stock/126640">화신정공</a></li><li><a href="/stock/004100">태양금속</a></li><li><a href="/stock/012200">계양전기</a></li><li><a href="/stock/0015S0">페스카로</a></li><li><a href="/stock/011330">유니켐</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>금융 종목 토론방 <span>(33)</span></h3>
+          <ul><li><a href="/stock/105560">KB금융</a></li><li><a href="/stock/032830">삼성생명</a></li><li><a href="/stock/055550">신한지주</a></li><li><a href="/stock/086790">하나금융지주</a></li><li><a href="/stock/000810">삼성화재</a></li><li><a href="/stock/316140">우리금융지주</a></li><li><a href="/stock/138040">메리츠금융지주</a></li><li><a href="/stock/024110">기업은행</a></li><li><a href="/stock/006800">미래에셋증권</a></li><li><a href="/stock/005830">DB손해보험</a></li><li><a href="/stock/071050">한국금융지주</a></li><li><a href="/stock/323410">카카오뱅크</a></li><li><a href="/stock/005940">NH투자증권</a></li><li><a href="/stock/016360">삼성증권</a></li><li><a href="/stock/039490">키움증권</a></li><li><a href="/stock/175330">JB금융지주</a></li><li><a href="/stock/029780">삼성카드</a></li><li><a href="/stock/138930">BNK금융지주</a></li><li><a href="/stock/088350">한화생명</a></li><li><a href="/stock/001450">현대해상</a></li><li><a href="/stock/085620">미래에셋생명</a></li><li><a href="/stock/279570">케이뱅크</a></li><li><a href="/stock/003530">한화투자증권</a></li><li><a href="/stock/100790">미래에셋벤처투자</a></li><li><a href="/stock/032190">다우데이타</a></li><li><a href="/stock/001510">SK증권</a></li><li><a href="/stock/041190">우리기술투자</a></li><li><a href="/stock/027360">아주IB투자</a></li><li><a href="/stock/006220">제주은행</a></li><li><a href="/stock/241520">DSC인베스트먼트</a></li><li><a href="/stock/293580">나우IB</a></li><li><a href="/stock/001290">상상인증권</a></li><li><a href="/stock/452300">캡스톤파트너스</a></li></ul>
+        </section>
+        <section class="dir-sector">
+          <h3>미국 주식 종목 토론방 <span>(100)</span></h3>
+          <ul><li><a href="/stock/NVDA.O">엔비디아</a></li><li><a href="/stock/AAPL.O">애플</a></li><li><a href="/stock/MSFT.O">마이크로소프트</a></li><li><a href="/stock/AMZN.O">아마존닷컴</a></li><li><a href="/stock/GOOGL.O">알파벳 Class A</a></li><li><a href="/stock/TSM">TSMC ADR</a></li><li><a href="/stock/SPCX.O">스페이스X</a></li><li><a href="/stock/GOOG.O">알파벳 Class C</a></li><li><a href="/stock/META.O">메타</a></li><li><a href="/stock/AVGO.O">브로드컴</a></li><li><a href="/stock/TSLA.O">테슬라</a></li><li><a href="/stock/SKHY.O">SK하이닉스 ADR</a></li><li><a href="/stock/MU.O">마이크론 테크놀로지</a></li><li><a href="/stock/LLY">일라이 릴리</a></li><li><a href="/stock/VOO">Vanguard S&amp;P 500 ETF</a></li><li><a href="/stock/AMD.O">AMD(어드밴스드 마이크로 디바이시스)</a></li><li><a href="/stock/IVV">iShares Core S&amp;P 500 ETF</a></li><li><a href="/stock/SPY">State Street SPDR S&amp;P 500 ETF Trust</a></li><li><a href="/stock/BRKb">버크셔 해서웨이 Class B</a></li><li><a href="/stock/ASML.O">ASML 홀딩 ADR</a></li><li><a href="/stock/INTC.O">인텔</a></li><li><a href="/stock/QQQ.O">Invesco QQQ Trust  Series 1</a></li><li><a href="/stock/PLTR.O">팔란티어 테크놀로지스</a></li><li><a href="/stock/ORCL.K">오라클</a></li><li><a href="/stock/AMAT.O">어플라이드 머티어리얼즈</a></li><li><a href="/stock/LRCX.O">램 리서치</a></li><li><a href="/stock/KO">코카콜라</a></li><li><a href="/stock/BRKa">버크셔 해서웨이 Class A</a></li><li><a href="/stock/DELL.K">델테크놀로지</a></li><li><a href="/stock/MRK">머크 앤 코</a></li><li><a href="/stock/PANW.O">팔로 알토 네트웍스</a></li><li><a href="/stock/UNH">유나이티드헬스 그룹</a></li><li><a href="/stock/NFLX.O">넷플릭스</a></li><li><a href="/stock/ARM.O">암 홀딩스 ADR</a></li><li><a href="/stock/MRVL.O">마벨 테크놀로지 그룹</a></li><li><a href="/stock/SNDK.O">샌디스크</a></li><li><a href="/stock/SPYM.K">State Street SPDR Portfolio S&amp;P 500 ETF</a></li><li><a href="/stock/STX.O">씨게이트</a></li><li><a href="/stock/MCD">맥도날드</a></li><li><a href="/stock/GLD">SPDR Gold Shares</a></li><li><a href="/stock/NET">클라우드플레어</a></li><li><a href="/stock/SGOV.K">iShares 0-3 Month Treasury Bond ETF</a></li><li><a href="/stock/QQQM.O">Invesco NASDAQ 100 ETF</a></li><li><a href="/stock/SCHD.K">Schwab US Dividend Equity ETF</a></li><li><a href="/stock/LITE.O">루멘텀 홀딩스</a></li><li><a href="/stock/HOOD.O">로빈후드</a></li><li><a href="/stock/VRT">버티브 홀딩스</a></li><li><a href="/stock/MRNA.O">모더나</a></li><li><a href="/stock/BE">블룸 에너지</a></li><li><a href="/stock/SMH.O">VanEck Semiconductor ETF</a></li><li><a href="/stock/MSTR.O">스트래티지</a></li><li><a href="/stock/COHR.K">코히런트</a></li><li><a href="/stock/NBIS.O">네비우스 그룹</a></li><li><a href="/stock/NKE">나이키</a></li><li><a href="/stock/O">리얼티 인컴</a></li><li><a href="/stock/TLT.O">iShares 20+ Year Treasury Bond ETF</a></li><li><a href="/stock/COIN.O">코인베이스 글로벌</a></li><li><a href="/stock/SOXX.O">iShares Semiconductor ETF</a></li><li><a href="/stock/JEPI.K">JPMorgan Equity Premium Income ETF</a></li><li><a href="/stock/CRWV.O">코어위브</a></li><li><a href="/stock/JEPQ.O">JPMorgan Nasdaq Equity Premium Income ETF</a></li><li><a href="/stock/RKLB.O">로켓 랩</a></li><li><a href="/stock/OKTA.O">옥타</a></li><li><a href="/stock/TQQQ.O">ProShares UltraPro QQQ</a></li><li><a href="/stock/SLV">iShares Silver Trust</a></li><li><a href="/stock/CPNG.K">쿠팡</a></li><li><a href="/stock/DRAM.K">Roundhill Memory ETF</a></li><li><a href="/stock/CRCL.K">써클 인터넷 그룹</a></li><li><a href="/stock/SOXL.K">Direxion Daily Semiconductor Bull 3X ETF</a></li><li><a href="/stock/ASTS.O">AST 스페이스모바일</a></li><li><a href="/stock/DOCN.K">디지털오션 홀딩스</a></li><li><a href="/stock/IONQ.K">아이온큐</a></li><li><a href="/stock/QLD">ProShares Ultra QQQ</a></li><li><a href="/stock/QQQI.O">NEOS Nasdaq-100 High Income ETF</a></li><li><a href="/stock/BMNR.K">비트마인 이머전 테크놀로지스</a></li><li><a href="/stock/BOXX.K">Alpha Architect 1-3 Month Box ETF</a></li><li><a href="/stock/IREN.O">아이렌</a></li><li><a href="/stock/TWST.O">트위스트 바이오사이언스</a></li><li><a href="/stock/AGNC.O">AGNC 인베스트먼트</a></li><li><a href="/stock/AAOI.O">어플라이드 옵토일렉트로닉스</a></li><li><a href="/stock/GPIQ.O">Goldman Sachs Nasdaq-100 Premium Income ETF</a></li><li><a href="/stock/JOBY.K">조비 에비에이션</a></li><li><a href="/stock/RGTI.O">리게티 컴퓨팅</a></li><li><a href="/stock/TSLL.O">Direxion Daily TSLA Bull 2X ETF</a></li><li><a href="/stock/MUU.O">Direxion Daily MU Bull 2X ETF</a></li><li><a href="/stock/NVDL.O">GraniteShares 2x Long NVDA Daily ETF</a></li><li><a href="/stock/SMR">뉴스케일 파워</a></li><li><a href="/stock/ASST.O">스트라이브</a></li><li><a href="/stock/RDW">레드와이어</a></li><li><a href="/stock/SOXS.K">Direxion Daily Semiconductor Bear 3X ETF</a></li><li><a href="/stock/TMF">Direxion Daily 20 Year Treasury Bull 3X ETF</a></li><li><a href="/stock/SNXX.K">Tradr 2X Long SNDK Daily ETF</a></li><li><a href="/stock/BITX.K">2x Bitcoin ETF</a></li><li><a href="/stock/KORU.K">Direxion Daily MSCI South Korea Bull 3X ETF</a></li><li><a href="/stock/ETHU.K">2X Ether ETF</a></li><li><a href="/stock/MSTY.K">YieldMax MSTR Option Income Strategy ETF</a></li><li><a href="/stock/GDXU.K">MicroSectors Gold Miners 3X Leveraged ETN</a></li><li><a href="/stock/BITU.K">ProShares Ultra Bitcoin ETF</a></li><li><a href="/stock/RAM">Roundhill T-REX 2X Long DRAM Daily Target ETF</a></li><li><a href="/stock/CONY.K">YieldMax COIN Option Income Strategy ETF</a></li></ul>
+        </section>
+    </div>
+  </details>
+  <!-- SEO:END -->
 
 </main>
 
@@ -90,51 +166,108 @@
     </div>
 
     <div class="modal-tabs">
-      <button class="tab active" onclick="switchModalTab('discuss', this)">토론</button>
-      <button class="tab" onclick="switchModalTab('info', this)">종목정보</button>
+      <button class="tab active" data-tab="discuss" onclick="switchModalTab('discuss', this)">토론</button>
+      <button class="tab" data-tab="news" onclick="switchModalTab('news', this)">실시간 종목 뉴스</button>
+      <button class="tab" data-tab="info" onclick="switchModalTab('info', this)">종목 정보</button>
+      <button class="tab" data-tab="research" onclick="switchModalTab('research', this)">분석 보고서</button>
+      <button class="tab" data-tab="disclosure" onclick="switchModalTab('disclosure', this)">공시 정보</button>
     </div>
 
     <!-- 토론탭 -->
     <div id="discussTab">
       <div class="write-box">
-        <input id="postNickname" type="text" placeholder="닉네임" maxlength="12" />
-        <textarea id="postContent" placeholder="의견을 남겨보세요..." maxlength="500" rows="3"></textarea>
+        <p class="write-policy">🛡️ 욕설·광고·외부 유도 글은 금칙어 필터로 등록되지 않으며, 신고 5건이 쌓이면 자동 블라인드 후 운영자가 삭제합니다. <a href="terms.html#policy" target="_blank">운영정책</a></p>
+        <div class="write-member hidden" id="writeMember"></div>
+        <div class="write-ids" id="writeGuest">
+          <span class="write-guest-label">비회원 글쓰기</span>
+          <input id="postNickname" type="text" placeholder="닉네임 (한글 10자 이내)" maxlength="10" />
+          <input id="postPassword" type="password" placeholder="비밀번호 (수정·삭제용 4~20자)" maxlength="20" autocomplete="new-password" />
+        </div>
+        <textarea id="postContent" placeholder="의견을 남겨보세요..." maxlength="1000" rows="3"></textarea>
         <div class="write-footer">
           <select id="postSentiment">
             <option value="neutral">-</option>
             <option value="up">📈 매수</option>
             <option value="down">📉 매도</option>
           </select>
-          <span id="charCount">0/500</span>
+          <span id="charCount">0/1000</span>
           <button class="btn-submit" onclick="submitPost()">등록</button>
         </div>
       </div>
       <div class="post-list" id="postList"></div>
     </div>
 
-    <!-- 종목정보 탭 -->
-    <div id="infoTab" class="hidden">
-      <table class="info-table" id="infoTable"></table>
-    </div>
+    <!-- 실시간 종목 뉴스 / 종목 정보 / 분석 보고서 / 공시 정보 탭 -->
+    <div id="newsTab" class="detail-panel hidden"></div>
+    <div id="infoTab" class="detail-panel hidden"></div>
+    <div id="researchTab" class="detail-panel hidden"></div>
+    <div id="disclosureTab" class="detail-panel hidden"></div>
   </div>
 </div>
 
-<!-- 로그인 드롭다운 -->
+<!-- 작성자 전체글 (팔로우) -->
+<div class="modal-overlay author-overlay hidden" id="authorOverlay" onclick="closeAuthor(event)">
+  <div class="modal author-modal">
+    <button class="modal-close" onclick="closeAuthor()">✕</button>
+    <div class="modal-header">
+      <div>
+        <h2 id="authorName"></h2>
+        <span id="authorCount" class="stock-code-badge"></span>
+      </div>
+      <div id="authorAction"></div>
+    </div>
+    <div class="post-list" id="authorPosts"></div>
+  </div>
+</div>
+
+<!-- 로그인 · 회원가입 · 내 정보 드롭다운 -->
 <div class="login-dropdown hidden" id="loginDropdown">
   <div class="login-box">
     <h3>로그인</h3>
-    <input type="text" id="loginId" placeholder="아이디" />
-    <input type="password" id="loginPw" placeholder="비밀번호" />
+    <input type="text" id="loginId" placeholder="아이디" maxlength="20" autocomplete="username" />
+    <input type="password" id="loginPw" placeholder="비밀번호" maxlength="30" autocomplete="current-password"
+           onkeydown="if (event.key === 'Enter') doLogin()" />
     <button class="btn-submit full-width" onclick="doLogin()">로그인</button>
-    <p class="login-note">* 데모용: 아무 값이나 입력하세요</p>
+    <p class="login-note">아직 회원이 아니신가요? <button class="link-btn" onclick="toggleSignup()">회원가입</button></p>
+  </div>
+</div>
+<div class="login-dropdown hidden" id="signupDropdown">
+  <div class="login-box">
+    <h3>회원가입</h3>
+    <input type="text" id="signupId" placeholder="아이디 (영문·영문+숫자 4~20자)" maxlength="20" autocomplete="username" />
+    <input type="text" id="signupNick" placeholder="닉네임 (한글 2~10자)" maxlength="10" />
+    <input type="password" id="signupPw" placeholder="비밀번호 (6~30자)" maxlength="30" autocomplete="new-password"
+           onkeydown="if (event.key === 'Enter') doSignup()" />
+    <button class="btn-submit full-width" onclick="doSignup()">가입하기</button>
+    <p class="login-note">아이디·닉네임은 다른 회원과 중복될 수 없습니다. 회원은 닉네임·비밀번호 입력 없이 바로 글을 쓸 수 있습니다.</p>
+  </div>
+</div>
+<div class="login-dropdown hidden" id="memberDropdown">
+  <div class="login-box">
+    <h3 id="memberTitle"></h3>
+    <p class="login-note" id="memberSub"></p>
+    <button class="btn-submit full-width" onclick="closeDropdowns(); openProfile()">회원정보 보기</button>
+    <button class="btn-cancel full-width" onclick="doLogout()">로그아웃</button>
   </div>
 </div>
 
 <footer class="site-footer">
   <div class="container">
-    <p>⚠️ 본 사이트의 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
-    <p>© 2026 주식 토론방. 데모 프로젝트.</p>
+    <nav class="policy-links">
+      <a href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a>
+    </nav>
+    <p>⚠️ 본 사이트 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
+    <p>운영자 김유랑 · <a href="mailto:tpsdurang@naver.com">tpsdurang@naver.com</a></p>
+    <p>© 2026 주식 업종 종목 토론방. 종목: 업종별 주요 종목</p>
+    <p><button class="admin-link" id="adminToggle" onclick="toggleAdminForm()">관리자</button></p>
+    <p class="admin-tools"><button class="btn-tool" onclick="openReports()">🚨 신고된 글</button> <button class="btn-tool" onclick="openContacts()">✉️ 문의 내역</button></p>
+    <div class="admin-form hidden" id="adminForm">
+      <input type="password" id="adminPassword" placeholder="관리자 비밀번호" autocomplete="off"
+             onkeydown="if (event.key === 'Enter') adminLogin()" />
+      <button class="btn-submit" onclick="adminLogin()">확인</button>
+    </div>
   </div>
+  <div class="admin-badge">관리자 모드 · <button onclick="adminLogout()">로그아웃</button></div>
 </footer>
 
 <script src="stocks.js"></script>

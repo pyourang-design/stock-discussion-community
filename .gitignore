@@ -1,1 +1,6 @@
 .vercel
+.agents/
+.claude/
+skills-lock.json
+scripts/.env*
+.env*

@@ -1,0 +1,12 @@
+{
+  "rewrites": [
+    {
+      "source": "/stock/:code",
+      "destination": "/api/page?code=:code"
+    },
+    {
+      "source": "/rss.xml",
+      "destination": "/api/rss"
+    }
+  ]
+}

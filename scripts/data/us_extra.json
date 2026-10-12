@@ -1,0 +1,906 @@
+[
+ {
+  "isin": "KYG651631007",
+  "seibroName": "JOBY AVIATION INC EXOF 008448244 KYG7483N1117",
+  "hits": 17,
+  "best": 22,
+  "lists": [
+   "setl_1m_net",
+   "hold_20260831",
+   "hold_20260731",
+   "hold_20260630",
+   "hold_20260529",
+   "hold_20260430",
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "setl_3m_net",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "JOBY.K"
+ },
+ {
+  "isin": "US4642874329",
+  "seibroName": "ISHARES 20+ YEAR TREASURY BOND ETF",
+  "hits": 16,
+  "best": 18,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_1w_all",
+   "hold_20260430",
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "setl_3m_net",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "TLT.O"
+ },
+ {
+  "isin": "US67079K1007",
+  "seibroName": "NUSCALE POWER CORP CL A MRGR 009185329 KYG8377A1085",
+  "hits": 16,
+  "best": 19,
+  "lists": [
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_3m_all",
+   "hold_20260529",
+   "hold_20260430",
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "setl_3m_buy",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "SMR"
+ },
+ {
+  "isin": "US68389X1054",
+  "seibroName": "ORACLE CORP",
+  "hits": 14,
+  "best": 14,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_3m_all",
+   "hold_20260529",
+   "hold_20260430",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251031",
+   "setl_3m_buy",
+   "setl_3m_net",
+   "setl_3m_prev_all",
+   "hold_20250930"
+  ],
+  "code": "ORCL.K"
+ },
+ {
+  "isin": "US91324P1021",
+  "seibroName": "UNITEDHEALTH GROUP INC",
+  "hits": 13,
+  "best": 20,
+  "lists": [
+   "hold_20260731",
+   "hold_20260529",
+   "hold_20260430",
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "UNH"
+ },
+ {
+  "isin": "US25460G1388",
+  "seibroName": "DIREXION DAILY 20 YEAR PLUS DRX DLY 20+ YR TREAS BULL 3X SPLR 953438320 US25459W5408",
+  "hits": 12,
+  "best": 19,
+  "lists": [
+   "setl_1m_buy",
+   "setl_1m_net",
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "TMF"
+ },
+ {
+  "isin": "US38747R8271",
+  "seibroName": "GRANITESHARES 2.0X LONG NVDA DAILY ETF",
+  "hits": 11,
+  "best": 31,
+  "lists": [
+   "setl_1w_all",
+   "hold_20260331",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "setl_3m_prev_all",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "NVDL.O"
+ },
+ {
+  "isin": "US25461A3876",
+  "seibroName": "DIREXION SHARES ETF TRUST DAILY MSCI SOUTH KOREA BULL SPLR 970211833 US25459Y5208",
+  "hits": 10,
+  "best": 3,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_3m_all",
+   "setl_1w_all",
+   "hold_20260831",
+   "hold_20260731",
+   "hold_20260630",
+   "hold_20260529",
+   "setl_3m_buy",
+   "setl_3m_prev_all"
+  ],
+  "code": "KORU.K"
+ },
+ {
+  "isin": "US92864M7983",
+  "seibroName": "VOLATILITY SHARES TRUST 2X ETHER ETF NEW SPLR 974476707 US92864M4006",
+  "hits": 8,
+  "best": 28,
+  "lists": [
+   "setl_1m_all",
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "ETHU.K"
+ },
+ {
+  "isin": "US25461H2913",
+  "seibroName": "DIREX DAI SEMI BE 3X ETF-USD SPLR 2642142633002 US25461H5726",
+  "hits": 7,
+  "best": 3,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_3m_all",
+   "setl_1w_all",
+   "setl_3m_buy",
+   "setl_3m_net"
+  ],
+  "code": "SOXS.K"
+ },
+ {
+  "isin": "US76655K1034",
+  "seibroName": "RIGETTI COMPUTING INC MRGR 008989411 KYG8T86C1136",
+  "hits": 7,
+  "best": 29,
+  "lists": [
+   "hold_20251230",
+   "hold_20251128",
+   "hold_20251031",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "RGTI.O"
+ },
+ {
+  "isin": "US78463V1070",
+  "seibroName": "SPDR GOLD SHARES ETF",
+  "hits": 7,
+  "best": 31,
+  "lists": [
+   "hold_20260430",
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128",
+   "setl_3m_net"
+  ],
+  "code": "GLD"
+ },
+ {
+  "isin": "US22266T1097",
+  "seibroName": "COUPANG INC",
+  "hits": 7,
+  "best": 36,
+  "lists": [
+   "setl_1m_net",
+   "hold_20251128",
+   "hold_20251031",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "CPNG.K"
+ },
+ {
+  "isin": "US6974351057",
+  "seibroName": "PALO ALTO NETWORKS INC",
+  "hits": 6,
+  "best": 7,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_1w_all",
+   "setl_3m_buy",
+   "setl_3m_net"
+  ],
+  "code": "PANW.O"
+ },
+ {
+  "isin": "US19260Q1076",
+  "seibroName": "COINBASE GLOBAL INC",
+  "hits": 6,
+  "best": 30,
+  "lists": [
+   "hold_20251128",
+   "hold_20251031",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "COIN.O"
+ },
+ {
+  "isin": "US64110L1061",
+  "seibroName": "NETFLIX INC",
+  "hits": 6,
+  "best": 40,
+  "lists": [
+   "setl_1m_net",
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130",
+   "hold_20251230",
+   "hold_20251128"
+  ],
+  "code": "NFLX.O"
+ },
+ {
+  "isin": "US02072L5654",
+  "seibroName": "ALPHA ARCHITECT 1-3 MONTH BOX ETF",
+  "hits": 5,
+  "best": 26,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_3m_all",
+   "setl_3m_buy"
+  ],
+  "code": "BOXX.K"
+ },
+ {
+  "isin": "US92864M3016",
+  "seibroName": "2X BITCOIN STRATEGY ETF",
+  "hits": 5,
+  "best": 30,
+  "lists": [
+   "hold_20251031",
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "BITX.K"
+ },
+ {
+  "isin": "US26923V4150",
+  "seibroName": "ROUNDHILL T-REX 2X LONG DRAM DAILY TARGET ETF",
+  "hits": 5,
+  "best": 39,
+  "lists": [
+   "setl_1m_all",
+   "setl_3m_all",
+   "setl_1w_all",
+   "setl_3m_buy",
+   "setl_3m_net"
+  ],
+  "code": "RAM"
+ },
+ {
+  "isin": "US1912161007",
+  "seibroName": "THE COCA COLA COMPANY",
+  "hits": 5,
+  "best": 41,
+  "lists": [
+   "setl_1m_net",
+   "hold_20260731",
+   "setl_3m_net",
+   "hold_20250829",
+   "hold_20250731"
+  ],
+  "code": "KO"
+ },
+ {
+  "isin": "US25461A5285",
+  "seibroName": "DXN MU BUL2X ETF",
+  "hits": 4,
+  "best": 13,
+  "lists": [
+   "setl_3m_all",
+   "hold_20260630",
+   "hold_20260529",
+   "setl_3m_prev_all"
+  ],
+  "code": "MUU.O"
+ },
+ {
+  "isin": "US46152A6689",
+  "seibroName": "TRADR 2X LONG SNDK DAILY ETF",
+  "hits": 4,
+  "best": 16,
+  "lists": [
+   "setl_3m_all",
+   "hold_20260630",
+   "setl_3m_buy",
+   "setl_3m_prev_all"
+  ],
+  "code": "SNXX.K"
+ },
+ {
+  "isin": "US24703L2025",
+  "seibroName": "DELL TECHNOLOGIES INC CL C MRGR 006138875 US24703L1035",
+  "hits": 4,
+  "best": 32,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_1w_all"
+  ],
+  "code": "DELL.K"
+ },
+ {
+  "isin": "US60770K1079",
+  "seibroName": "MODERNA INC",
+  "hits": 4,
+  "best": 33,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_3m_all",
+   "setl_1w_all"
+  ],
+  "code": "MRNA.O"
+ },
+ {
+  "isin": "US8629453007",
+  "seibroName": "STRIVE INC SPLR 2640969890002 US8629451027",
+  "hits": 4,
+  "best": 37,
+  "lists": [
+   "setl_1m_buy",
+   "setl_1m_net",
+   "setl_1w_all",
+   "setl_3m_net"
+  ],
+  "code": "ASST.O"
+ },
+ {
+  "isin": "US88634T4931",
+  "seibroName": "TIDAL TRUST II YIELDMAX MSTR OPTION INCOME STRATEG",
+  "hits": 4,
+  "best": 39,
+  "lists": [
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "MSTY.K"
+ },
+ {
+  "isin": "US74349Y7040",
+  "seibroName": "PROSHARES ULTRA BITCOIN ETF",
+  "hits": 4,
+  "best": 41,
+  "lists": [
+   "hold_20250930",
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "BITU.K"
+ },
+ {
+  "isin": "US19247G1076",
+  "seibroName": "II-VI INCORPORATED Com CHAN 009623241 US9021041085",
+  "hits": 4,
+  "best": 43,
+  "lists": [
+   "setl_3m_all",
+   "setl_1w_all",
+   "setl_3m_buy",
+   "setl_3m_prev_all"
+  ],
+  "code": "COHR.K"
+ },
+ {
+  "isin": "US0636795421",
+  "seibroName": "MicroSectors Gold Miners 3X Leveraged ETN",
+  "hits": 3,
+  "best": 25,
+  "lists": [
+   "setl_1m_all",
+   "setl_1m_buy",
+   "setl_1m_net"
+  ],
+  "code": "GDXU.K"
+ },
+ {
+  "isin": "US46428Q1094",
+  "seibroName": "ISHARES SILVER TRUST ETF",
+  "hits": 3,
+  "best": 30,
+  "lists": [
+   "hold_20260331",
+   "hold_20260227",
+   "hold_20260130"
+  ],
+  "code": "SLV"
+ },
+ {
+  "isin": "US6541061031",
+  "seibroName": "NIKE INC CL B",
+  "hits": 3,
+  "best": 33,
+  "lists": [
+   "setl_1m_net",
+   "setl_1w_all",
+   "setl_3m_net"
+  ],
+  "code": "NKE"
+ },
+ {
+  "isin": "US0846701086",
+  "seibroName": "BERKSHIRE HATHAWAY INC CL A",
+  "hits": 3,
+  "best": 44,
+  "lists": [
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "BRKa"
+ },
+ {
+  "isin": "US88634T8247",
+  "seibroName": "TD YILDMX CN ETF",
+  "hits": 3,
+  "best": 44,
+  "lists": [
+   "hold_20250829",
+   "hold_20250731",
+   "hold_20250630"
+  ],
+  "code": "CONY.K"
+ },
+ {
+  "isin": "US7707001027",
+  "seibroName": "ROBINHOOD MARKETS INC",
+  "hits": 3,
+  "best": 45,
+  "lists": [
+   "hold_20251128",
+   "hold_20251031",
+   "hold_20250930"
+  ],
+  "code": "HOOD.O"
+ },
+ {
+  "isin": "US18915M1071",
+  "seibroName": "CLOUDFLARE INC",
+  "hits": 2,
+  "best": 28,
+  "lists": [
+   "setl_1m_net",
+   "setl_3m_net"
+  ],
+  "code": "NET"
+ },
+ {
+  "isin": "US00123Q1040",
+  "seibroName": "AGNC INVESTMENT CORP CHAN 39626602014 US02503X1054",
+  "hits": 2,
+  "best": 34,
+  "lists": [
+   "setl_1m_net",
+   "setl_3m_net"
+  ],
+  "code": "AGNC.O"
+ },
+ {
+  "isin": "US5801351017",
+  "seibroName": "MCDONALD'S CORP",
+  "hits": 2,
+  "best": 36,
+  "lists": [
+   "setl_1m_net",
+   "setl_3m_net"
+  ],
+  "code": "MCD"
+ },
+ {
+  "isin": "US5324571083",
+  "seibroName": "ELI LILLY & CO",
+  "hits": 2,
+  "best": 44,
+  "lists": [
+   "hold_20251230",
+   "hold_20250829"
+  ],
+  "code": "LLY"
+ },
+ {
+  "isin": "US03823U1025",
+  "seibroName": "APPLIED OPTOELECTRONICS INC",
+  "hits": 2,
+  "best": 45,
+  "lists": [
+   "setl_3m_all",
+   "setl_3m_prev_all"
+  ],
+  "code": "AAOI.O"
+ },
+ {
+  "isin": "US25461H5726",
+  "seibroName": "DIREXION SHARES ETF TRUST DAILY SEMICONDUCTOR BEAR 3X SHS (R",
+  "hits": 1,
+  "best": 10,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "SOXL.K"
+ },
+ {
+  "isin": "US58933Y1055",
+  "seibroName": "MERCK N CO INC",
+  "hits": 1,
+  "best": 21,
+  "lists": [
+   "setl_3m_net"
+  ],
+  "code": "MRK"
+ },
+ {
+  "isin": "US0420682058",
+  "seibroName": "ARM HOLDINGS PLC SPON ADS EACH REP 1 ORD SHS",
+  "hits": 1,
+  "best": 26,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "ARM.O"
+ },
+ {
+  "isin": "IE00BKVD2N49",
+  "seibroName": "SEAGATE TECHNOLOGY HOLDINGS PLC",
+  "hits": 1,
+  "best": 27,
+  "lists": [
+   "setl_1w_all"
+  ],
+  "code": "STX.O"
+ },
+ {
+  "isin": "US90184D1000",
+  "seibroName": "TWIST BIOSCIENCE CORP",
+  "hits": 1,
+  "best": 29,
+  "lists": [
+   "setl_1m_net"
+  ],
+  "code": "TWST.O"
+ },
+ {
+  "isin": "US92537N1081",
+  "seibroName": "VERTIV HOLDINGS CO",
+  "hits": 1,
+  "best": 33,
+  "lists": [
+   "setl_3m_net"
+  ],
+  "code": "VRT"
+ },
+ {
+  "isin": "US25402D1028",
+  "seibroName": "DIGITALOCEAN HOLDINGS INC",
+  "hits": 1,
+  "best": 34,
+  "lists": [
+   "setl_3m_net"
+  ],
+  "code": "DOCN.K"
+ },
+ {
+  "isin": "US75776W1036",
+  "seibroName": "REDWIRE CORP EXOF 008516579 KYG382451170",
+  "hits": 1,
+  "best": 34,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "RDW"
+ },
+ {
+  "isin": "US00217D1000",
+  "seibroName": "AST SPACEMOBILE INC CL A EXOF 008072919 US64822P2056",
+  "hits": 1,
+  "best": 36,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "ASTS.O"
+ },
+ {
+  "isin": "US6792951054",
+  "seibroName": "OKTA INC",
+  "hits": 1,
+  "best": 38,
+  "lists": [
+   "setl_1m_net"
+  ],
+  "code": "OKTA.O"
+ },
+ {
+  "isin": "US21873S1087",
+  "seibroName": "CoreWeave Inc",
+  "hits": 1,
+  "best": 38,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "CRWV.O"
+ },
+ {
+  "isin": "US38149W6306",
+  "seibroName": "GOLDMAN SACHS NASDAQ 100 CORE PREMIUM INCOME ETF",
+  "hits": 1,
+  "best": 39,
+  "lists": [
+   "setl_3m_net"
+  ],
+  "code": "GPIQ.O"
+ },
+ {
+  "isin": "US22788C1053",
+  "seibroName": "CROWDSTRIKE HOLDINGS INC CL A",
+  "hits": 1,
+  "best": 40,
+  "lists": [
+   "setl_1m_net"
+  ],
+  "code": "CRWD.O"
+ },
+ {
+  "isin": "US46438T3095",
+  "seibroName": "ISHARES NASDAQ 100 ETF",
+  "hits": 1,
+  "best": 40,
+  "lists": [
+   "setl_3m_net"
+  ],
+  "code": "IQQ.O"
+ },
+ {
+  "isin": "US9581021055",
+  "seibroName": "WESTERN DIGITAL CORP",
+  "hits": 1,
+  "best": 41,
+  "lists": [
+   "setl_1w_all"
+  ],
+  "code": "WDC.O"
+ },
+ {
+  "isin": "US88636Y5087",
+  "seibroName": "DEFIANCE DAILY TARGET 2X LONG IONQ ETF",
+  "hits": 1,
+  "best": 42,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "IONX.O"
+ },
+ {
+  "isin": "US4180561072",
+  "seibroName": "HASBRO INC",
+  "hits": 1,
+  "best": 43,
+  "lists": [
+   "hold_20250630"
+  ],
+  "code": "HAS.O"
+ },
+ {
+  "isin": "US02156V1098",
+  "seibroName": "ALTC ACQUISITION CORP",
+  "hits": 1,
+  "best": 46,
+  "lists": [
+   "hold_20251031"
+  ],
+  "code": "OKLO.K"
+ },
+ {
+  "isin": "US87975E7765",
+  "seibroName": "Tema Space Innovators ETF",
+  "hits": 1,
+  "best": 46,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "NASA.K"
+ },
+ {
+  "isin": "US72703X1063",
+  "seibroName": "PLANET LABS PBC",
+  "hits": 1,
+  "best": 47,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "PL"
+ },
+ {
+  "isin": "US25461A8412",
+  "seibroName": "DIREXION DAILY GOOGL BULL 1.5X SHARES",
+  "hits": 1,
+  "best": 48,
+  "lists": [
+   "setl_1m_net"
+  ],
+  "code": "GGLL.O"
+ },
+ {
+  "isin": "US15675D1037",
+  "seibroName": "CEREBRAS SYSTEMS INC",
+  "hits": 1,
+  "best": 48,
+  "lists": [
+   "setl_1w_all"
+  ],
+  "code": "CBRS.O"
+ },
+ {
+  "isin": "US53656F4173",
+  "seibroName": "ROUNDHILL BALL METAVERSE ETF",
+  "hits": 1,
+  "best": 48,
+  "lists": [
+   "hold_20260430"
+  ],
+  "code": "METV.K"
+ },
+ {
+  "isin": "US01741R1023",
+  "seibroName": "ALLEGHENY TECHNOLOGIES INC",
+  "hits": 1,
+  "best": 48,
+  "lists": [
+   "setl_3m_net"
+  ],
+  "code": "ATI"
+ },
+ {
+  "isin": "US3364331070",
+  "seibroName": "FIRST SOLAR INC",
+  "hits": 1,
+  "best": 49,
+  "lists": [
+   "setl_1m_net"
+  ],
+  "code": "FSLR.O"
+ },
+ {
+  "isin": "US36828A1016",
+  "seibroName": "GE Vernova",
+  "hits": 1,
+  "best": 49,
+  "lists": [
+   "hold_20260430"
+  ],
+  "code": "GEV"
+ },
+ {
+  "isin": "US88636R2224",
+  "seibroName": "DEFIANCE DAILY TARGET 2X LONG RKLB ETF",
+  "hits": 1,
+  "best": 49,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "RKLX.O"
+ },
+ {
+  "isin": "US88023B1035",
+  "seibroName": "Tempus AI Inc",
+  "hits": 1,
+  "best": 49,
+  "lists": [
+   "hold_20250731"
+  ],
+  "code": "TEM.O"
+ },
+ {
+  "isin": "US8334451098",
+  "seibroName": "SNOWFLAKE INC",
+  "hits": 1,
+  "best": 50,
+  "lists": [
+   "setl_1m_net"
+  ],
+  "code": "SNOW.K"
+ },
+ {
+  "isin": "US46125A1007",
+  "seibroName": "INFLECTION POINT ACQUISITIO INTUITIVE MACHINES INC MRGR 944502928 KYG478741211",
+  "hits": 1,
+  "best": 50,
+  "lists": [
+   "setl_3m_prev_all"
+  ],
+  "code": "LUNR.O"
+ },
+ {
+  "isin": "US26923N4622",
+  "seibroName": "T-Rex 2X Long MSTR Daily Target ETF",
+  "hits": 1,
+  "best": 50,
+  "lists": [
+   "hold_20250630"
+  ],
+  "code": "MSTU.K"
+ }
+]
