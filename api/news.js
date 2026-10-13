@@ -6,8 +6,8 @@ import { googleNews, stripTags } from './_google.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const MAX_CODES = 15;
-const MAX_ITEMS = 50;
-const GOOGLE_MAX = 20;
+const MAX_ITEMS = 200;  // 화면에서 업종 키워드로 한 번 더 거른 뒤 최신 100건 표시
+const GOOGLE_MAX = 50;
 
 // 업종별 Google 뉴스 검색어 (임의 검색어 프록시가 되지 않도록 서버에 고정)
 const GOOGLE_QUERY = {
@@ -25,7 +25,7 @@ const GOOGLE_QUERY = {
 
 // 미국 종목: 네이버 해외주식 뉴스 (로이터 등)
 async function usStockNews(code) {
-  const r = await fetch(`https://api.stock.naver.com/news/worldStock/${code}?pageSize=10&page=1`, {
+  const r = await fetch(`https://api.stock.naver.com/news/worldStock/${code}?pageSize=20&page=1`, {
     headers: { 'User-Agent': UA, 'Referer': 'https://m.stock.naver.com/', 'Accept': 'application/json' },
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);
@@ -44,7 +44,7 @@ async function usStockNews(code) {
 
 async function stockNews(code) {
   if (!/^[0-9][0-9A-Z]{5}$/.test(code)) return usStockNews(code);
-  const r = await fetch(`https://m.stock.naver.com/api/news/stock/${code}?pageSize=15&page=1`, {
+  const r = await fetch(`https://m.stock.naver.com/api/news/stock/${code}?pageSize=20&page=1`, {
     headers: { 'User-Agent': UA, 'Referer': 'https://m.stock.naver.com/', 'Accept': 'application/json' },
   });
   if (!r.ok) throw new Error(`HTTP ${r.status}`);

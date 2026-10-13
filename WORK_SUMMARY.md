@@ -123,7 +123,7 @@ api/
   stock.js        실시간 시세 (국내 + 미국, 네이버 polling)
   market.js       상단 지수 6개
   detail.js       종목 뉴스·정보·보고서·공시 (국내 네이버/WISEfn, 미국 네이버 해외주식)
-  news.js         업종 뉴스 (네이버 종목 뉴스 + Google 뉴스 RSS)
+  news.js         업종 뉴스 (상위 12종목 네이버 뉴스 각 20건 + Google 뉴스 50건 → 화면에서 업종 키워드로 걸러 최신 100건, 20건씩 더보기)
   page.js         종목 페이지 서버 렌더링
   rss.js          RSS
   _redis.js       Upstash Redis 클라이언트

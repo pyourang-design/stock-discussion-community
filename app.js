@@ -144,7 +144,10 @@ function sectorNewsHtml(key) {
   const updated = new Date(n.ts).toLocaleTimeString('ko-KR', { hour12: false });
   const foot = `<div class="panel-footer"><span class="news-src naver">N</span>네이버 증권 (업종 시총 상위 ${NEWS_CODES}종목 뉴스) · <span class="news-src google">G</span>Google 뉴스 (업종 키워드)</div>`;
   if (!n.data.length) return '<p class="empty-msg">최근 뉴스가 없습니다.</p>' + foot;
-  return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신</div>` + n.data.map(item => {
+  const shown = sectorShown[key] || NEWS_PAGE;
+  const more = n.data.length > shown
+    ? `<button class="news-more" onclick="moreSectorNews('${key}')">더보기 (${shown} / ${n.data.length})</button>` : '';
+  return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신 · 최신 ${n.data.length}건</div>` + n.data.slice(0, shown).map(item => {
     const names = item.codes.map(c => STOCKS.find(s => s.code === c)?.name).filter(Boolean);
     return `
       <a class="news-item" href="${safeUrl(item.url)}" target="_blank" rel="noopener">
@@ -152,7 +155,15 @@ function sectorNewsHtml(key) {
         <div class="news-item-meta"><span class="news-src ${item.source === 'google' ? 'google' : 'naver'}">${item.source === 'google' ? 'G' : 'N'}</span>${names.slice(0, 3).map(x => `<span class="news-stock">${escHtml(x)}</span>`).join('')}
           ${escHtml(item.press || '')} · ${newsTime(item.datetime)}</div>
       </a>`;
-  }).join('') + foot;
+  }).join('') + more + foot;
+}
+// 업종 뉴스도 최대 100건을 20건씩 '더보기'로 표시 (자동 갱신해도 펼친 개수 유지)
+const SECTOR_NEWS_MAX = 100;
+const sectorShown = {};
+function moreSectorNews(key) {
+  if (!sectorNews[key]?.data) return;
+  sectorShown[key] = (sectorShown[key] || NEWS_PAGE) + NEWS_PAGE;
+  document.getElementById('newsTab').innerHTML = sectorNewsHtml(key);
 }
 
 function newsCardHtml() {
@@ -185,7 +196,7 @@ async function loadSectorNews(force = false, key = currentFilter) {
     const res = await fetch(`${API_BASE}/api/news?sector=${key}&codes=${codes.join(',')}`);
     const json = await res.json();
     if (!res.ok || json.error) throw new Error(json.error || res.status);
-    sectorNews[key] = { ts: Date.now(), data: json.data.filter(n => isSectorNews(n, key)) };
+    sectorNews[key] = { ts: Date.now(), data: json.data.filter(n => isSectorNews(n, key)).slice(0, SECTOR_NEWS_MAX) };
   } catch (e) {
     // 실패 시 이전 뉴스 유지
     sectorNews[key] = cached ? { ...cached, error: true } : { error: true };
