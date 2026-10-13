@@ -159,8 +159,8 @@ export default async function handler(req, res) {
   const peers = STOCKS.filter(x => x.code !== s.code && x.sectors[main]).sort((a, b) => a.sectors[main].order - b.sectors[main].order).slice(0, 40);
   const discussUrl = `/?stock=${encodeURIComponent(s.code)}`;
 
-  const title = `${s.name} 종목 토론방 - ${s.name} 주가·뉴스·투자자 의견 | ${NAME}`;
-  const desc = `${s.name}(${s.us ? s.ticker : s.code}) 종목 토론방. ${sectorName} ${rankParts[0] || ''} 종목의 실시간 주가, 시가총액·PER·PBR, 최근 뉴스와 투자자 토론 의견을 한곳에서 확인하고 함께 이야기하는 주식 종목 토론방입니다.`;
+  const title = `${s.name} 종목 토론방(종토방) - 주가·뉴스·투자자 의견 | 주식 종목 토론 게시판`;
+  const desc = `${s.name}(${s.us ? s.ticker : s.code}) 종목 토론방·종목 토론 게시판. ${sectorName} ${rankParts[0] || ''} 종목의 실시간 주가, 시가총액·PER·PBR, 최근 뉴스와 투자자 토론 의견을 한곳에서 확인하고 함께 이야기하는 주식 종목 토론방입니다.`;
   const canonical = `${SITE}/stock/${encodeURIComponent(s.code)}`;
 
   const body = `

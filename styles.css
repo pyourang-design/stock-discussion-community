@@ -367,7 +367,10 @@ a.logo { color: inherit; text-decoration: none; }
 .hero { margin: 14px 0 0; }
 .hero h1 { font-size: 1.05rem; font-weight: 800; }
 .hero p { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
-.sector-directory { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--border); }
+.seo-guide { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--border); }
+.seo-guide h2 { font-size: 0.9rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
+.seo-guide p { font-size: 0.8rem; color: var(--text-muted); line-height: 1.6; margin-top: 4px; }
+.sector-directory { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .sector-directory summary { cursor: pointer; font-size: 0.9rem; font-weight: 700; color: var(--text-muted); }
 .sector-directory summary span { font-weight: 400; }
 .sector-directory[open] summary { margin-bottom: 14px; color: var(--text); }
