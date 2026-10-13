@@ -1,0 +1,5 @@
+# Cloudflare Pages 설정 — 배포: npm run cf:deploy (scripts/cf-build.mjs가 dist/에 정적 파일을 모음)
+name = "stock-forum"
+pages_build_output_dir = "dist"
+compatibility_date = "2025-09-01"
+compatibility_flags = ["nodejs_compat"]

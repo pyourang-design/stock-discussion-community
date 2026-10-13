@@ -6,7 +6,7 @@ import fs from 'fs';
 import { fileURLToPath } from 'url';
 import vm from 'vm';
 const DIR = fileURLToPath(new URL('../', import.meta.url));
-const SITE = 'https://stocksector.vercel.app/';
+const SITE = 'https://upjong.com/';
 const ctx = {};
 vm.runInNewContext(fs.readFileSync(DIR + 'stocks.js', 'utf8') + '\nthis.r = { SECTORS, STOCKS, STOCKS_AS_OF, US_AS_OF };', ctx);
 const { SECTORS, STOCKS, STOCKS_AS_OF, US_AS_OF } = ctx.r;
@@ -27,7 +27,7 @@ export const STOCKS = ${JSON.stringify(slim)};
 // 2) 사이트맵
 const urls = [
   { loc: SITE, freq: 'daily', pri: '1.0' },
-  ...['about.html', 'terms.html', 'privacy.html', 'contact.html'].map(p => ({ loc: SITE + p, freq: 'monthly', pri: '0.3' })),
+  ...['about.html', 'terms.html', 'privacy.html', 'contact.html'].map(p => ({ loc: SITE + p.replace(/\.html$/, ''), freq: 'monthly', pri: '0.3' })),
   ...STOCKS.map(s => ({ loc: stockUrl(s.code), freq: 'daily', pri: '0.7' })),
 ];
 fs.writeFileSync(DIR + 'sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>

@@ -2,7 +2,7 @@
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 const DIR = fileURLToPath(new URL('../', import.meta.url));
-const SITE = 'https://stocksector.vercel.app/';
+const SITE = 'https://upjong.com/';
 const NAME = '주식 업종 종목 토론방';
 const EFFECTIVE = '2026년 10월 12일';
 const OWNER = '김유랑';
@@ -27,12 +27,12 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${p.title} | ${NAME}</title>
   <meta name="description" content="${p.desc}" />
-  <link rel="canonical" href="${SITE}${p.file}" />
+  <link rel="canonical" href="${SITE}${p.file.replace(/\.html$/, '')}" />
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="${NAME}" />
   <meta property="og:title" content="${p.title} | ${NAME}" />
   <meta property="og:description" content="${p.desc}" />
-  <meta property="og:url" content="${SITE}${p.file}" />
+  <meta property="og:url" content="${SITE}${p.file.replace(/\.html$/, '')}" />
   <meta property="og:locale" content="ko_KR" />
   <script src="/theme.js"></script>
   <link rel="stylesheet" href="styles.css" />

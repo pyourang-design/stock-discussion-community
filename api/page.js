@@ -4,7 +4,7 @@
 import { STOCKS, SECTORS, STOCKS_AS_OF, US_AS_OF } from './_stocks.js';
 import { redis, dbReady } from './_redis.js';
 
-const SITE = 'https://stocksector.vercel.app';
+const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', 'Referer': 'https://m.stock.naver.com/', 'Accept': 'application/json' };
 const POSTS_SHOWN = 20;

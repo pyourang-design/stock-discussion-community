@@ -1,9 +1,11 @@
 # 주식 업종 종목 토론방 — 작업 정리 (2026-10-12)
 
-- **운영 주소**: https://stocksector.vercel.app (예전 주소 https://homepage-plum-nine.vercel.app 도 동작)
-- **배포**: Vercel 프로젝트 `homepage` (팀 jimmy-eadd). Git 연동 없이 이 폴더에서 `vercel --prod --yes` 로 직접 배포
-- **DB**: Upstash Redis (`bio-forum-db`, Vercel 환경변수 `KV_REST_API_URL` / `KV_REST_API_TOKEN`)
-- **관리자 비밀번호**: Vercel 환경변수 `ADMIN_PASSWORD` (코드·문서에 값 없음)
+- **운영 주소**: https://upjong.com (2026-10-13 이전. www.upjong.com · stock-forum.pages.dev · 옛 Vercel 주소는 모두 301/308로 upjong.com 이동)
+- **배포**: Cloudflare Pages 프로젝트 `stock-forum` (계정 pyourang@naver.com). 이 폴더에서 `node scripts/cf-build.mjs && npx wrangler pages deploy dist --project-name stock-forum --branch main` (MANUAL.md 5-4)
+- **도메인**: upjong.com (Cloudflare Registrar, DNS CNAME @·www → stock-forum.pages.dev)
+- **옛 Vercel 프로젝트** `homepage` (팀 jimmy-eadd): `vercel.json`이 전체를 upjong.com으로 리다이렉트만 함. 검색 순위 이전을 위해 몇 달 유지
+- **DB**: Upstash Redis (`bio-forum-db`, Cloudflare Pages 시크릿 `KV_REST_API_URL` / `KV_REST_API_TOKEN`)
+- **관리자 비밀번호**: Cloudflare Pages 시크릿 `ADMIN_PASSWORD` (코드·문서에 값 없음)
 - **운영자**: 김유랑 · tpsdurang@naver.com
 
 ---
@@ -99,8 +101,8 @@ KOSPI · KOSDAQ · USD/KRW · 다우존스 · 나스닥 · S&P 500 (WTI 원유·
 
 **운영자가 할 일**
 - 구글 Search Console: `sitemap.xml` 재제출, 주요 페이지 URL 검사 → 색인 생성 요청
-- 네이버 서치어드바이저: 요청 → 사이트맵 제출(`sitemap.xml`), RSS 제출(`https://stocksector.vercel.app/rss.xml`), 웹 페이지 수집(홈·주요 종목 페이지)
-- 신뢰도 높이기: 개인 도메인 연결, 네이버 블로그·카페 등에서의 링크, 꾸준한 글 활동
+- 네이버 서치어드바이저: 요청 → 사이트맵 제출(`sitemap.xml`), RSS 제출(`https://upjong.com/rss.xml`), 웹 페이지 수집(홈·주요 종목 페이지)
+- 신뢰도 높이기: 네이버 블로그·카페 등에서의 링크, 꾸준한 글 활동
 - 애드센스 신청 후 광고 코드·`ads.txt` 반영
 
 ---

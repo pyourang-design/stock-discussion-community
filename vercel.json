@@ -1,12 +1,6 @@
 {
-  "rewrites": [
-    {
-      "source": "/stock/:code",
-      "destination": "/api/page?code=:code"
-    },
-    {
-      "source": "/rss.xml",
-      "destination": "/api/rss"
-    }
+  "redirects": [
+    { "source": "/", "destination": "https://upjong.com/", "permanent": true },
+    { "source": "/:path*", "destination": "https://upjong.com/:path*", "permanent": true }
   ]
 }

@@ -4,3 +4,6 @@
 skills-lock.json
 scripts/.env*
 .env*
+dist/
+.wrangler/
+.dev.vars

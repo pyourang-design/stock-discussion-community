@@ -4,7 +4,7 @@
 import { STOCKS, SECTORS, STOCKS_AS_OF } from './_stocks.js';
 import { redis, dbReady } from './_redis.js';
 
-const SITE = 'https://stocksector.vercel.app';
+const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
 const MAX_POSTS = 50, MAX_ITEMS = 100, PER_BOARD = 10;
 const SENTIMENT = { up: '매수', down: '매도', neutral: '중립' };

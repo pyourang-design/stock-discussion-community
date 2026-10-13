@@ -160,6 +160,25 @@ vercel --token <YOUR_VERCEL_TOKEN> --prod --yes
 
 > 현재 사이트는 정적 파일 위주(약 30KB)라 월 300만 방문까지 무료 커버 가능합니다.
 
+### 5-4. Cloudflare Pages 배포 (상업적 이용 가능한 무료 호스팅)
+
+`api/*.js`는 그대로 두고 `functions/_adapter.js`가 Cloudflare 방식으로 감싸서 실행합니다. Vercel과 Cloudflare 양쪽에 배포할 수 있어요.
+
+| 파일 | 역할 |
+|------|------|
+| `wrangler.toml` | 프로젝트 이름·`nodejs_compat` 설정 |
+| `functions/api/[name].js` | `/api/*` → `api/<name>.js` |
+| `functions/stock/[code].js`, `functions/rss.xml.js` | `vercel.json` rewrite와 동일 |
+| `scripts/cf-build.mjs` | 루트의 정적 파일만 `dist/`로 복사 |
+
+```bash
+npx wrangler login                                  # 최초 1회 (브라우저 로그인)
+node scripts/cf-build.mjs
+npx wrangler pages dev dist                         # 로컬 테스트 (환경변수는 .dev.vars)
+npx wrangler pages deploy dist --branch main        # 프로덕션 배포
+npx wrangler pages secret put KV_REST_API_URL       # 환경변수 (KV_REST_API_TOKEN, ADMIN_PASSWORD도 동일)
+```
+
 ---
 
 ## 6. GitHub 연동

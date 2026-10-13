@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://stocksector.vercel.app/sitemap.xml
+Sitemap: https://upjong.com/sitemap.xml

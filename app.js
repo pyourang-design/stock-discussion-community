@@ -3,7 +3,7 @@ let currentFilter = SECTORS[0].key;  // 현재 업종 탭
 let currentStock = null;
 let currentModalTab = 'discuss';
 // index.html을 파일로 직접 열었을 때(file://)는 운영 서버 API 사용
-const API_BASE = location.protocol === 'file:' ? 'https://homepage-plum-nine.vercel.app' : '';
+const API_BASE = location.protocol === 'file:' ? 'https://upjong.com' : '';
 
 // ── 초기화 ────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {

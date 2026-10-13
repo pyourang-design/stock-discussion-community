@@ -4,3 +4,7 @@ skills-lock.json
 scripts
 WORK_SUMMARY.md
 MANUAL.md
+functions
+dist
+.wrangler
+wrangler.toml
