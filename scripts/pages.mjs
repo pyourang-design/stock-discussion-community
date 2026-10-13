@@ -42,7 +42,7 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
 <header class="site-header">
   <div class="container header-inner">
     <a class="logo" href="./">
-      <span class="logo-icon">📈</span>
+      <span class="logo-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#f04452" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18l6-6 4 4 8-8"/><path d="M14 8h7v7"/></svg></span>
       <span class="logo-text">${NAME}</span>
     </a>
     <nav class="main-nav page-nav">

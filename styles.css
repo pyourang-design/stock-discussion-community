@@ -46,8 +46,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 /* ── 헤더 ────────────────────────────────────────── */
 .site-header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(8px); }
 .header-inner { display: flex; align-items: center; gap: 16px; padding: 12px 16px; }
-.logo { display: flex; align-items: center; gap: 8px; font-size: 1.2rem; font-weight: 700; white-space: nowrap; }
-.logo-icon { font-size: 1.5rem; }
+.logo { display: flex; align-items: center; gap: 8px; font-size: 1.32rem; font-weight: 700; white-space: nowrap; }
+.logo-icon { font-size: 1.85rem; display: inline-flex; }
 .main-nav { display: flex; gap: 4px; flex: 1; }
 /* Home · 다크모드 버튼은 로그인 버튼과 같은 모양·크기 */
 .main-nav a { padding: 7px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 600; line-height: 1.2; color: var(--text-muted); border: 1px solid var(--border); transition: all 0.2s; }
@@ -313,8 +313,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 @media (max-width: 600px) {
   .main-nav { flex: 1; justify-content: flex-start; gap: 4px; }
   .main-nav a, .theme-toggle { padding: 7px 0; width: 64px; font-size: 0.82rem; }
-  .logo { font-size: 1.02rem; gap: 6px; }
-  .logo-icon { font-size: 1.25rem; }
+  .logo { font-size: 1.1rem; gap: 6px; }
+  .logo-icon { font-size: 1.5rem; }
   .header-inner { flex-wrap: wrap; gap: 8px 10px; }
   .header-actions { width: 100%; }
   .search-box { flex: 1; width: auto; min-width: 0; }
@@ -325,6 +325,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
   .modal { max-height: 95vh; }
   .modal-close { min-height: 38px; padding: 0 13px; }
 }
+/* 아주 좁은 휴대폰(약 380px 이하): 제목이 커서 Home·Dark 버튼이 아랫줄로 밀리지 않게 */
+@media (max-width: 380px) { .logo { font-size: 1.02rem; gap: 5px; } .logo-icon { font-size: 1.3rem; } }
 
 /* ── 관리자 ──────────────────────────────────────── */
 .admin-link { font-size: 0.75rem; color: var(--text-muted); text-decoration: underline; }
