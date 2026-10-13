@@ -13,15 +13,30 @@ const EXCLUDE = {
   kbeauty: ['코웨이', '유한양행', '대웅제약', '네이처셀', '파미셀', '현대바이오', '미원상사', '지놈앤컴퍼니', '강스템바이오텍', '국제약품', '동성제약', '유바이오로직스', '현대퓨처넷', '원익'],
   kculture: ['카카오', '이마트', 'IPARK현대산업개발', 'HDC', '다날', '한국정보통신', '한화머시너리앤서비스홀딩스'],
 };
+// 100개로 늘리며 추가로 걸러낸 비본업 종목 (네이버 업종이 탭과 무관: 석유화학·통신·컴퓨터·휴대폰 액세서리·완구·반도체·방송 등)
+const EXCLUDE_MORE = {
+  battery: ['대한유화', '성우하이텍'],
+  power: ['프리티', '에이루트', 'CS', '코콤', 'SG&G', '대창스틸'],
+  kbeauty: ['휴온스', '동구바이오제약', '모아라이프플러스', '슈피겐코리아', '알에프텍', '제이에스코퍼레이션', '넥사다이내믹스', 'HLB글로벌', '헝셩그룹', '프리티', '그래디언트', '고스트스튜디오', '프롬바이오'],
+  ship: ['덕산하이메탈', 'YTN', '아이티엠반도체', '아이티센엔텍', '국영지앤엠', '에이텀', '케이앤에스아이앤씨', '웰크론', '에스코넥', '평화산업'],
+  auto: ['폴라리스오피스'],
+  finance: ['LS네트웍스', '글로벌텍스프리'],
+};
+EXCLUDE_MORE.nuclear = EXCLUDE_MORE.power;
+EXCLUDE_MORE.kculture = EXCLUDE_MORE.kbeauty;
+EXCLUDE_MORE.defense = EXCLUDE_MORE.ship;
+for (const [k, v] of Object.entries(EXCLUDE_MORE)) EXCLUDE[k] = [...(EXCLUDE[k] || []), ...v];
 const AS_OF = process.argv[2];
 const capText = v => v >= 1e13 ? (v / 1e12).toFixed(1) + '조' : v >= 1e12 ? (v / 1e12).toFixed(2) + '조' : Math.round(v / 1e8).toLocaleString() + '억';
 const all = new Map();
 const report = [];
 const subList = key => members[key].filter(s => s.code.endsWith('0') && stats[s.code] && !(EXCLUDE[key] || []).includes(s.name));
 // 원본 업종 하나의 선정 기준: 시총 TOP 20 + 토론 TOP 20 + 거래대금 TOP 10
-// 종목 수를 정한 업종: 기존 기준(시총 N · 토론 N · 거래대금 N/2)의 N을 20에서 넓혀 가며 먼저 들어오는 순서로 채움
+// 모든 업종 100개 목표: 기존 기준으로 뽑은 종목은 그대로 두고, 기준(시총 N · 토론 N · 거래대금 N/2)의 N을 넓혀 가며
+//   먼저 들어오는 순서로 100개까지 채움 (후보가 100개 미만이면 후보 전체)
 //   = 각 종목의 진입 기준 min(시총순위, 토론순위, 거래대금순위×2)이 작은 순, 같으면 시총순
-const TARGET = { bio: 50, semi: 50 };
+const TARGET_N = 100;
+const TARGET = { bio: 50, semi: 50 };  // 기존 기준이 '50개 채우기'였던 업종
 function targetPick(list, n) {
   const rankOf = k => { const r = new Map([...list].sort((a, b) => k(b) - k(a)).map((s, i) => [s.code, i + 1])); return c => r.get(c); };
   const cap = rankOf(s => s.cap), talk = rankOf(s => stats[s.code].posts), tv = rankOf(s => stats[s.code].tv);
@@ -41,6 +56,7 @@ for (const [key, , subs = [key]] of SECTORS) {
   const rank = (arr, c) => arr.findIndex(s => s.code === c) + 1;
   const pick = new Set(TARGET[key] ? targetPick(list, TARGET[key]) : subs.flatMap(k => subPick(subList(k))));
   const base = pick.size;
+  for (const c of targetPick(list, list.length)) { if (pick.size >= TARGET_N) break; pick.add(c); }
   const chosen = byCap.filter(s => pick.has(s.code));
   chosen.forEach((s, i) => {
     const o = all.get(s.code) || { code: s.code, name: s.name, market: s.market, price: s.price, change: s.change, volume: s.volume, cap: capText(s.cap), sectors: {} };
@@ -66,8 +82,8 @@ for (const r of us.rows) {
 const usAsOf = us.asOf.replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3');
 report.push(`usa: SEIBro ${usAsOf} 보관금액 TOP 50 + 보충 ${us.rows.length - 50} (ETF ${us.rows.filter(r => r.etf).length})`);
 let out = `// 업종별 주요 종목 (기준: ${AS_OF}, 네이버 증권) — 가격은 페이지에서 실시간 갱신
-// 업종 탭마다: 시가총액 TOP 20 + 네이버 종목토론방 최근 1년 글 수 TOP 20 + 최근 6개월 거래대금 TOP 10
-//   → 중복 제거 (차순위로 채우지 않음). 탭 안 정렬은 시총순.
+// 업종 탭마다 최대 100종목: 시가총액 TOP 20 + 네이버 종목토론방 최근 1년 글 수 TOP 20 + 최근 6개월 거래대금 TOP 10에서 시작해
+//   기준(시총 N·토론 N·거래대금 N/2)을 넓혀 가며 100개까지 채움 (후보가 100개 미만이면 후보 전체). 탭 안 정렬은 시총순.
 // 업종 구성: 네이버 증권 업종/테마 분류 (바이오=제약·생물공학·생명과학도구, 반도체=반도체와반도체장비,
 //   2차전지=2차전지 테마, 조선=조선 업종·테마·조선기자재, 방산=우주항공과국방·방위산업 테마,
 //   원자력=원자력발전·원전해체 테마, 자동차=자동차·자동차부품,

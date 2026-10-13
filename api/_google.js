@@ -9,6 +9,29 @@ export const stripTags = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&
 // Date → 한국시간 YYYYMMDDHHmm (네이버 datetime 형식에 맞춤)
 const kstStamp = d => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace(/[-T:]/g, '');
 
+// 언론사 기사만 남김 — 블로그·카페·개인 연재, 투자정보·시세 사이트, 기업 뉴스룸, SNS·동영상, 관련 없는 해외 사이트 제외
+// (언론사 이름 또는 출처 주소로 판단, 출처 주소는 하위 도메인까지 포함해 비교)
+const NON_PRESS_NAME = /blog|블로그|티스토리|tistory|brunch|브런치|velog|egloos|이글루스|medium|카페|프리미엄콘텐츠|뉴스룸|newsroom|investing\.com|tradingview|simply wall|youtube/i;
+const NON_PRESS_HOST = [
+  // 블로그·카페·개인 연재
+  'blog.naver.com', 'tistory.com', 'brunch.co.kr', 'velog.io', 'egloos.com', 'medium.com', 'blogspot.com', 'wordpress.com',
+  'cafe.naver.com', 'cafe.daum.net', 'contents.premium.naver.com', 'note.com',
+  // 투자정보·시세·분석 사이트
+  'judal.co.kr', 'itooza.com', 'buffettlab.co.kr', 'thinkpool.com', 'investing.com', 'tradingview.com', 'tradingkey.com',
+  'simplywall.st', 'tikr.com', 'tradersunion.com', 'idnfinancials.com', 'indexbox.io', 'kbthink.com', 'econmingle.com',
+  'seekingalpha.com', 'fool.com', 'marketscreener.com',
+  // 기업 뉴스룸·홍보 사이트
+  'shinsegaegroupnewsroom.com', 'hyundaimotorgroup.com', 'about.nike.com',
+  // SNS·동영상·커뮤니티·쇼핑
+  'youtube.com', 'youtu.be', 'weverse.io', 't.co', 'x.com', 'twitter.com', 'facebook.com', 'instagram.com', 'reddit.com',
+  'coolenjoy.net', 'danawa.com', 'dazabi.com',
+  // 관련 없는 해외·기타 사이트
+  'calgaryroughnecks.com', 'wwr-stardom.com', 'actt.org.tt', 'haveagood-holiday.com', 'belpostel.com', 'mezha.net', 'vietnam.vn',
+  'storagereview.com', 'faq.donga.com', 'programs.sbs.co.kr', 'webzine.kacta.or.kr',
+];
+const isNonPress = (press, host) => NON_PRESS_NAME.test(press) || /^blog\./.test(host) || /\.go\.kr$/.test(host)
+  || NON_PRESS_HOST.some(d => host === d || host.endsWith('.' + d));
+
 // query: 서버에 고정된 검색어만 넘길 것 (임의 검색어 프록시 방지)
 export async function googleNews(query, { when = '1d', max = 20 } = {}) {
   const proxy = process.env.GNEWS_PROXY_URL;
@@ -21,6 +44,7 @@ export async function googleNews(query, { when = '1d', max = 20 } = {}) {
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => {
     const it = m[1];
     const press = stripTags(tag(it, 'source'));
+    const host = ((it.match(/<source[^>]*url="https?:\/\/([^/"]+)/) || [])[1] || '').toLowerCase();
     let title = stripTags(tag(it, 'title').replace(/<!\[CDATA\[|\]\]>/g, ''));
     if (press && title.endsWith(` - ${press}`)) title = title.slice(0, -(press.length + 3));
     const d = new Date(tag(it, 'pubDate'));
@@ -33,8 +57,10 @@ export async function googleNews(query, { when = '1d', max = 20 } = {}) {
       url: stripTags(tag(it, 'link')),
       thumb: null,
       source: 'google',
+      nonPress: isNonPress(press, host),
     };
-  }).filter(n => n.title && /^https:\/\//.test(n.url))
+  }).filter(n => n.title && /^https:\/\//.test(n.url) && !n.nonPress)
+    .map(({ nonPress, ...n }) => n)
     .sort((a, b) => b.datetime.localeCompare(a.datetime))
     .slice(0, max);
 }

@@ -13,7 +13,15 @@ const SENTIMENT = { up: '📈 매수', down: '📉 매도', neutral: '🔍 중�
 const BLIND_TEXT = '신고가 누적되어 블라인드 처리된 글입니다.';
 
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-const strip = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+// 받침에 따라 조사 고르기 (셀트리온은 / 삼성전자는). 영문·숫자로 끝나면 읽는 소리 기준
+function josa(word, withBatchim, withoutBatchim) {
+  const ch = String(word).trim().slice(-1);
+  const code = ch.charCodeAt(0) - 0xac00;
+  if (code >= 0 && code <= 11171) return code % 28 ? withBatchim : withoutBatchim;
+  const batchimEnd = /[LMNRlmnr136780]$/;  // 엘·엠·엔·알, 일·삼·육·칠·팔·영 등 받침 소리
+  return batchimEnd.test(ch) ? withBatchim : withoutBatchim;
+}
+const strip = s =>String(s ?? '').replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
 const sectorTitle = key => key === 'usa' ? '미국 주식' : `${SECTORS.find(s => s.key === key)?.name || ''} 업종`;
 // 한국시간 표시
 const kst = ts => {
@@ -53,11 +61,12 @@ async function news(s) {
     const data = await getJson(`https://api.stock.naver.com/news/worldStock/${s.code}?pageSize=${NEWS_SHOWN}&page=1`);
     return data.slice(0, NEWS_SHOWN).map(n => ({ title: strip(n.tit), press: n.ohnm, dt: String(n.dt || '').slice(0, 12), url: `https://n.news.naver.com/article/${n.oid}/${n.aid}` }));
   }
-  const data = await getJson(`https://m.stock.naver.com/api/news/stock/${s.code}?pageSize=${NEWS_SHOWN}&page=1`);
-  return data.flatMap(g => g.items ?? []).slice(0, NEWS_SHOWN).map(n => ({
+  // 넉넉히 받아 제목이 잘린 기사("…선보...")는 빼고 NEWS_SHOWN건
+  const data = await getJson(`https://m.stock.naver.com/api/news/stock/${s.code}?pageSize=${NEWS_SHOWN * 2}&page=1`);
+  return data.flatMap(g => g.items ?? []).map(n => ({
     title: strip(n.titleFull || n.title), press: n.officeName, dt: n.datetime,
     url: n.mobileNewsUrl || `https://n.news.naver.com/mnews/article/${n.officeId}/${n.articleId}`,
-  }));
+  })).filter(n => n.title && !/(\.\.\.|…)$/.test(n.title)).slice(0, NEWS_SHOWN);
 }
 
 async function posts(code) {
@@ -146,7 +155,7 @@ export default async function handler(req, res) {
   if (r.hold) rankParts.push(`국내 투자자 보유 ${r.hold}위 (${r.amt})`);
   if (r.hits) rankParts.push(`국내 투자자 관심 ${r.sel}위`);
   if (r.cap) rankParts.push(`시가총액 ${r.cap}위`);
-  if (r.talk) rankParts.push(`토론 ${r.talk}위`);
+  if (r.talk) rankParts.push(`네이버 토론글 ${r.talk}위`);  // 네이버 종목토론방 최근 1년 글 수 순위 (이 사이트 글 수 아님)
   if (r.tv) rankParts.push(`거래대금 ${r.tv}위`);
   const idLabel = s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : `${s.code} · ${s.market.toUpperCase()}`;
   const unit = s.us ? '$' : '';
@@ -174,15 +183,16 @@ export default async function handler(req, res) {
     <span class="sp-time">${qt?.time ? esc(String(qt.time).replace('T', ' ').slice(0, 16)) + ' 기준' : '시세는 토론 화면에서 실시간 확인'}</span>
   </div>
   <a class="btn-submit sp-cta" href="${esc(discussUrl)}">💬 ${esc(s.name)} 토론 참여하기 · 실시간 시세 보기</a>
+  <p class="sp-disclaimer">⚠️ 이 페이지의 시세·뉴스·토론글은 정보 제공용이며 투자 권유가 아닙니다. 투자 판단과 그 결과의 책임은 투자자 본인에게 있습니다.</p>
 
   <p class="sp-intro">${esc(s.name)} 종목 토론방은 ${esc(s.name)}(${esc(s.us ? s.ticker : s.code)}) 주가와 뉴스, 종목 정보, 투자자들의 매수·매도 의견을 한곳에서 보는 주식 종목 토론방입니다.
-  ${esc(s.name)}은(는) ${esc(sectorNames.join(', '))}에 속하며${rankParts.length ? `, ${esc(rankParts.join(', '))}` : ''} 종목입니다.
+  ${esc(s.name)}${josa(s.name, '은', '는')} ${esc(sectorNames.join(', '))}에 속하며${rankParts.length ? `, ${esc(rankParts.join(', '))}` : ''} 종목입니다.
   회원은 닉네임·비밀번호 입력 없이 바로 의견을 남길 수 있고, 비회원도 닉네임과 비밀번호로 글을 쓸 수 있습니다.</p>
 
   <section class="sp-section">
     <h2>${esc(s.name)} 최근 토론글 <span>(${total}건)</span></h2>
     ${postList.length ? `<ul class="sp-posts">${postList.map(p => `
-      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.member ? ' <span class="member-badge">회원</span>' : ''} <span class="post-sentiment ${esc(p.sentiment)}">${SENTIMENT[p.sentiment] || SENTIMENT.neutral}</span> <time>${kst(p.ts)}</time></div>
+      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <span class="post-sentiment ${esc(p.sentiment)}">${SENTIMENT[p.sentiment] || SENTIMENT.neutral}</span> <time>${kst(p.ts)}</time></div>
       <p>${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p></li>`).join('')}
     </ul>` : `<p class="sp-empty">아직 ${esc(s.name)} 토론글이 없습니다. 첫 번째 의견을 남겨보세요.</p>`}
     <a class="sp-more" href="${esc(discussUrl)}">${esc(s.name)} 토론 전체 보기 · 글쓰기 →</a>

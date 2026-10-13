@@ -3,6 +3,7 @@
 // GET  /api/posts?code=068270&cid=..   → 종목 게시글 목록
 // GET  /api/posts?counts=1             → 종목별 게시글 수
 // POST /api/posts { action: 'create', cid, code, nick, password, content, sentiment }   비회원 글
+// POST /api/posts { action: 'create', cid, code, content, sentiment, asOperator: true, adminKey }   운영자 글 (관리자 모드)
 // POST /api/posts { action: 'create', cid, code, token, content, sentiment }             회원 글 (닉네임·비밀번호 없이)
 // POST /api/posts { action: 'edit',   cid, id, password | token, content, sentiment }
 // POST /api/posts { action: 'delete', cid, id, password | token }
@@ -21,7 +22,8 @@
 // POST /api/posts { action: 'favToggle', cid, token, code, on }  관심 종목 추가(on=true)·해제
 // POST /api/posts { action: 'adminCheck',  cid, adminKey }       관리자 로그인 확인
 // POST /api/posts { action: 'adminDelete', cid, id, adminKey }   관리자 삭제 (ADMIN_PASSWORD 환경변수)
-// POST /api/posts { action: 'like',   cid, id }
+// POST /api/posts { action: 'like',   cid, id }               공감 토글 (예전 화면 호환)
+// POST /api/posts { action: 'vote',   cid, id, type: 'up'|'down' }   공감·비공감 토글 (둘 중 하나만)
 // 팔로우 (회원 전용: 로그인한 회원이 다른 회원 닉네임을 팔로우)
 // POST /api/posts { action: 'follow',  cid, token, nick, follow: true|false }
 // POST /api/posts { action: 'author',  cid, nick, token? }   작성자 전체글 + 팔로워 수 + 내 팔로우 여부 + 회원 여부
@@ -36,7 +38,8 @@
 //   post:{id}          게시글 JSON
 //   posts:{code}       종목별 게시글 id 목록 (최신순)
 //   author:{nick}      작성자별 게시글 id 목록 (최신순)
-//   likes:{id}         좋아요 누른 cid 집합
+//   likes:{id}         공감 누른 cid 집합
+//   dislikes:{id}      비공감 누른 cid 집합
 //   postcount          종목코드 → 게시글 수 (hash)
 //   mfollowing:{아이디} 회원이 팔로우한 회원 닉네임 집합
 //   mfollowers:{닉네임} 해당 회원을 팔로우한 회원 아이디 집합
@@ -68,6 +71,10 @@ const SENTIMENTS = ['up', 'down', 'neutral'];
 const USER_ID_RE = /^(?=.*[A-Za-z])[A-Za-z0-9]{4,20}$/;
 const MEMBER_NICK_RE = /^[가-힣]{2,10}$/;
 const MEMBER_PW_MIN = 6, MEMBER_PW_MAX = 30;
+// 운영자 계정 닉네임 (관리자 모드에서 쓴 글)
+const OPERATOR_NICK = '운영자';
+// 운영진 사칭 방지: 회원가입·비회원 글쓰기 닉네임 모두 사용 불가
+const RESERVED_NICK_RE = /운영자|관리자|운영진|운영팀|관리팀|어드민|스태프|업종토론방/;
 const SESSION_TTL = 30 * 24 * 3600;
 const FAV_MAX = 300;
 const VISIT_GAP = 1800;        // 사이트 조회수: 같은 브라우저 30분에 1회
@@ -120,11 +127,16 @@ function samePassword(pw, stored) {
 }
 
 // 수정·삭제 전 작성자 확인: 회원 글은 로그인한 본인, 비회원 글은 비밀번호 검증 (연속 실패 시 잠금)
-async function authorize(id, password, token) {
+async function authorize(id, password, token, adminKey, cid) {
   if (!isPostId(id)) throw new BadRequest('게시글 id가 올바르지 않습니다');
   const [rawPost] = await redis([['GET', `post:${id}`]]);
   if (!rawPost) throw new BadRequest('게시글이 없습니다');
   const target = JSON.parse(rawPost);
+  // 운영자 글: 관리자 비밀번호로만 수정·삭제
+  if (target.official) {
+    await checkAdmin(adminKey, cid);
+    return target;
+  }
   if (target.uid) {
     const user = await sessionUser(token);
     if (!user || user.id.toLowerCase() !== target.uid) throw new BadRequest('작성한 회원만 수정·삭제할 수 있습니다');
@@ -146,7 +158,7 @@ async function authorize(id, password, token) {
 // 게시글과 연결된 데이터 모두 삭제
 async function removePost(post) {
   await redis([
-    ['DEL', `post:${post.id}`, `pw:${post.id}`, `likes:${post.id}`, `pwfail:${post.id}`, `reports:${post.id}`, `reportwhy:${post.id}`],
+    ['DEL', `post:${post.id}`, `pw:${post.id}`, `likes:${post.id}`, `dislikes:${post.id}`, `pwfail:${post.id}`, `reports:${post.id}`, `reportwhy:${post.id}`],
     ['ZREM', 'reported', post.id],
     ['HDEL', 'postviews', post.id],
     ['LREM', `posts:${post.code}`, 0, post.id],
@@ -158,12 +170,12 @@ async function removePost(post) {
 
 // 관리자 비밀번호 확인 (Vercel 환경변수 ADMIN_PASSWORD, 브라우저별 10분 내 5회 실패 시 잠금)
 async function checkAdmin(key, cid) {
-  const secret = process.env.ADMIN_PASSWORD;
+  const secret = String(process.env.ADMIN_PASSWORD ?? '').trim();  // 대시보드 입력 시 딸려 들어간 앞뒤 공백·줄바꿈 무시
   if (!secret) throw new BadRequest('관리자 비밀번호가 설정되지 않았습니다');
   const [fails] = await redis([['GET', `adminfail:${cid}`]]);
   if (Number(fails) >= PW_FAIL_LIMIT) throw new BadRequest('관리자 비밀번호를 여러 번 틀려 10분간 잠겼습니다');
   const digest = v => crypto.createHash('sha256').update(String(v ?? '')).digest();
-  if (!crypto.timingSafeEqual(digest(key), digest(secret))) {
+  if (!crypto.timingSafeEqual(digest(String(key ?? '').trim()), digest(secret))) {
     await redis([['INCR', `adminfail:${cid}`], ['EXPIRE', `adminfail:${cid}`, 600]]);
     throw new BadRequest('관리자 비밀번호가 일치하지 않습니다');
   }
@@ -205,7 +217,7 @@ async function signup(b) {
   const password = String(b.password ?? '');
   if (!USER_ID_RE.test(userId)) throw new BadRequest('아이디는 영문 또는 영문+숫자 4~20자로 입력해주세요');
   if (!MEMBER_NICK_RE.test(nick)) throw new BadRequest('닉네임은 한글 2~10자로 입력해주세요');
-  if (nick === '익명' || /운영자|관리자|운영진/.test(nick)) throw new BadRequest('사용할 수 없는 닉네임입니다');
+  if (nick === '익명' || RESERVED_NICK_RE.test(nick)) throw new BadRequest('사용할 수 없는 닉네임입니다');
   checkBanned(nick, '닉네임');
   if (password.length < MEMBER_PW_MIN || password.length > MEMBER_PW_MAX) throw new BadRequest(`비밀번호는 ${MEMBER_PW_MIN}~${MEMBER_PW_MAX}자로 입력해주세요`);
   const [ok] = await redis([['SET', `rl:signup:${b.cid}`, '1', 'NX', 'EX', 10]]);
@@ -243,25 +255,30 @@ async function login(b) {
   return newSession(user);
 }
 
-// id 목록 → 게시글 + 좋아요 수 + 내가 좋아요 했는지
+// 공감·비공감 수 + 내가 누른 것 조회 명령 (4개)
+const voteCmds = (id, cid) => [
+  ['SCARD', `likes:${id}`], ['SCARD', `dislikes:${id}`],
+  cid ? ['SISMEMBER', `likes:${id}`, cid] : ['ECHO', '0'],
+  cid ? ['SISMEMBER', `dislikes:${id}`, cid] : ['ECHO', '0'],
+];
+const voteFields = ([likes, dislikes, liked, disliked]) => ({
+  likes: Number(likes) || 0, dislikes: Number(dislikes) || 0, liked: Number(liked) === 1, disliked: Number(disliked) === 1,
+});
+
+// id 목록 → 게시글 + 공감·비공감 수 + 내가 누른 것 + 조회수
 async function loadPosts(ids, cid) {
   if (!ids.length) return [];
   const cmds = [];
-  ids.forEach(id => {
-    cmds.push(['GET', `post:${id}`], ['SCARD', `likes:${id}`]);
-    cmds.push(cid ? ['SISMEMBER', `likes:${id}`, cid] : ['ECHO', '0']);
-    cmds.push(['HGET', 'postviews', id]);
-  });
+  ids.forEach(id => cmds.push(['GET', `post:${id}`], ...voteCmds(id, cid), ['HGET', 'postviews', id]));
   const res = await redis(cmds);
   const posts = [];
   ids.forEach((id, i) => {
-    const raw = res[i * 4];
-    if (!raw) return;
-    const p = publicPost(JSON.parse(raw));
+    const r = res.slice(i * 6, i * 6 + 6);
+    if (!r[0]) return;
+    const p = publicPost(JSON.parse(r[0]));
     if (p.blind) p.content = BLIND_TEXT;
-    p.likes = Number(res[i * 4 + 1]) || 0;
-    p.liked = Number(res[i * 4 + 2]) === 1;
-    p.views = Number(res[i * 4 + 3]) || 0;
+    Object.assign(p, voteFields(r.slice(1, 5)));
+    p.views = Number(r[5]) || 0;
     posts.push(p);
   });
   return posts;
@@ -375,6 +392,7 @@ async function handlePost(b) {
     const reason = REPORT_REASONS.includes(b.reason) ? b.reason : '기타';
     const [raw] = await redis([['GET', `post:${id}`]]);
     if (!raw) throw new BadRequest('게시글이 없습니다');
+    if (JSON.parse(raw).official) throw new BadRequest('운영자 글은 신고할 수 없습니다');  // 신고 누적으로 운영자 공지가 가려지지 않게
     const [added] = await redis([['SADD', `reports:${id}`, b.cid]]);
     if (!Number(added)) throw new BadRequest('이미 신고한 글입니다');
     const [, count] = await redis([['HINCRBY', `reportwhy:${id}`, reason, 1], ['SCARD', `reports:${id}`], ['ZADD', 'reported', 0, id]]);
@@ -453,14 +471,20 @@ async function handlePost(b) {
   }
 
   if (b.action === 'create') {
-    const member = b.token ? await sessionUser(b.token) : null;
-    if (b.token && !member) throw new BadRequest('로그인이 만료되었습니다. 다시 로그인해주세요');
+    // 운영자 글: 관리자 모드(관리자 비밀번호)에서만, 닉네임 '운영자' 고정 (일반 회원·비회원은 RESERVED_NICK_RE로 사용 불가)
+    const official = b.asOperator === true;
+    if (official) await checkAdmin(b.adminKey, b.cid);
+    const member = !official && b.token ? await sessionUser(b.token) : null;
+    if (!official && b.token && !member) throw new BadRequest('로그인이 만료되었습니다. 다시 로그인해주세요');
     let nick, password;
-    if (member) {
+    if (official) {
+      nick = OPERATOR_NICK;
+    } else if (member) {
       nick = member.nick;
     } else {
       nick = String(b.nick ?? '').trim() || '익명';
       if (!NICK_RE.test(nick)) throw new BadRequest('닉네임은 한글로만 최대 10자까지 입력할 수 있습니다');
+      if (RESERVED_NICK_RE.test(nick)) throw new BadRequest('사용할 수 없는 닉네임입니다 (운영진 사칭 방지)');
       checkBanned(nick, '닉네임');
       password = checkPassword(b.password);
       const [owned] = await redis([['EXISTS', `nickowner:${nick}`]]);
@@ -475,30 +499,29 @@ async function handlePost(b) {
     if (ok !== 'OK') throw new BadRequest('잠시 후 다시 등록해주세요');
 
     const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-    const post = { id, code: b.code, nick, content, sentiment, ts: Date.now(), ...(member ? { uid: member.id.toLowerCase() } : {}) };
+    const post = { id, code: b.code, nick, content, sentiment, ts: Date.now(), ...(member ? { uid: member.id.toLowerCase() } : {}), ...(official ? { official: true } : {}) };
     await redis([
       ['SET', `post:${id}`, JSON.stringify(post)],
-      member ? ['ECHO', 'member'] : ['SET', `pw:${id}`, hashPassword(password)],
+      member || official ? ['ECHO', 'nopw'] : ['SET', `pw:${id}`, hashPassword(password)],
       ['LPUSH', `posts:${b.code}`, id],
       ['LPUSH', `author:${nick}`, id],
       ['HINCRBY', 'postcount', b.code, 1],
     ]);
-    return { post: { ...publicPost(post), likes: 0, liked: false } };
+    return { post: { ...publicPost(post), likes: 0, dislikes: 0, liked: false, disliked: false } };
   }
 
   if (b.action === 'edit') {
-    const post = await authorize(String(b.id ?? ''), b.password, b.token);
+    const post = await authorize(String(b.id ?? ''), b.password, b.token, b.adminKey, b.cid);
     if (post.blind) throw new BadRequest('블라인드 처리된 글은 수정할 수 없습니다');
     post.content = checkContent(b.content);
     if (SENTIMENTS.includes(b.sentiment)) post.sentiment = b.sentiment;
     post.editedTs = Date.now();
     await redis([['SET', `post:${post.id}`, JSON.stringify(post)]]);
-    const [likes, liked] = await redis([['SCARD', `likes:${post.id}`], ['SISMEMBER', `likes:${post.id}`, b.cid]]);
-    return { post: { ...publicPost(post), likes: Number(likes) || 0, liked: Number(liked) === 1 } };
+    return { post: { ...publicPost(post), ...voteFields(await redis(voteCmds(post.id, b.cid))) } };
   }
 
   if (b.action === 'delete') {
-    const post = await authorize(String(b.id ?? ''), b.password, b.token);
+    const post = await authorize(String(b.id ?? ''), b.password, b.token, b.adminKey, b.cid);
     return removePost(post);
   }
 
@@ -517,14 +540,18 @@ async function handlePost(b) {
     return removePost(JSON.parse(raw));
   }
 
-  if (b.action === 'like') {
+  // 공감·비공감: 같은 걸 다시 누르면 취소, 반대쪽을 누르면 옮겨감 (한 브라우저에 하나만)
+  if (b.action === 'vote' || b.action === 'like') {
     const id = String(b.id ?? '');
     if (!isPostId(id)) throw new BadRequest('게시글 id가 올바르지 않습니다');
-    const [exists, isMember] = await redis([['EXISTS', `post:${id}`], ['SISMEMBER', `likes:${id}`, b.cid]]);
+    const type = b.action === 'like' ? 'up' : b.type;
+    if (type !== 'up' && type !== 'down') throw new BadRequest('잘못된 요청입니다');
+    const key = type === 'up' ? `likes:${id}` : `dislikes:${id}`;
+    const other = type === 'up' ? `dislikes:${id}` : `likes:${id}`;
+    const [exists, on] = await redis([['EXISTS', `post:${id}`], ['SISMEMBER', key, b.cid]]);
     if (!exists) throw new BadRequest('게시글이 없습니다');
-    const liked = Number(isMember) !== 1;
-    const [, count] = await redis([[liked ? 'SADD' : 'SREM', `likes:${id}`, b.cid], ['SCARD', `likes:${id}`]]);
-    return { id, liked, likes: Number(count) || 0 };
+    await redis(Number(on) === 1 ? [['SREM', key, b.cid]] : [['SADD', key, b.cid], ['SREM', other, b.cid]]);
+    return { id, ...voteFields(await redis(voteCmds(id, b.cid))) };
   }
 
   // ── 팔로우 (회원 전용) ──

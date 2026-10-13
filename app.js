@@ -58,7 +58,7 @@ function renderTabNote() {
     ? '종목 카드의 ☆를 눌러 추가한 관심 종목 (회원 전용)'
     : currentFilter === 'usa'
     ? '국내 투자자 보유 TOP50 + 관심 TOP50 (한국예탁결제원) · 시총순'
-    : '시총 TOP20 + 토론글 TOP20 + 거래대금 TOP10 · 시총순';
+    : '업종 내 시총·토론글·거래대금 상위 최대 100종목 · 시총순';
 }
 
 // 가격 표시: 국내 원, 미국 달러
@@ -110,7 +110,7 @@ const whenVisible = fn => () => { if (!document.hidden) fn(); };
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden) { fetchAllPrices(); fetchMarket(); }  // 다시 보이면 바로 최신값으로
 });
-const NEWS_CODES = 12;      // 업종 시총 상위 12종목의 뉴스를 모음
+const NEWS_CHUNK = 25;      // 업종 전체 종목의 뉴스를 모음 — 서버 요청 1번에 25종목씩 나눠 보냄 (api/news.js MAX_CODES)
 const sectorNews = {};      // 업종 key → { ts, data } | { error }
 // 업종과 무관하게 종목 태그만 걸린 기사를 거르기 위한 업종 키워드 (제목·요약에 키워드나 관련 종목명이 있어야 표시)
 const SECTOR_KEYWORDS = {
@@ -142,7 +142,7 @@ function sectorNewsHtml(key) {
   if (!n) return '<p class="empty-msg">뉴스를 불러오는 중...</p>';
   if (n.error && !n.data) return '<p class="empty-msg">뉴스를 불러오지 못했습니다.</p>';
   const updated = new Date(n.ts).toLocaleTimeString('ko-KR', { hour12: false });
-  const foot = `<div class="panel-footer"><span class="news-src naver">N</span>네이버 증권 (업종 시총 상위 ${NEWS_CODES}종목 뉴스) · <span class="news-src google">G</span>Google 뉴스 (업종 키워드)</div>`;
+  const foot = `<div class="panel-footer"><span class="news-src naver">N</span>네이버 증권 (업종 전체 ${sectorList(key).length}종목 뉴스) · <span class="news-src google">G</span>Google 뉴스 (업종 키워드, 최근 7일)</div>`;
   if (!n.data.length) return '<p class="empty-msg">최근 뉴스가 없습니다.</p>' + foot;
   const shown = sectorShown[key] || NEWS_PAGE;
   const more = n.data.length > shown
@@ -187,16 +187,36 @@ function redrawSectorNews(key) {
   }
 }
 
+// 나눠 받은 업종 뉴스 합치기: 같은 제목은 하나로 (관련 종목은 모음) → 최신순
+function mergeSectorNews(items) {
+  const byTitle = new Map();
+  for (const n of items) {
+    const k = n.title.replace(/\s+/g, '');
+    const prev = byTitle.get(k);
+    if (prev) { for (const c of n.codes) if (!prev.codes.includes(c)) prev.codes.push(c); continue; }
+    byTitle.set(k, { ...n, codes: [...n.codes] });
+  }
+  return [...byTitle.values()].sort((a, b) => String(b.datetime).localeCompare(String(a.datetime)));
+}
+
 async function loadSectorNews(force = false, key = currentFilter) {
   if (key === 'fav') return;
   const cached = sectorNews[key];
   if (cached && cached.data && !force && Date.now() - cached.ts < NEWS_REFRESH) return redrawSectorNews(key);
-  const codes = sectorList(key).slice(0, NEWS_CODES).map(s => s.code);
+  const codes = sectorList(key).map(s => s.code);
+  const chunks = [];
+  for (let i = 0; i < codes.length; i += NEWS_CHUNK) chunks.push(codes.slice(i, i + NEWS_CHUNK));
   try {
-    const res = await fetch(`${API_BASE}/api/news?sector=${key}&codes=${codes.join(',')}`);
-    const json = await res.json();
-    if (!res.ok || json.error) throw new Error(json.error || res.status);
-    sectorNews[key] = { ts: Date.now(), data: json.data.filter(n => isSectorNews(n, key)).slice(0, SECTOR_NEWS_MAX) };
+    // 구글 업종 뉴스는 첫 요청(sector 포함)에서만 받음. 일부 요청이 실패해도 받은 기사로 표시
+    const results = await Promise.allSettled(chunks.map(async (c, i) => {
+      const res = await fetch(`${API_BASE}/api/news?${i === 0 ? `sector=${key}&` : ''}codes=${c.join(',')}`);
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || res.status);
+      return json.data;
+    }));
+    const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    if (!items.length) throw new Error('no news');
+    sectorNews[key] = { ts: Date.now(), data: mergeSectorNews(items).filter(n => isSectorNews(n, key)).slice(0, SECTOR_NEWS_MAX) };
   } catch (e) {
     // 실패 시 이전 뉴스 유지
     sectorNews[key] = cached ? { ...cached, error: true } : { error: true };
@@ -249,7 +269,7 @@ function filterTab(type, btn) {
   loadSectorNews();
 }
 
-// 업종 탭 종목: 시총 TOP 20 + 토론글 TOP 20 + 거래대금 TOP 10 (중복 제거, 시총순)
+// 업종 탭 종목: 시총·토론글·거래대금 순위 상위 최대 100개 (scripts/build.mjs, 시총순)
 function filteredList() {
   if (currentFilter === 'fav') return member ? STOCKS.filter(s => favs.has(s.code)) : [];
   return sectorList(currentFilter);
@@ -262,8 +282,19 @@ function sectorList(key) {
 
 
 // ── 검색 ──────────────────────────────────────────────
-function searchStocks() {
-  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+// 브라우저 자동 채우기(저장된 로그인 아이디 등)가 검색창에 들어가면 "종목을 찾을 수 없습니다"만 보이는 문제 방지:
+// 검색창에 커서가 없는데 값이 바뀌면(=사용자가 친 게 아니면) 비움
+function clearAutofilledSearch() {
+  const input = document.getElementById('searchInput');
+  if (input.value && document.activeElement !== input) { input.value = ''; searchStocks(); }
+}
+window.addEventListener('pageshow', clearAutofilledSearch);
+[300, 1000, 2500].forEach(ms => setTimeout(clearAutofilledSearch, ms));
+
+function searchStocks(e) {
+  const input = document.getElementById('searchInput');
+  if (e && document.activeElement !== input) input.value = '';
+  const q = input.value.trim().toLowerCase();
   const stockEl = document.getElementById('stockList');
   const resultEl = document.getElementById('searchResults');
 
@@ -580,8 +611,13 @@ function toggleMore(btn) {
   btn.textContent = open ? '접기' : '더 보기';
 }
 
-const likeBtnHtml = p =>
-  `<button class="btn-like ${p.liked ? 'liked' : ''}" data-id="${escHtml(p.id)}" onclick="toggleLike(this.dataset.id)">👍 ${p.likes || 0}</button>`;
+// 공감·비공감 버튼 (같은 걸 다시 누르면 취소, 한 브라우저에 하나만)
+const likeBtnHtml = p => `<span class="vote-btns" data-id="${escHtml(p.id)}">
+  <button class="btn-vote up ${p.liked ? 'on' : ''}" onclick="vote(this.parentNode.dataset.id, 'up')">공감 <b>${p.likes || 0}</b></button>
+  <button class="btn-vote down ${p.disliked ? 'on' : ''}" onclick="vote(this.parentNode.dataset.id, 'down')">비공감 <b>${p.dislikes || 0}</b></button>
+</span>`;
+const memberBadgeHtml = p => p.official ? '<span class="member-badge official">운영자</span>'
+  : p.member ? '<span class="member-badge">회원</span>' : '<span class="member-badge guest">비회원</span>';
 
 async function renderPosts() {
   const s = currentStock;
@@ -625,7 +661,7 @@ function drawPosts() {
   el.innerHTML = currentPosts.map(p => `
     <div class="post-item">
       <div class="post-header">
-        <span class="post-nick">${escHtml(p.nick)}</span>${p.member ? '<span class="member-badge">회원</span>' : ''}
+        <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
         <span class="post-sentiment ${p.sentiment}">${sentimentLabel(p.sentiment)}</span>
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
@@ -636,7 +672,7 @@ function drawPosts() {
         ${p.editedTs ? `<span class="post-edited">수정됨 · ${timeAgo(p.editedTs)}</span>` : ''}
         ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'edit')">수정</button>
         <button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'delete')">삭제</button>` : ''}
-        ${isMyPost(p) || p.blind ? '' : `<button class="btn-tool btn-report" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'report')">신고</button>`}
+        ${isMyPost(p) || p.blind || p.official ? '' : `<button class="btn-tool btn-report" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'report')">신고</button>`}
         ${adminDeleteBtnHtml(p)}
       </div>
       ${postAction?.id === p.id && postAction.mode === 'delete' ? deleteFormHtml(p) : ''}
@@ -647,7 +683,9 @@ function drawPosts() {
 
 // ── 게시글 수정·삭제 (비회원 글: 작성 시 입력한 비밀번호 / 회원 글: 로그인한 본인) ────
 const isMyPost = p => Boolean(p.member && member && p.nick === member.nick);
-const canManage = p => !p.member || isMyPost(p);
+// 운영자 글은 관리자 모드에서만 수정·삭제 (비밀번호 입력 없음)
+const canManage = p => p.official ? isAdmin() : !p.member || isMyPost(p);
+const noPassword = p => p.member || p.official;
 function editFormHtml(p) {
   return `
       <div class="post-form">
@@ -658,7 +696,7 @@ function editFormHtml(p) {
             <option value="up" ${p.sentiment === 'up' ? 'selected' : ''}>📈 매수</option>
             <option value="down" ${p.sentiment === 'down' ? 'selected' : ''}>📉 매도</option>
           </select>
-          ${p.member ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
+          ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
           <button class="btn-submit" data-id="${escHtml(p.id)}" onclick="savePostEdit(this.dataset.id)">저장</button>
           <button class="btn-cancel" onclick="closePostAction()">취소</button>
         </div>
@@ -668,8 +706,8 @@ function editFormHtml(p) {
 function deleteFormHtml(p) {
   return `
       <div class="post-form post-form-row">
-        <span class="post-form-label">${p.member ? '이 글을 삭제할까요?' : '삭제하려면 비밀번호를 입력하세요'}</span>
-        ${p.member ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
+        <span class="post-form-label">${noPassword(p) ? '이 글을 삭제할까요?' : '삭제하려면 비밀번호를 입력하세요'}</span>
+        ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
         <button class="btn-danger" data-id="${escHtml(p.id)}" onclick="deletePost(this.dataset.id)">삭제</button>
         <button class="btn-cancel" onclick="closePostAction()">취소</button>
       </div>`;
@@ -713,7 +751,8 @@ function closePostAction() {
 
 // 회원 글은 비밀번호 없이 로그인 정보로 처리 (빈 문자열 반환)
 function actionPassword(id) {
-  if (currentPosts.find(p => p.id === id)?.member) return '';
+  const p = currentPosts.find(x => x.id === id);
+  if (p && noPassword(p)) return '';
   const pw = document.getElementById('actionPassword').value;
   if (!pw) { alert('비밀번호를 입력해주세요.'); return null; }
   return pw;
@@ -726,7 +765,7 @@ async function savePostEdit(id) {
   const password = actionPassword(id);
   if (password === null) return;
   try {
-    const { post } = await api({}, { action: 'edit', id, password, content, sentiment });
+    const { post } = await api({}, { action: 'edit', id, password, content, sentiment, ...(isAdmin() ? { adminKey } : {}) });
     currentPosts = currentPosts.map(p => p.id === id ? post : p);
     postAction = null;
     drawPosts();
@@ -739,7 +778,7 @@ async function deletePost(id) {
   const password = actionPassword(id);
   if (password === null) return;
   try {
-    const r = await api({}, { action: 'delete', id, password });
+    const r = await api({}, { action: 'delete', id, password, ...(isAdmin() ? { adminKey } : {}) });
     currentPosts = currentPosts.filter(p => p.id !== id);
     postCounts[r.code] = Math.max(0, (postCounts[r.code] || 1) - 1);
     postAction = null;
@@ -756,7 +795,7 @@ async function submitPost() {
   const password = document.getElementById('postPassword').value;
   const content = document.getElementById('postContent').value.trim();
   const sentiment = document.getElementById('postSentiment').value;
-  if (member) {
+  if (member || isAdmin()) {
     if (!content) return alert('내용을 입력해주세요.');
   } else if (!NICK_RE.test(nick)) {
     alert('닉네임은 한글로만 최대 10자까지 입력할 수 있습니다.');
@@ -774,7 +813,9 @@ async function submitPost() {
   const btn = document.querySelector('.write-box .btn-submit');
   btn.disabled = true;
   try {
-    const { post } = await api({}, member
+    const { post } = await api({}, isAdmin()
+      ? { action: 'create', code: currentStock.code, content, sentiment, asOperator: true, adminKey }
+      : member
       ? { action: 'create', code: currentStock.code, content, sentiment }
       : { action: 'create', code: currentStock.code, nick, password, content, sentiment });
     currentPosts.unshift(post);
@@ -792,15 +833,12 @@ async function submitPost() {
   }
 }
 
-async function toggleLike(id) {
+async function vote(id, type) {
   try {
-    const r = await api({}, { action: 'like', id });
+    const r = await api({}, { action: 'vote', id, type });
     // 토론 목록과 작성자 화면 양쪽 버튼 갱신
-    currentPosts.forEach(p => { if (p.id === id) { p.liked = r.liked; p.likes = r.likes; } });
-    document.querySelectorAll(`.btn-like[data-id="${id}"]`).forEach(b => {
-      b.classList.toggle('liked', r.liked);
-      b.textContent = `👍 ${r.likes}`;
-    });
+    currentPosts.forEach(p => { if (p.id === id) Object.assign(p, { liked: r.liked, disliked: r.disliked, likes: r.likes, dislikes: r.dislikes }); });
+    document.querySelectorAll(`.vote-btns[data-id="${id}"]`).forEach(box => { box.outerHTML = likeBtnHtml({ id, ...r }); });
   } catch (e) {
     alert(`처리하지 못했습니다: ${e.message}`);
   }
@@ -901,11 +939,26 @@ const adminDeleteBtnHtml = p => isAdmin()
   ? `<button class="btn-admin-del" data-id="${escHtml(p.id)}" onclick="adminDeletePost(this.dataset.id, this)">관리자 삭제</button>`
   : '';
 
+// 관리자 로그인 창·관리 버튼·모드 표시는 HTML에 두지 않고 필요할 때만 만듦 (일반 방문자·검색 로봇에게 관리 화면 문구가 보이지 않게)
 function toggleAdminForm() {
   if (isAdmin()) return adminLogout();
-  const form = document.getElementById('adminForm');
-  form.classList.toggle('hidden');
-  if (!form.classList.contains('hidden')) document.getElementById('adminPassword').focus();
+  const area = document.getElementById('adminArea');
+  if (document.getElementById('adminForm')) { area.innerHTML = ''; return; }
+  area.innerHTML = `<div class="admin-form" id="adminForm">
+      <input type="password" id="adminPassword" name="admin-key" placeholder="관리자 비밀번호" autocomplete="new-password" data-lpignore="true" data-1p-ignore
+             onkeydown="if (event.key === 'Enter') adminLogin()" />
+      <button class="btn-submit" onclick="adminLogin()">확인</button>
+    </div>`;
+  document.getElementById('adminPassword').focus();
+}
+
+function renderAdminArea() {
+  document.getElementById('adminArea').innerHTML = isAdmin()
+    ? '<p class="admin-tools"><button class="btn-tool" onclick="openReports()">🚨 신고된 글</button> <button class="btn-tool" onclick="openContacts()">✉️ 문의 내역</button></p>'
+    : '';
+  document.getElementById('adminBadge')?.remove();
+  if (isAdmin()) document.querySelector('footer').insertAdjacentHTML('beforeend',
+    '<div class="admin-badge" id="adminBadge">관리자 모드 · <button onclick="adminLogout()">로그아웃</button></div>');
 }
 
 async function adminLogin() {
@@ -933,7 +986,19 @@ function adminLogout() {
 function refreshAdminUi() {
   document.body.classList.toggle('admin-mode', isAdmin());
   document.getElementById('adminToggle').textContent = isAdmin() ? '관리자 로그아웃' : '관리자';
+  renderAdminArea();
+  renderWriteBox();
   if (currentStock) drawPosts();
+}
+
+// 글쓰기 상자: 관리자 모드는 '운영자'로, 회원은 닉네임·비밀번호 입력 없이, 비회원은 닉네임·비밀번호 입력
+function renderWriteBox() {
+  const asMember = Boolean(member) || isAdmin();
+  document.getElementById('writeGuest').classList.toggle('hidden', asMember);
+  const wm = document.getElementById('writeMember');
+  wm.classList.toggle('hidden', !asMember);
+  wm.innerHTML = isAdmin() ? '<b>운영자</b>로 작성 (관리자 모드)'
+    : member ? `<b>${escHtml(member.nick)}</b> 님으로 작성 (회원)` : '';
 }
 
 async function adminDeletePost(id, btn) {
@@ -961,7 +1026,7 @@ async function openReports() {
       <div class="post-item">
         <div class="post-header">
           <button class="author-stock" onclick="openModal('${escHtml(p.code)}')">${escHtml(findStock(p.code)?.name || p.code)}</button>
-          <span class="post-nick">${escHtml(p.nick)}</span>${p.member ? '<span class="member-badge">회원</span>' : ''}
+          <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
           <span class="report-count">신고 ${p.reports}건${p.blind ? ' · 블라인드' : ''}</span>
           <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         </div>
@@ -1061,11 +1126,7 @@ function setMember(user, token) {
   document.getElementById('btnProfile').classList.toggle('hidden', !user);
   document.getElementById('memberTitle').textContent = user ? `${user.nick}님` : '';
   document.getElementById('memberSub').textContent = user ? `아이디 ${user.id} · 회원 글쓰기 사용 중` : '';
-  // 글쓰기 상자: 회원은 닉네임·비밀번호 입력 없음
-  document.getElementById('writeGuest').classList.toggle('hidden', !!user);
-  const wm = document.getElementById('writeMember');
-  wm.classList.toggle('hidden', !user);
-  wm.innerHTML = user ? `<b>${escHtml(user.nick)}</b> 님으로 작성 (회원)` : '';
+  renderWriteBox();
   if (currentStock) drawPosts();
   loadFavs();
   loadFollowing();
@@ -1318,6 +1379,11 @@ async function fetchMarket() {
     if (!res.ok) return;
     const { indices } = await res.json();
     (indices || []).forEach(renderIndexCard);
+    if (indices?.length) {
+      const banner = document.getElementById('marketBanner');
+      banner.classList.remove('loading');
+      banner.removeAttribute('aria-busy');
+    }
   } catch (e) {
     // 네트워크 오류 시 마지막 값 유지
   }
