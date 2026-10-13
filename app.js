@@ -14,7 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderStocks(filteredList());
   startRealtime();
   loadSectorNews();
-  setInterval(() => loadSectorNews(true), NEWS_REFRESH);
+  setInterval(whenVisible(() => loadSectorNews(true)), NEWS_REFRESH);
   startMarketBanner();
   refreshAdminUi();
   loadForumMeta();
@@ -104,6 +104,12 @@ function boardCardHtml() {
 
 // ── 업종 뉴스 (업종 대표 종목의 네이버 종목 뉴스 모음, 1분마다 갱신) ──
 const NEWS_REFRESH = 60000;
+// 시세·지수 갱신 주기. 탭이 화면에 안 보일 때는 갱신을 멈춰 서버 호출(Cloudflare 무료 한도)을 아낌
+const PRICE_REFRESH = 20000;
+const whenVisible = fn => () => { if (!document.hidden) fn(); };
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden) { fetchAllPrices(); fetchMarket(); }  // 다시 보이면 바로 최신값으로
+});
 const NEWS_CODES = 12;      // 업종 시총 상위 12종목의 뉴스를 모음
 const sectorNews = {};      // 업종 key → { ts, data } | { error }
 // 업종과 무관하게 종목 태그만 걸린 기사를 거르기 위한 업종 키워드 (제목·요약에 키워드나 관련 종목명이 있어야 표시)
@@ -355,12 +361,12 @@ function switchModalTab(tab, btn) {
       const key = currentStock.sector;
       document.getElementById('newsTab').innerHTML = sectorNewsHtml(key);
       loadSectorNews(false, key);
-      newsTimer = setInterval(() => loadSectorNews(true, key), NEWS_REFRESH);
+      newsTimer = setInterval(whenVisible(() => loadSectorNews(true, key)), NEWS_REFRESH);
     }
     return;
   }
   if (DETAIL_TABS.includes(tab)) loadDetail(tab);
-  if (tab === 'news') newsTimer = setInterval(() => loadDetail('news', true), 60000);
+  if (tab === 'news') newsTimer = setInterval(whenVisible(() => loadDetail('news', true)), NEWS_REFRESH);
 }
 
 // ── 상세 데이터 (뉴스·종목정보·보고서·공시) ────────────
@@ -1233,12 +1239,12 @@ async function doLogout() {
   try { await api({}, { action: 'logout', token }); } catch {}
 }
 
-// ── 화면에 보이는 종목 실시간 주가 연동 (네이버 금융, 10초 주기) ────
+// ── 화면에 보이는 종목 실시간 주가 연동 (네이버 금융, 20초 주기 · 탭 숨김 시 정지) ────
 const liveCodes = new Set();
 
 async function startRealtime() {
   await fetchAllPrices();
-  setInterval(fetchAllPrices, 10000);
+  setInterval(whenVisible(fetchAllPrices), PRICE_REFRESH);
 }
 
 async function fetchAllPrices() {
@@ -1294,12 +1300,12 @@ function updateCard(s) {
   });
 }
 
-// ── 상단 지수 8개 실시간 갱신 (/api/market, 10초 주기) ──
+// ── 상단 지수 실시간 갱신 (/api/market, 20초 주기 · 탭 숨김 시 정지) ──
 const MARKET_STATUS = { CLOSE: '장마감', PREOPEN: '장전', OPEN: '' };
 
 function startMarketBanner() {
   fetchMarket();
-  setInterval(fetchMarket, 10000);
+  setInterval(whenVisible(fetchMarket), PRICE_REFRESH);
 }
 
 async function fetchMarket() {
