@@ -8,3 +8,12 @@ functions
 dist
 .wrangler
 wrangler.toml
+api/*
+!api/gnews.js
+*.html
+*.css
+*.xml
+*.txt
+app.js
+stocks.js
+theme.js

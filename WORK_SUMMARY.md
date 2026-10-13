@@ -3,8 +3,8 @@
 - **운영 주소**: https://upjong.com (2026-10-13 이전. www.upjong.com · stock-forum.pages.dev · 옛 Vercel 주소는 모두 301/308로 upjong.com 이동)
 - **배포**: Cloudflare Pages 프로젝트 `stock-forum` (계정 pyourang@naver.com). 이 폴더에서 `node scripts/cf-build.mjs && npx wrangler pages deploy dist --project-name stock-forum --branch main` (MANUAL.md 5-4)
 - **도메인**: upjong.com (Cloudflare Registrar, DNS CNAME @·www → stock-forum.pages.dev)
-- **옛 Vercel 프로젝트** `homepage` (팀 jimmy-eadd): `vercel.json`이 전체를 upjong.com으로 리다이렉트만 함. 검색 순위 이전을 위해 몇 달 유지
-- **DB**: Upstash Redis (`bio-forum-db`, Cloudflare Pages 시크릿 `KV_REST_API_URL` / `KV_REST_API_TOKEN`)
+- **옛 Vercel 프로젝트** `homepage` (팀 jimmy-eadd): `vercel.json`이 전체를 upjong.com으로 리다이렉트 + **Google 뉴스 중계 `/api/gnews`** (Google이 Cloudflare IP를 503으로 막아서). 인증 키 GNEWS_PROXY_KEY는 Vercel 환경변수·Cloudflare 시크릿에 같은 값. Vercel 배포는 `vercel --prod --yes` (.vercelignore로 gnews.js만 올라감). 중계가 죽어도 네이버 기사만으로 동작
+- **DB**: Upstash Redis `upjong-db` (2026-10-13 Vercel 마켓플레이스 DB `bio-forum-db`에서 이관, Upstash에 구글 계정으로 직접 가입한 계정, 도쿄 리전). Cloudflare Pages 시크릿 `KV_REST_API_URL` / `KV_REST_API_TOKEN`. 옛 DB는 백업용으로 한 달 정도 보관 후 삭제
 - **관리자 비밀번호**: Cloudflare Pages 시크릿 `ADMIN_PASSWORD` (코드·문서에 값 없음)
 - **운영자**: 김유랑 · tpsdurang@naver.com
 

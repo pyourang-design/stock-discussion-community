@@ -129,6 +129,7 @@ const SECTOR_KEYWORDS = {
 };
 
 function isSectorNews(item, key) {
+  if (item.source === 'google') return true;  // 구글은 업종 키워드 검색 결과라 그대로 사용
   if (key === 'usa') return true;              // 미국 종목 뉴스(로이터)는 종목별 기사라 그대로 사용
   const text = item.title + ' ' + (item.summary || '');
   const names = item.codes.map(c => STOCKS.find(s => s.code === c)?.name).filter(Boolean);
@@ -141,14 +142,14 @@ function sectorNewsHtml(key) {
   if (!n) return '<p class="empty-msg">뉴스를 불러오는 중...</p>';
   if (n.error && !n.data) return '<p class="empty-msg">뉴스를 불러오지 못했습니다.</p>';
   const updated = new Date(n.ts).toLocaleTimeString('ko-KR', { hour12: false });
-  const foot = `<div class="panel-footer">네이버 증권 (업종 시총 상위 ${NEWS_CODES}종목 뉴스)</div>`;
+  const foot = `<div class="panel-footer"><span class="news-src naver">N</span>네이버 증권 (업종 시총 상위 ${NEWS_CODES}종목 뉴스) · <span class="news-src google">G</span>Google 뉴스 (업종 키워드)</div>`;
   if (!n.data.length) return '<p class="empty-msg">최근 뉴스가 없습니다.</p>' + foot;
   return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신</div>` + n.data.map(item => {
     const names = item.codes.map(c => STOCKS.find(s => s.code === c)?.name).filter(Boolean);
     return `
       <a class="news-item" href="${safeUrl(item.url)}" target="_blank" rel="noopener">
         <div class="news-item-title">${escHtml(item.title)}</div>
-        <div class="news-item-meta">${names.slice(0, 3).map(x => `<span class="news-stock">${escHtml(x)}</span>`).join('')}
+        <div class="news-item-meta"><span class="news-src ${item.source === 'google' ? 'google' : 'naver'}">${item.source === 'google' ? 'G' : 'N'}</span>${names.slice(0, 3).map(x => `<span class="news-stock">${escHtml(x)}</span>`).join('')}
           ${escHtml(item.press || '')} · ${newsTime(item.datetime)}</div>
       </a>`;
   }).join('') + foot;
@@ -422,7 +423,7 @@ const safeUrl = u => /^https:\/\//.test(u || '') ? escHtml(u) : '#';
 
 function renderDetail(type, data, ts) {
   const s = currentStock;
-  const footer = `<div class="panel-footer">출처: 네이버 증권${type === 'info' && !s.us ? ' · WISEfn' : ''}
+  const footer = `<div class="panel-footer">출처: ${type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}${type === 'info' && !s.us ? ' · WISEfn' : ''}
     · <a class="panel-link" href="${naverUrl(s)}" target="_blank" rel="noopener">네이버 증권에서 더 보기 ↗</a></div>`;
 
   if (type === 'info') return (data.us ? renderUsInfo(data) : renderInfo(data)) + footer;
@@ -443,7 +444,7 @@ function renderDetail(type, data, ts) {
         <div class="feed-main">
           <div class="feed-title">${escHtml(n.title)}</div>
           <div class="feed-summary">${escHtml(n.summary || '')}</div>
-          <div class="feed-meta">${escHtml(n.press || '')} · ${newsTime(n.datetime)}</div>
+          <div class="feed-meta"><span class="news-src ${n.source === 'google' ? 'google' : 'naver'}">${n.source === 'google' ? 'G' : 'N'}</span>${escHtml(n.press || '')} · ${newsTime(n.datetime)}</div>
         </div>
         ${n.thumb ? `<img class="feed-thumb" src="${safeUrl(n.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
       </a>`).join('') + more + footer;

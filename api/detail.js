@@ -1,9 +1,11 @@
 // GET /api/detail?code=068270&type=news|research|disclosure|info
 // 종목 상세 모달용 데이터 (네이버 금융 / WISEfn 프록시)
 // 미국 종목(code=TSLA.O 등)은 news·info만 (네이버 해외주식)
-// 뉴스 = 네이버 증권 최신 100건 → 화면에는 20건씩 '더보기'
-//   국내: 20건×5쪽 (50건 단위로 받으면 2쪽이 1쪽과 겹침), 미국: 50건×2쪽 (한 번에 최대 50건)
-// (Google 뉴스 RSS는 Cloudflare 서버 IP를 503으로 막고, 네이버 검색 API는 신규 신청이 막혀 네이버 증권만 사용)
+// 뉴스 = 네이버 증권 최신 100건 + Google 뉴스 종목명 검색(최근 7일) 50건 → 중복 제거 후 최신순 100건
+//        (화면에는 20건씩 '더보기'로 표시)
+//   네이버 국내: 20건×5쪽 (50건 단위로 받으면 2쪽이 1쪽과 겹침), 미국: 50건×2쪽 (한 번에 최대 50건)
+import { googleNews, dedupeByTitle } from './_google.js';
+import { STOCKS } from './_stocks.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const NAVER = 'https://m.stock.naver.com/api';
@@ -14,17 +16,23 @@ async function getJson(url) {
   return r.json();
 }
 
-const NEWS_MAX = 100, KR_NEWS_PAGE = 20, US_NEWS_PAGE = 50, LIST_SIZE = 50;
+const NEWS_MAX = 100, KR_NEWS_PAGE = 20, US_NEWS_PAGE = 50, GOOGLE_MAX = 50, LIST_SIZE = 50;
 
 const stripTags = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
 
-// 여러 쪽을 합쳐 최신순 NEWS_MAX건 (두 쪽에 걸친 같은 기사는 하나로). 한 쪽이 실패해도 나머지로 응답
-async function mergeNews(pages) {
-  const results = await Promise.allSettled(pages);
+// 종목명으로 Google 뉴스 검색 (검색어는 서버의 종목 목록에서만 만듦)
+function stockGoogleNews(code) {
+  const s = STOCKS.find(x => x.code === code);
+  if (!s) return Promise.resolve([]);
+  return googleNews(`"${s.name}" (주가 OR 주식 OR 실적 OR 공시)`, { when: '7d', max: GOOGLE_MAX });
+}
+
+// 네이버 뉴스(+구글)를 합쳐 최신순 NEWS_MAX건. 한쪽이 실패해도 나머지로 응답
+async function mergeNews(naverPages, google) {
+  const results = await Promise.allSettled([...naverPages, google]);
   if (results.every(r => r.status === 'rejected')) throw results[0].reason;
-  const seen = new Set();
-  return results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
-    .filter(n => !seen.has(n.url) && seen.add(n.url))
+  const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+  return dedupeByTitle(items)
     .sort((a, b) => String(b.datetime).localeCompare(String(a.datetime)))
     .slice(0, NEWS_MAX);
 }
@@ -39,9 +47,10 @@ const naverNewsPage = async (code, page) => {
     datetime: n.datetime, // YYYYMMDDHHmm
     url: n.mobileNewsUrl || `https://n.news.naver.com/mnews/article/${n.officeId}/${n.articleId}`,
     thumb: n.imageOriginLink || null,
+    source: 'naver',
   }));
 };
-const news = code => mergeNews([1, 2, 3, 4, 5].map(p => naverNewsPage(code, p)));
+const news = code => mergeNews([1, 2, 3, 4, 5].map(p => naverNewsPage(code, p)), stockGoogleNews(code));
 
 // 증권사 분석 보고서
 async function research(code) {
@@ -130,9 +139,10 @@ const usNewsPage = async (code, page) => {
     datetime: String(n.dt || '').slice(0, 12), // YYYYMMDDHHmm
     url: `https://n.news.naver.com/article/${n.oid}/${n.aid}`,
     thumb: n.thumbUrl || null,
+    source: 'naver',
   }));
 };
-const usNews = code => mergeNews([usNewsPage(code, 1), usNewsPage(code, 2)]);
+const usNews = code => mergeNews([usNewsPage(code, 1), usNewsPage(code, 2)], stockGoogleNews(code));
 
 // 시총·PER·PBR·52주 최고/최저 등 네이버 해외주식 주요 지표 그대로
 async function usInfo(code) {
