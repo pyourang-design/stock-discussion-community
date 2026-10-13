@@ -127,9 +127,6 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .news-item-title { font-size: 0.86rem; font-weight: 600; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; transition: color .15s; }
 .news-item-meta { font-size: 0.7rem; color: var(--text-muted); margin-top: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .news-stock { display: inline-block; padding: 0 5px; margin-right: 4px; border-radius: 4px; background: rgba(91,140,255,.15); color: var(--accent); font-weight: 600; }
-.news-src { display: inline-block; width: 15px; height: 15px; line-height: 15px; text-align: center; margin-right: 4px; border-radius: 3px; font-size: 0.62rem; font-weight: 800; color: #fff; vertical-align: 1px; }
-.news-src.naver { background: #03c75a; }
-.news-src.google { background: #4285f4; }
 /* 윗줄: 로고 + 주가·등락 */
 .card-top { display: flex; align-items: center; gap: 8px; min-width: 0; padding-right: 18px; }
 .card-quote { min-width: 0; line-height: 1.25; }
