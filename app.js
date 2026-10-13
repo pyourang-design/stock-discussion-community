@@ -97,7 +97,7 @@ function boardCardHtml() {
   return `
   <div class="stock-card sector-card board" data-code="${code}" onclick="openModal('${code}', 'discuss')">
     <div class="sector-icon">💬</div>
-    <div class="sector-label">${escHtml(sectorName(currentFilter))} 게시판 보기</div>
+    <div class="sector-label">${escHtml(sectorName(currentFilter))}<br>게시판 보기</div>
     <div class="sector-sub">${currentFilter === 'usa' ? '미국주식 전체 토론' : '업종 전체 토론'} · 글 ${postCounts[code] || 0}</div>
   </div>`;
 }
@@ -173,7 +173,7 @@ function newsCardHtml() {
   return `
   <div class="stock-card sector-card news" id="sectorNews" onclick="openModal('${boardCode(currentFilter)}', 'news')">
     <div class="sector-icon">📰</div>
-    <div class="sector-label">${escHtml(sectorName(currentFilter))} 실시간 뉴스 보기</div>
+    <div class="sector-label">${escHtml(sectorName(currentFilter))} 실시간<br>뉴스 보기</div>
     <div class="sector-sub">${sub}</div>
   </div>`;
 }
@@ -434,8 +434,7 @@ const safeUrl = u => /^https:\/\//.test(u || '') ? escHtml(u) : '#';
 
 function renderDetail(type, data, ts) {
   const s = currentStock;
-  const footer = `<div class="panel-footer">출처: ${type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}${type === 'news' ? '' : `
-    · <a class="panel-link" href="${naverUrl(s)}" target="_blank" rel="noopener">네이버 증권에서 더 보기 ↗</a>`}</div>`;
+  const footer = `<div class="panel-footer">출처: ${type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}</div>`;
 
   if (type === 'info') return renderPriceInfo(data) + footer;
 
