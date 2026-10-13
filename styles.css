@@ -167,12 +167,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .modal { position: relative; background: var(--surface); border-radius: var(--radius) var(--radius) 0 0; width: 100%; max-width: 720px; height: 85vh; max-height: 90vh; display: flex; flex-direction: column; overflow: hidden; animation: slideUp .25s ease; }
 @keyframes slideUp { from { transform: translateY(60px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 /* 닫기 버튼: 글자와 테두리로 눈에 잘 띄게, 휴대폰에서도 누르기 쉬운 크기 */
-.modal-close { position: absolute; top: 14px; right: 14px; z-index: 10; display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 14px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 0.88rem; font-weight: 700; line-height: 1; white-space: nowrap; transition: all .2s; }
+.modal-close { flex-shrink: 0; display: inline-flex; align-items: center; gap: 5px; min-height: 36px; padding: 0 14px; border-radius: 20px; background: var(--surface2); border: 1px solid var(--border); color: var(--text); font-size: 0.88rem; font-weight: 700; line-height: 1; white-space: nowrap; transition: all .2s; }
 .modal-close .x { font-size: 1rem; }
 .modal-close:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
-.modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 104px 0 20px; border-bottom: 1px solid var(--border); padding-bottom: 14px; }
+.modal-header { display: flex; justify-content: space-between; align-items: flex-start; padding: 20px 20px 0 20px; border-bottom: 1px solid var(--border); padding-bottom: 14px; }
 .modal-header h2 { font-size: 1.3rem; }
 .stock-code-badge { display: inline-block; margin-top: 4px; font-size: 0.78rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 6px; padding: 1px 7px; }
+.modal-head-right { display: flex; align-items: center; gap: 14px; flex-shrink: 0; }
 .modal-price-block { text-align: right; }
 .modal-price { font-size: 1.4rem; font-weight: 700; display: block; }
 .modal-change { font-size: 1rem; font-weight: 600; }
@@ -322,8 +323,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
   .login-box { width: auto; }
   .market-banner { gap: 8px; }
   .modal { max-height: 95vh; }
-  .modal-close { top: 12px; right: 12px; min-height: 38px; padding: 0 13px; }
-  .modal-header { padding-right: 96px; }
+  .modal-close { min-height: 38px; padding: 0 13px; }
 }
 
 /* ── 관리자 ──────────────────────────────────────── */

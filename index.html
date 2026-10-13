@@ -159,16 +159,17 @@
 <!-- 종목 상세 / 토론방 모달 -->
 <div class="modal-overlay hidden" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal" id="modal">
-    <button class="modal-close" onclick="closeModal()" title="토론방 닫기 — Esc 키, 바깥 화면 누르기, 휴대폰 뒤로가기로도 닫혀요" aria-label="토론방 닫기"><span class="x" aria-hidden="true">✕</span>닫기</button>
-
     <div class="modal-header">
       <div>
         <h2 id="modalStockName"></h2>
         <span id="modalStockCode" class="stock-code-badge"></span>
       </div>
-      <div class="modal-price-block">
-        <span class="modal-price" id="modalPrice"></span>
-        <span class="modal-change" id="modalChange"></span>
+      <div class="modal-head-right">
+        <div class="modal-price-block">
+          <span class="modal-price" id="modalPrice"></span>
+          <span class="modal-change" id="modalChange"></span>
+        </div>
+        <button class="modal-close" onclick="closeModal()" title="토론방 닫기 — Esc 키, 바깥 화면 누르기, 휴대폰 뒤로가기로도 닫혀요" aria-label="토론방 닫기"><span class="x" aria-hidden="true">✕</span>닫기</button>
       </div>
     </div>
 
@@ -215,13 +216,15 @@
 <!-- 작성자 전체글 (팔로우) -->
 <div class="modal-overlay author-overlay hidden" id="authorOverlay" onclick="closeAuthor(event)">
   <div class="modal author-modal">
-    <button class="modal-close" onclick="closeAuthor()" title="닫기 — Esc 키, 바깥 화면 누르기, 휴대폰 뒤로가기로도 닫혀요" aria-label="닫기"><span class="x" aria-hidden="true">✕</span>닫기</button>
     <div class="modal-header">
       <div>
         <h2 id="authorName"></h2>
         <span id="authorCount" class="stock-code-badge"></span>
       </div>
-      <div id="authorAction"></div>
+      <div class="modal-head-right">
+        <div id="authorAction"></div>
+        <button class="modal-close" onclick="closeAuthor()" title="닫기 — Esc 키, 바깥 화면 누르기, 휴대폰 뒤로가기로도 닫혀요" aria-label="닫기"><span class="x" aria-hidden="true">✕</span>닫기</button>
+      </div>
     </div>
     <div class="post-list" id="authorPosts"></div>
   </div>
