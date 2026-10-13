@@ -273,6 +273,16 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .info-table tr:last-child { border-bottom: none; }
 .info-key { padding: 10px 8px; color: var(--text-muted); font-size: 0.88rem; width: 28%; vertical-align: top; }
 .info-val { padding: 10px 8px; font-weight: 600; font-size: 0.9rem; }
+.price-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.price-table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+.price-table th, .price-table td { padding: 8px 6px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--border); font-variant-numeric: tabular-nums; }
+.price-table thead th { color: var(--text-muted); font-weight: 600; font-size: 0.78rem; }
+.price-table th:first-child { text-align: left; }
+.price-table tbody th { color: var(--text-muted); font-weight: 500; }
+.price-table td { font-weight: 600; }
+.price-table td.muted { color: var(--text-muted); font-weight: 400; font-size: 0.76rem; }
+.price-note { margin-top: 8px; line-height: 1.5; }
+@media (max-width: 480px) { .price-table { font-size: 0.78rem; } .price-table th, .price-table td { padding: 7px 4px; } }
 
 /* ── 로그인 드롭다운 ─────────────────────────────── */
 .login-dropdown { position: fixed; top: 62px; right: 16px; z-index: 300; }

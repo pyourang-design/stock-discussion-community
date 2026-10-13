@@ -382,7 +382,7 @@ function switchModalTab(tab, btn) {
 
 // ── 상세 데이터 (뉴스·종목정보·보고서·공시) ────────────
 const detailCache = {};
-const DETAIL_TTL = { news: 60000, info: 600000, research: 600000, disclosure: 300000 };
+const DETAIL_TTL = { news: 60000, info: 60000, research: 600000, disclosure: 300000 };
 // 종목 뉴스는 최대 100건을 받아 20건씩 '더보기'로 표시 (자동 갱신해도 펼친 개수 유지)
 const NEWS_PAGE = 20;
 const newsShown = {};
@@ -434,13 +434,13 @@ const safeUrl = u => /^https:\/\//.test(u || '') ? escHtml(u) : '#';
 
 function renderDetail(type, data, ts) {
   const s = currentStock;
-  const footer = `<div class="panel-footer">출처: ${type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}${type === 'info' && !s.us ? ' · WISEfn' : ''}${type === 'news' ? '' : `
+  const footer = `<div class="panel-footer">출처: ${type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}${type === 'news' ? '' : `
     · <a class="panel-link" href="${naverUrl(s)}" target="_blank" rel="noopener">네이버 증권에서 더 보기 ↗</a>`}</div>`;
 
-  if (type === 'info') return (data.us ? renderUsInfo(data) : renderInfo(data)) + footer;
+  if (type === 'info') return renderPriceInfo(data) + footer;
 
   if (!data || !data.length) {
-    const label = { news: '뉴스가', research: '분석 보고서가', disclosure: '공시가' }[type];
+    const label = { news: '뉴스가', research: '증권사 리포트가', disclosure: '공시가' }[type];
     return `<p class="empty-msg">최근 ${label} 없습니다.</p>` + footer;
   }
 
@@ -482,52 +482,34 @@ function renderDetail(type, data, ts) {
       </a>`).join('') + footer;
 }
 
-function renderInfo(d) {
-  const num = v => {
-    const t = String(v).trim();
-    return `<td class="${t.startsWith('-') && t !== '-' ? 'down' : ''}">${escHtml(t)}</td>`;
+// 시세 정보: 최근 10거래일 종가·등락률 + 외국인·기관·개인 순매수 수량 (미국 종목은 종가·등락률만)
+function renderPriceInfo(d) {
+  const days = d?.days || [];
+  if (!days.length) return '<p class="empty-msg">시세 정보가 없습니다.</p>';
+  const sign = v => {
+    const t = String(v ?? '').trim();
+    if (!t || t === '-') return { text: '-', cls: '' };
+    const neg = t.startsWith('-'), zero = /^[+-]?0(\.0+)?$/.test(t.replace(/,/g, ''));
+    return { text: zero ? t.replace(/^[+-]/, '') : neg || t.startsWith('+') ? t : '+' + t, cls: zero ? '' : neg ? 'down' : 'up' };
   };
-  const f = d.financials;
-  const finTable = f && f.years.length ? `
-    <table class="fin-table">
-      <thead><tr><th>구분</th>${f.years.map(y => `<th>${escHtml(y)}</th>`).join('')}</tr></thead>
-      <tbody>
-        <tr><th>매출액</th>${f.revenue.map(num).join('')}</tr>
-        <tr><th>영업이익</th>${f.operatingIncome.map(num).join('')}</tr>
-        <tr><th>당기순이익</th>${f.netIncome.map(num).join('')}</tr>
-      </tbody>
-    </table>` : '<span class="info-sub">재무 데이터 없음</span>';
-
-  const foreign = d.foreignOwnership
-    ? escHtml(d.foreignOwnership)
-    : `${escHtml(d.foreignExhaustion)} <span class="info-sub">(외인소진율)</span>`;
-  const holder = d.majorHolder
-    ? `${escHtml(d.majorHolder.name)} <span class="info-sub">${escHtml(d.majorHolder.pct)}%</span>`
-    : '-';
-
+  const cell = (v, suffix = '') => {
+    if (v == null) return '<td class="muted">집계 전</td>';
+    const x = sign(v);
+    return `<td class="${x.cls}">${escHtml(x.text)}${x.text === '-' ? '' : suffix}</td>`;
+  };
+  const date = s => String(s).slice(5).replace('-', '.');
+  const kr = !d.us;
   return `
-    <table class="info-table">
-      <tr><td class="info-key">시가총액</td><td class="info-val">${escHtml(d.marketCap)}</td></tr>
-      <tr class="fin-row"><td class="info-key">최근 3개년 실적<br><span class="info-sub">(단위: ${escHtml(f?.unit || '억원')})</span></td><td class="info-val">${finTable}</td></tr>
-      <tr><td class="info-key">PER</td><td class="info-val">${escHtml(d.per)}${d.perDate ? ` <span class="info-sub">${escHtml(d.perDate)} 기준</span>` : ''}</td></tr>
-      <tr><td class="info-key">PBR</td><td class="info-val">${escHtml(d.pbr)}</td></tr>
-      <tr><td class="info-key">외국인지분율</td><td class="info-val">${foreign}</td></tr>
-      <tr><td class="info-key">최대주주</td><td class="info-val">${holder}</td></tr>
-    </table>`;
-}
-
-// 미국 종목 정보: 네이버 해외주식 주요 지표 (시총·PER·PBR·52주 최고/최저 등)
-function renderUsInfo(d) {
-  const s = currentStock;
-  const u = s?.sectors?.usa;
-  const head = !u ? '' : u.hold
-    ? `<tr><td class="info-key">국내 투자자 보관</td><td class="info-val">${escHtml(u.amt)} <span class="info-sub">보관금액 ${u.hold}위 · ${escHtml(US_AS_OF)} 기준</span></td></tr>`
-    : `<tr><td class="info-key">국내 투자자 순위</td><td class="info-val">${u.sel}위 <span class="info-sub">예탁원 최근 1년 월말 보관·최근 결제금액 TOP 50 진입 ${u.hits}회</span></td></tr>`;
-  const ind = d.industry ? `<tr><td class="info-key">업종</td><td class="info-val">${escHtml(d.industry)}</td></tr>` : '';
-  return `
-    <table class="info-table">${head}${ind}
-      ${d.rows.map(r => `<tr><td class="info-key">${escHtml(r.key)}</td><td class="info-val">${escHtml(r.value)}${r.desc ? ` <span class="info-sub">${escHtml(r.desc)}</span>` : ''}</td></tr>`).join('')}
-    </table>`;
+    <div class="price-wrap">
+      <table class="price-table">
+        <thead><tr><th>날짜</th><th>종가</th><th>등락률</th>${kr ? '<th>외국인</th><th>기관</th><th>개인</th>' : ''}</tr></thead>
+        <tbody>${days.map(r => {
+          const rate = sign(r.rate);
+          return `<tr><th>${escHtml(date(r.date))}</th><td class="${rate.cls}">${escHtml(String(r.close))}</td>${cell(r.rate, '%')}${kr ? cell(r.foreign) + cell(r.organ) + cell(r.individual) : ''}</tr>`;
+        }).join('')}</tbody>
+      </table>
+    </div>
+    <p class="info-sub price-note">${kr ? '외국인·기관·개인: 순매수 수량(주), + 순매수 / − 순매도 · 당일 수량은 장 마감 후 집계돼요' : '미국 종목은 투자자별 매매 정보가 제공되지 않아 종가·등락률만 보여드려요 (현지 날짜 기준)'}</p>`;
 }
 
 // 뉴스 시각 (YYYYMMDDHHmm) → "N분 전"

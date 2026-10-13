@@ -1,4 +1,4 @@
-// GET /api/detail?code=068270&type=news|research|disclosure|info
+// GET /api/detail?code=068270&type=news|research|disclosure|info (info = 시세 정보)
 // 종목 상세 모달용 데이터 (네이버 금융 / WISEfn 프록시)
 // 미국 종목(code=TSLA.O 등)은 news·info만 (네이버 해외주식)
 // 뉴스 = 네이버 증권 최신 100건 + Google 뉴스 종목명 검색(최근 7일) 50건 → 중복 제거 후 최신순 100건
@@ -76,54 +76,28 @@ async function disclosure(code) {
   }));
 }
 
-// WISEfn 기업개요: 최대주주, 외국인지분율
-async function wise(code) {
-  const r = await fetch(`https://navercomp.wisereport.co.kr/v2/company/c1010001.aspx?cmp_cd=${code}`, { headers: { 'User-Agent': UA } });
-  if (!r.ok) return {};
-  const html = await r.text();
-  const out = {};
-  const fr = html.match(/>외국인지분율<\/th>\s*<td[^>]*>\s*([\d.,]+%)/);
-  if (fr) out.foreignOwnership = fr[1];
-  const mj = html.match(/<tr class="p_sJJ10">[\s\S]*?title="([^"]*)"[\s\S]*?<td class="line num">([^<]*)<\/td>\s*<td class="noline-right num">([^<]*)</);
-  if (mj && mj[1]) out.majorHolder = { name: mj[1].trim(), shares: mj[2].trim(), pct: mj[3].trim() };
-  return out;
-}
-
-// 종목 정보: 시가총액, 최근 3개년 실적, PER, PBR, 외국인지분율, 최대주주
+// 시세 정보: 최근 10거래일 종가·등락률 + 외국인·기관·개인 순매수 수량 (네이버 일별 시세 + 투자자별 매매동향)
+//   당일 장중에는 투자자별 수량이 아직 없을 수 있어 null로 둠
+const DAYS = 10;
 async function info(code) {
-  const [integ, fin, w] = await Promise.all([
-    getJson(`${NAVER}/stock/${code}/integration`),
-    getJson(`${NAVER}/stock/${code}/finance/annual`).catch(() => null),
-    wise(code).catch(() => ({})),
+  const [prices, trend] = await Promise.all([
+    getJson(`${NAVER}/stock/${code}/price?pageSize=${DAYS}&page=1`),
+    getJson(`${NAVER}/stock/${code}/trend?pageSize=${DAYS}`).catch(() => []),
   ]);
-  const m = Object.fromEntries((integ.totalInfos ?? []).map(x => [x.code, x]));
-
-  let financials = null;
-  const fi = fin?.financeInfo;
-  if (fi) {
-    const periods = (fi.trTitleList ?? []).filter(p => p.isConsensus === 'N').slice(-3);
-    const pick = title => {
-      const row = (fi.rowList ?? []).find(r => r.title === title);
-      return periods.map(p => row?.columns?.[p.key]?.value ?? '-');
-    };
-    financials = {
-      unit: '억원',
-      years: periods.map(p => p.title.replace(/\.$/, '')),
-      revenue: pick('매출액'),
-      operatingIncome: pick('영업이익'),
-      netIncome: pick('당기순이익'),
-    };
-  }
-
+  const byDate = new Map(trend.map(t => [t.bizdate, t]));
   return {
-    marketCap: m.marketValue?.value ?? '-',
-    financials,
-    per: m.per?.value ?? '-',
-    perDate: m.per?.valueDesc ?? '',
-    pbr: m.pbr?.value ?? '-',
-    foreignOwnership: w.foreignOwnership ?? null,
-    foreignExhaustion: m.foreignRate?.value ?? '-', // 외인소진율 (지분율 조회 실패 시 대체)
-    majorHolder: w.majorHolder ?? null,
+    days: prices.slice(0, DAYS).map(p => {
+      const t = byDate.get(String(p.localTradedAt).replace(/-/g, ''));
+      return {
+        date: p.localTradedAt,
+        close: p.closePrice,
+        change: p.compareToPreviousClosePrice,
+        rate: p.fluctuationsRatio,
+        foreign: t?.foreignerPureBuyQuant ?? null,
+        organ: t?.organPureBuyQuant ?? null,
+        individual: t?.individualPureBuyQuant ?? null,
+      };
+    }),
   };
 }
 
@@ -144,15 +118,17 @@ const usNewsPage = async (code, page) => {
 };
 const usNews = code => mergeNews([usNewsPage(code, 1), usNewsPage(code, 2)], stockGoogleNews(code));
 
-// 시총·PER·PBR·52주 최고/최저 등 네이버 해외주식 주요 지표 그대로
+// 미국 종목 시세 정보: 최근 10거래일 종가·등락률 (투자자별 매매동향은 제공되지 않음)
 async function usInfo(code) {
-  const d = await getJson(`${WORLD}/stock/${code}/basic`);
+  const prices = await getJson(`${WORLD}/stock/${code}/price?pageSize=${DAYS}&page=1`);
   return {
     us: true,
-    industry: d.industryCodeType?.industryGroupKor || null,
-    rows: (d.stockItemTotalInfos ?? [])
-      .filter(x => x.value && x.value !== 'N/A' && x.code !== 'industryGroupKor')
-      .map(x => ({ key: x.key, value: x.value, desc: x.valueDesc || x.keyDesc || '' })),
+    days: prices.slice(0, DAYS).map(p => ({
+      date: String(p.localTradedAt).slice(0, 10),
+      close: p.closePrice,
+      change: p.compareToPreviousClosePrice,
+      rate: p.fluctuationsRatio,
+    })),
   };
 }
 
@@ -170,8 +146,8 @@ export default async function handler(req, res) {
   if (!handlers || !handlers[type]) {
     return res.status(400).json({ error: 'code 또는 type이 올바르지 않습니다' });
   }
-  // 뉴스는 1분, 나머지는 10분 캐시
-  res.setHeader('Cache-Control', type === 'news' ? 's-maxage=60, stale-while-revalidate=60' : 's-maxage=600, stale-while-revalidate=600');
+  // 뉴스·시세 정보는 1분, 나머지는 10분 캐시
+  res.setHeader('Cache-Control', type === 'news' || type === 'info' ? 's-maxage=60, stale-while-revalidate=60' : 's-maxage=600, stale-while-revalidate=600');
 
   try {
     res.json({ code, type, data: await handlers[type](code) });
