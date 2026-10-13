@@ -12,7 +12,7 @@ function isLightTheme() {
 
 function renderThemeButtons() {
   document.querySelectorAll('.theme-toggle').forEach(b => {
-    b.textContent = isLightTheme() ? '라이트모드' : '다크모드';
+    b.textContent = isLightTheme() ? 'Light' : 'Dark';
     b.title = isLightTheme() ? '눌러서 다크모드로' : '눌러서 라이트모드로';
   });
 }

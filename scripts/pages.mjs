@@ -47,7 +47,7 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
     </a>
     <nav class="main-nav page-nav">
       <a href="./">Home</a>
-      <button class="theme-toggle" onclick="toggleTheme()">다크모드</button>
+      <button class="theme-toggle" onclick="toggleTheme()">Dark</button>
     </nav>
   </div>
 </header>
