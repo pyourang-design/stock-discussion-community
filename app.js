@@ -173,7 +173,7 @@ function newsCardHtml() {
   return `
   <div class="stock-card sector-card news" id="sectorNews" onclick="openModal('${boardCode(currentFilter)}', 'news')">
     <div class="sector-icon">📰</div>
-    <div class="sector-label">${escHtml(sectorName(currentFilter))} 실시간<br>뉴스 보기</div>
+    <div class="sector-label">${escHtml(sectorName(currentFilter))}<br>실시간 뉴스 보기</div>
     <div class="sector-sub">${sub}</div>
   </div>`;
 }
