@@ -46,8 +46,8 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
       <span class="logo-text">${NAME}</span>
     </a>
     <nav class="main-nav page-nav">
-      <a href="./">홈</a>
-      <button class="theme-toggle" onclick="toggleTheme()">🌙 다크</button>
+      <a href="./">Home</a>
+      <button class="theme-toggle" onclick="toggleTheme()">다크모드</button>
     </nav>
   </div>
 </header>

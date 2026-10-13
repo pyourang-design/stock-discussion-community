@@ -92,7 +92,7 @@ function layout({ title, desc, canonical, body, jsonld, status = 200 }) {
 <header class="site-header">
   <div class="container header-inner">
     <a class="logo" href="/"><span class="logo-icon">📈</span><span class="logo-text">${NAME}</span></a>
-    <nav class="main-nav page-nav"><a href="/">홈</a><button class="theme-toggle" onclick="toggleTheme()">🌙 다크</button></nav>
+    <nav class="main-nav page-nav"><a href="/">Home</a><button class="theme-toggle" onclick="toggleTheme()">다크모드</button></nav>
   </div>
 </header>
 <main class="container stock-page">
