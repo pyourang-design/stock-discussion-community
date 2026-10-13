@@ -1,3 +1,5 @@
+import { ASSET_VERSION } from './_assets.js';
+
 // Vercel 방식(req, res) API 핸들러를 Cloudflare Pages Functions(fetch 방식)로 감싸는 어댑터
 // api/*.js 코드는 그대로 두고 Vercel·Cloudflare 양쪽에서 동작하게 함
 const HANDLERS = {
@@ -35,7 +37,7 @@ export async function runVercelHandler(name, context, extraQuery = {}) {
   }
   const req = { method: request.method, query, body, headers: Object.fromEntries(request.headers), url: url.pathname + url.search };
 
-  const response = await new Promise((resolve, reject) => {
+  let response = await new Promise((resolve, reject) => {
     const headers = new Headers();
     let status = 200;
     const res = {
@@ -47,6 +49,12 @@ export async function runVercelHandler(name, context, extraQuery = {}) {
     };
     load().then(m => m.default(req, res)).catch(reject);
   });
+
+  // 서버 렌더링 HTML의 CSS·JS 링크에도 버전(?v=)을 붙임 (브라우저 캐시에 남은 옛 파일 방지)
+  if ((response.headers.get('Content-Type') || '').startsWith('text/html')) {
+    const html = (await response.text()).replace(/((?:src|href)="\/?)(styles\.css|app\.js|stocks\.js|theme\.js)"/g, (_, a, f) => `${a}${f}?v=${ASSET_VERSION[f]}"`);
+    response = new Response(html, response);
+  }
 
   const cc = response.headers.get('Cache-Control') || '';
   const m = cc.match(/s-maxage=(\d+)/);
