@@ -246,6 +246,8 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .detail-panel { flex: 1; overflow-y: auto; padding: 4px 20px 16px; }
 #infoTab { padding-top: 12px; }
 .panel-status { font-size: 0.75rem; color: var(--text-muted); padding: 10px 0 4px; }
+.news-more { display: block; width: 100%; margin: 10px 0 0; padding: 9px 0; border-radius: 8px; border: 1px solid var(--border); color: var(--text-muted); font-size: 0.85rem; font-weight: 600; transition: all .2s; }
+.news-more:hover { color: var(--accent); border-color: var(--accent); }
 .panel-footer { font-size: 0.75rem; color: var(--text-muted); padding: 14px 0 4px; text-align: center; }
 .panel-link { color: var(--accent); }
 .panel-link:hover { text-decoration: underline; }

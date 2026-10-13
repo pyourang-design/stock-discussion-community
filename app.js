@@ -372,6 +372,15 @@ function switchModalTab(tab, btn) {
 // ── 상세 데이터 (뉴스·종목정보·보고서·공시) ────────────
 const detailCache = {};
 const DETAIL_TTL = { news: 60000, info: 600000, research: 600000, disclosure: 300000 };
+// 종목 뉴스는 최대 100건을 받아 20건씩 '더보기'로 표시 (자동 갱신해도 펼친 개수 유지)
+const NEWS_PAGE = 20;
+const newsShown = {};
+function moreNews() {
+  const s = currentStock, cached = s && detailCache[`news_${s.code}`];
+  if (!cached) return;
+  newsShown[s.code] = (newsShown[s.code] || NEWS_PAGE) + NEWS_PAGE;
+  document.getElementById('newsTab').innerHTML = renderDetail('news', cached.data, cached.ts);
+}
 let newsTimer = null;
 
 function stopNewsRefresh() {
@@ -414,7 +423,7 @@ const safeUrl = u => /^https:\/\//.test(u || '') ? escHtml(u) : '#';
 
 function renderDetail(type, data, ts) {
   const s = currentStock;
-  const footer = `<div class="panel-footer">출처: 네이버 증권${type === 'info' && !s.us ? ' · WISEfn' : ''}
+  const footer = `<div class="panel-footer">출처: ${type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}${type === 'info' && !s.us ? ' · WISEfn' : ''}
     · <a class="panel-link" href="${naverUrl(s)}" target="_blank" rel="noopener">네이버 증권에서 더 보기 ↗</a></div>`;
 
   if (type === 'info') return (data.us ? renderUsInfo(data) : renderInfo(data)) + footer;
@@ -426,16 +435,19 @@ function renderDetail(type, data, ts) {
 
   if (type === 'news') {
     const updated = new Date(ts).toLocaleTimeString('ko-KR', { hour12: false });
-    return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신</div>` +
-      data.map(n => `
+    const shown = newsShown[s.code] || NEWS_PAGE;
+    const more = data.length > shown
+      ? `<button class="news-more" onclick="moreNews()">더보기 (${shown} / ${data.length})</button>` : '';
+    return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신 · 최신 ${data.length}건</div>` +
+      data.slice(0, shown).map(n => `
       <a class="feed-item" href="${safeUrl(n.url)}" target="_blank" rel="noopener">
         <div class="feed-main">
           <div class="feed-title">${escHtml(n.title)}</div>
           <div class="feed-summary">${escHtml(n.summary || '')}</div>
-          <div class="feed-meta">${escHtml(n.press || '')} · ${newsTime(n.datetime)}</div>
+          <div class="feed-meta"><span class="news-src ${n.source === 'google' ? 'google' : 'naver'}">${n.source === 'google' ? 'G' : 'N'}</span>${escHtml(n.press || '')} · ${newsTime(n.datetime)}</div>
         </div>
         ${n.thumb ? `<img class="feed-thumb" src="${safeUrl(n.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
-      </a>`).join('') + footer;
+      </a>`).join('') + more + footer;
   }
 
   if (type === 'research') {

@@ -2,6 +2,8 @@
 //   - 네이버: 업종 대표 종목들의 네이버 종목 뉴스 (미국 종목은 네이버 해외주식 뉴스)
 //   - 구글: Google 뉴스 RSS 업종 키워드 검색 (최근 1일)
 // { data: [{ title, summary, press, datetime, url, thumb, codes: [관련 종목코드], source: 'naver'|'google' }] }
+import { googleNews, stripTags } from './_google.js';
+
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const MAX_CODES = 15;
 const MAX_ITEMS = 50;
@@ -20,7 +22,6 @@ const GOOGLE_QUERY = {
   usa: '미국 증시 OR 뉴욕증시 OR 나스닥 OR 서학개미 OR 미국 주식',
 };
 
-const stripTags = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
 
 // 미국 종목: 네이버 해외주식 뉴스 (로이터 등)
 async function usStockNews(code) {
@@ -61,38 +62,9 @@ async function stockNews(code) {
   }));
 }
 
-// Date → 한국시간 YYYYMMDDHHmm (네이버 datetime 형식에 맞춤)
-const kstStamp = d => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace(/[-T:]/g, '');
-
-async function googleNews(sector) {
+async function sectorGoogleNews(sector) {
   const q = GOOGLE_QUERY[sector];
-  if (!q) return [];
-  const r = await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(q + ' when:1d')}&hl=ko&gl=KR&ceid=KR:ko`, {
-    headers: { 'User-Agent': UA },
-  });
-  if (!r.ok) throw new Error(`Google HTTP ${r.status}`);
-  const xml = await r.text();
-  const tag = (s, t) => (s.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)) || [])[1] || '';
-  return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => {
-    const it = m[1];
-    const press = stripTags(tag(it, 'source'));
-    let title = stripTags(tag(it, 'title').replace(/<!\[CDATA\[|\]\]>/g, ''));
-    if (press && title.endsWith(` - ${press}`)) title = title.slice(0, -(press.length + 3));
-    const d = new Date(tag(it, 'pubDate'));
-    return {
-      id: 'g_' + tag(it, 'guid').slice(0, 60),
-      title,
-      summary: '',
-      press,
-      datetime: isNaN(d) ? '' : kstStamp(d),
-      url: stripTags(tag(it, 'link')),
-      thumb: null,
-      code: null,
-      source: 'google',
-    };
-  }).filter(n => n.title && /^https:\/\//.test(n.url))
-    .sort((a, b) => b.datetime.localeCompare(a.datetime))
-    .slice(0, GOOGLE_MAX);
+  return q ? googleNews(q, { when: '1d', max: GOOGLE_MAX }) : [];
 }
 
 export default async function handler(req, res) {
@@ -107,7 +79,7 @@ export default async function handler(req, res) {
   if (!codes.length && !GOOGLE_QUERY[sector]) return res.status(400).json({ error: '종목코드 또는 업종이 올바르지 않습니다' });
   res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=60');
 
-  const results = await Promise.allSettled([...codes.map(stockNews), googleNews(sector)]);
+  const results = await Promise.allSettled([...codes.map(stockNews), sectorGoogleNews(sector)]);
   const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
   if (!items.length) return res.status(502).json({ error: '뉴스를 불러오지 못했습니다' });
 
