@@ -54,7 +54,6 @@ async function marketIndex(key, name, path, unit) {
 }
 
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=10');
 
   // 한 곳이 실패해도 나머지 지수는 표시

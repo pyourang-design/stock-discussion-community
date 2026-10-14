@@ -13,8 +13,8 @@ document.addEventListener('DOMContentLoaded', () => {
   renderTabNote();
   renderStocks(filteredList());
   startRealtime();
-  loadSectorNews();
-  setInterval(whenVisible(() => loadSectorNews(true)), NEWS_REFRESH);
+  loadHomeNews();
+  setInterval(whenVisible(() => loadHomeNews(true)), NEWS_REFRESH);
   startMarketBanner();
   refreshAdminUi();
   loadForumMeta();
@@ -42,6 +42,11 @@ function openFromUrl() {
     if (btn) filterTab(key, btn);
   }
   if (s) openModal(s.code);
+  const col = q.get('column');
+  // 바로가기 주소는 처음 기록에서 지움 (창을 닫으면 홈 주소로 돌아가게, 열린 칼럼 주소는 창 안에서 다시 반영)
+  if (col) syncColumnUrl(null);
+  if (col === 'list') openColumnLink(null);
+  else if (col && /^[0-9a-z]{6,20}$/.test(col)) openColumnLink(col);
 }
 
 // 탭 이름: PC는 한 줄, 모바일은 두 단어를 두 줄로 (예: 전력 / 원자력)
@@ -70,37 +75,33 @@ const fmtPrice = s => s.us
 function renderStocks(list) {
   const el = document.getElementById('stockList');
   if (currentFilter === 'fav') {
-    // 관심 종목 탭: 업종 뉴스·게시판 카드 없이 관심 종목만
+    // 관심 종목 탭: 회원은 맨 앞에 주식 시장 경제 뉴스·토론 카드, 이어서 등록한 관심 종목만 (비회원은 안내만)
     el.innerHTML = !member
       ? '<p class="empty-msg">관심 종목은 회원 전용입니다.<br><button class="link-btn" onclick="toggleLogin()">로그인</button> 또는 <button class="link-btn" onclick="toggleSignup()">회원가입</button> 후 종목 카드의 ☆를 눌러 추가하세요.</p>'
-      : list.length ? list.map(s => stockCard(s)).join('') : '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>';
+      : newsCardHtml(MARKET_KEY) + (list.length ? list.map(s => stockCard(s)).join('') : '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>');
     return;
   }
   if (!list.length) {
     el.innerHTML = '<p class="empty-msg">검색 결과가 없습니다.</p>';
     return;
   }
-  // 맨 앞 두 칸은 업종 실시간 뉴스 · 업종 게시판, 이어서 종목 카드(시총순)
-  el.innerHTML = newsCardHtml() + boardCardHtml() + list.map(s => stockCard(s)).join('');
+  // 맨 앞 두 칸은 주식 시장 경제 뉴스·토론 → 업종 뉴스·토론, 이어서 종목 카드(시총순)
+  el.innerHTML = newsCardHtml(MARKET_KEY) + newsCardHtml(currentFilter) + list.map(s => stockCard(s)).join('');
 }
 
 // ── 업종 게시판: 업종별 가상 코드(SECBIO 등)로 종목 게시판과 같은 DB를 사용 ──
 const boardCode = key => 'SEC' + key.slice(0, 3).toUpperCase();
 // 게시판·뉴스 카드 이름: "바이오 업종", 미국주식은 "미국주식"
 const sectorTitle = sec => sec.key === 'usa' ? sec.name : `${sec.name} 업종`;
-const SECTOR_BOARDS = SECTORS.map(sec => ({ code: boardCode(sec.key), name: sectorTitle(sec), sector: sec.key, isSector: true }));
-const findStock = code => STOCKS.find(s => s.code === code) || SECTOR_BOARDS.find(b => b.code === code);
+// 주식 시장 경제 게시판: 업종과 무관한 전체 시장·경제 뉴스와 토론 (뉴스는 /api/news?sector=market)
+const MARKET_KEY = 'market';
+const MARKET_BOARD = { code: 'SECMKT', name: '주식 시장 경제', sector: MARKET_KEY, isSector: true, isMarket: true };
+const SECTOR_BOARDS = [MARKET_BOARD, ...SECTORS.map(sec => ({ code: boardCode(sec.key), name: sectorTitle(sec), sector: sec.key, isSector: true }))];
+const sectorBoard = key => SECTOR_BOARDS.find(b => b.sector === key);
+const findStock = code => STOCKS.find(s => s.code === code) || SECTOR_BOARDS.find(b => b.code === code)
+  || (code === 'COLMKT' ? { code, name: '운영자 칼럼', isColumn: true } : undefined);
 const sectorName = key => { const sec = SECTORS.find(x => x.key === key); return sec ? sectorTitle(sec) : ''; };
 
-function boardCardHtml() {
-  const code = boardCode(currentFilter);
-  return `
-  <div class="stock-card sector-card board" data-code="${code}" onclick="openModal('${code}', 'discuss')">
-    <div class="sector-icon">💬</div>
-    <div class="sector-label">${escHtml(sectorName(currentFilter))}<br>게시판 보기</div>
-    <div class="sector-sub">${currentFilter === 'usa' ? '미국주식 전체 토론' : '업종 전체 토론'} · 글 ${postCounts[code] || 0}</div>
-  </div>`;
-}
 
 // ── 업종 뉴스 (업종 대표 종목의 네이버 종목 뉴스 모음, 1분마다 갱신) ──
 const NEWS_REFRESH = 60000;
@@ -129,7 +130,7 @@ const SECTOR_KEYWORDS = {
 };
 
 function isSectorNews(item, key) {
-  if (item.source === 'google') return true;  // 구글은 업종 키워드 검색 결과라 그대로 사용
+  if (item.source === 'google' || key === MARKET_KEY) return true;  // 구글·시장 뉴스는 검색어·주요뉴스 그대로 사용  // 구글은 업종 키워드 검색 결과라 그대로 사용
   if (key === 'usa') return true;              // 미국 종목 뉴스(로이터)는 종목별 기사라 그대로 사용
   const text = item.title + ' ' + (item.summary || '');
   const names = item.codes.map(c => STOCKS.find(s => s.code === c)?.name).filter(Boolean);
@@ -142,18 +143,25 @@ function sectorNewsHtml(key) {
   if (!n) return '<p class="empty-msg">뉴스를 불러오는 중...</p>';
   if (n.error && !n.data) return '<p class="empty-msg">뉴스를 불러오지 못했습니다.</p>';
   const updated = new Date(n.ts).toLocaleTimeString('ko-KR', { hour12: false });
-  const foot = `<div class="panel-footer"><span class="news-src naver">N</span>네이버 증권 (업종 전체 ${sectorList(key).length}종목 뉴스) · <span class="news-src google">G</span>Google 뉴스 (업종 키워드, 최근 7일)</div>`;
+  const foot = key === MARKET_KEY
+    ? `<div class="panel-footer"><span class="news-src naver">N</span>네이버 증권 (주요뉴스·실시간 속보) · <span class="news-src google">G</span>Google 뉴스 (증시·경제 키워드, 최근 7일)</div>`
+    : `<div class="panel-footer"><span class="news-src naver">N</span>네이버 증권 (업종 전체 ${sectorList(key).length}종목 뉴스) · <span class="news-src google">G</span>Google 뉴스 (업종 키워드, 최근 7일)</div>`;
   if (!n.data.length) return '<p class="empty-msg">최근 뉴스가 없습니다.</p>' + foot;
   const shown = sectorShown[key] || NEWS_PAGE;
   const more = n.data.length > shown
     ? `<button class="news-more" onclick="moreSectorNews('${key}')">더보기 (${shown} / ${n.data.length})</button>` : '';
   return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신 · 최신 ${n.data.length}건</div>` + n.data.slice(0, shown).map(item => {
     const names = item.codes.map(c => STOCKS.find(s => s.code === c)?.name).filter(Boolean);
+    // 종목 뉴스와 같은 모양: 제목 · 요약 · 출처 + 오른쪽 사진 미리보기 (구글 기사는 사진·요약 없음)
     return `
-      <a class="news-item" href="${safeUrl(item.url)}" target="_blank" rel="noopener">
-        <div class="news-item-title">${escHtml(item.title)}</div>
-        <div class="news-item-meta"><span class="news-src ${item.source === 'google' ? 'google' : 'naver'}">${item.source === 'google' ? 'G' : 'N'}</span>${names.slice(0, 3).map(x => `<span class="news-stock">${escHtml(x)}</span>`).join('')}
-          ${escHtml(item.press || '')} · ${newsTime(item.datetime)}</div>
+      <a class="feed-item" href="${safeUrl(item.url)}" target="_blank" rel="noopener">
+        <div class="feed-main">
+          <div class="feed-title">${escHtml(item.title)}</div>
+          ${item.summary ? `<div class="feed-summary">${escHtml(item.summary)}</div>` : ''}
+          <div class="feed-meta"><span class="news-src ${item.source === 'google' ? 'google' : 'naver'}">${item.source === 'google' ? 'G' : 'N'}</span>${names.slice(0, 3).map(x => `<span class="news-stock">${escHtml(x)}</span>`).join('')}
+            ${escHtml(item.press || '')} · ${newsTime(item.datetime)}</div>
+        </div>
+        ${/^https:\/\//.test(item.thumb || '') ? `<img class="feed-thumb" src="${safeUrl(item.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
       </a>`;
   }).join('') + more + foot;
 }
@@ -166,21 +174,34 @@ function moreSectorNews(key) {
   document.getElementById('newsTab').innerHTML = sectorNewsHtml(key);
 }
 
-function newsCardHtml() {
-  const n = sectorNews[currentFilter];
-  const updated = n?.ts ? new Date(n.ts).toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit' }) : '';
-  const sub = n?.data ? `${n.data.length}건 · ${updated} 업데이트` : '불러오는 중...';
+// 실시간 뉴스 + 토론 게시판 통합 카드 (누르면 실시간 뉴스 탭, 토론 탭은 창 안에서 전환)
+function newsCardHtml(key) {
+  const n = sectorNews[key];
+  const board = sectorBoard(key);
+  const sub = `<span>${n?.data ? `뉴스 ${n.data.length}건` : '뉴스 불러오는 중...'}</span> · <span>댓글 ${postCounts[board.code] || 0}</span>`;
+  // 두 줄 고정 (업종명이 길어도 줄바꿈은 한 번만): 첫 줄 이름, 둘째 줄 '실시간 뉴스 토론'
+  const label = `<span>${escHtml(key === MARKET_KEY ? '주식 시장 경제' : board.name)}</span><br><span>실시간 뉴스 토론</span>`;
   return `
-  <div class="stock-card sector-card news" id="sectorNews" onclick="openModal('${boardCode(currentFilter)}', 'news')">
-    <div class="sector-icon">📰</div>
-    <div class="sector-label">${escHtml(sectorName(currentFilter))}<br>실시간 뉴스 보기</div>
+  <div class="stock-card sector-card ${key === MARKET_KEY ? 'market' : 'news'}" id="news-${key}" data-code="${board.code}" onclick="openModal(this.dataset.code, 'news')">
+    <div class="sector-icon">${key === MARKET_KEY ? '🌐' : '📰'}</div>
+    <div class="sector-label">${label}</div>
     <div class="sector-sub">${sub}</div>
   </div>`;
 }
 
+// 시장 뉴스(관심 종목 탭 제외)와 현재 업종 뉴스를 함께 불러옴
+function loadHomeNews(force = false) {
+  if (currentFilter === 'fav') {
+    if (member) loadSectorNews(force, MARKET_KEY);  // 관심 종목 탭(회원)도 맨 앞에 주식 시장 경제 카드
+    return;
+  }
+  loadSectorNews(force, MARKET_KEY);
+  loadSectorNews(force);
+}
+
 function redrawSectorNews(key) {
-  const el = document.getElementById('sectorNews');
-  if (el && currentFilter === key) el.outerHTML = newsCardHtml();
+  const el = document.getElementById(`news-${key}`);
+  if (el && (currentFilter === key || key === MARKET_KEY)) el.outerHTML = newsCardHtml(key);
   // 모달에서 해당 업종 뉴스를 보고 있으면 함께 갱신
   if (currentStock?.isSector && currentStock.sector === key && currentModalTab === 'news') {
     document.getElementById('newsTab').innerHTML = sectorNewsHtml(key);
@@ -203,9 +224,10 @@ async function loadSectorNews(force = false, key = currentFilter) {
   if (key === 'fav') return;
   const cached = sectorNews[key];
   if (cached && cached.data && !force && Date.now() - cached.ts < NEWS_REFRESH) return redrawSectorNews(key);
-  const codes = sectorList(key).map(s => s.code);
+  const codes = key === MARKET_KEY ? [] : sectorList(key).map(s => s.code);
   const chunks = [];
   for (let i = 0; i < codes.length; i += NEWS_CHUNK) chunks.push(codes.slice(i, i + NEWS_CHUNK));
+  if (!chunks.length) chunks.push([]);  // 시장 뉴스: 종목 없이 sector=market 한 번
   try {
     // 구글 업종 뉴스는 첫 요청(sector 포함)에서만 받음. 일부 요청이 실패해도 받은 기사로 표시
     const results = await Promise.allSettled(chunks.map(async (c, i) => {
@@ -229,27 +251,27 @@ function stockCard(s) {
   const sign = up ? '+' : '';
   const postCount = postCounts[s.code] || 0;
   return `
-  <div class="stock-card" data-code="${s.code}" onclick="openModal('${s.code}')">
+  <div class="stock-card" data-code="${escHtml(s.code)}" onclick="openModal(this.dataset.code, 'news')">
     <div class="card-top">
       <div class="stock-avatar ${up ? 'up' : 'down'}">
-        <img class="stock-logo" src="${s.logo || LOGO_URL(s.code)}" alt="${s.name} CI" loading="lazy"
+        <img class="stock-logo" src="${escHtml(s.logo || LOGO_URL(s.code))}" alt="${escHtml(s.name)} CI" loading="lazy"
              onerror="this.parentNode.classList.add('no-logo'); this.remove()">
-        <span class="avatar-letter">${s.name[0]}</span>
+        <span class="avatar-letter">${escHtml(s.name[0])}</span>
       </div>
       <div class="card-quote">
         <div class="stock-price">${fmtPrice(s)}</div>
         <div class="price-change ${up ? 'up' : 'down'}">${sign}${s.change}%</div>
       </div>
       <div class="card-marks">
-        <button class="fav-star${favs.has(s.code) ? ' on' : ''}" title="관심 종목" onclick="toggleFav(event, '${s.code}')">${favs.has(s.code) ? '★' : '☆'}</button>
+        <button class="fav-star${favs.has(s.code) ? ' on' : ''}" title="관심 종목" data-code="${escHtml(s.code)}" onclick="toggleFav(event, this.dataset.code)">${favs.has(s.code) ? '★' : '☆'}</button>
       </div>
     </div>
     <div class="stock-meta">
-      <div class="stock-name" title="${s.name}">${s.name}</div>
-      <div class="stock-sub">${s.us ? s.ticker : s.code} · <span class="badge ${s.market}">${s.market.toUpperCase()}</span>${s.etf ? ' <span class="badge etf">ETF</span>' : ''}</div>
+      <div class="stock-name" title="${escHtml(s.name)}">${escHtml(s.name)}</div>
+      <div class="stock-sub">${escHtml(s.us ? s.ticker : s.code)} · <span class="badge ${escHtml(s.market)}">${escHtml(String(s.market).toUpperCase())}</span>${s.etf ? ' <span class="badge etf">ETF</span>' : ''}</div>
     </div>
     <div class="card-bottom">
-      <div class="stock-extra">${s.etf ? '규모' : '시총'} ${s.cap} · 댓글 ${postCount}</div>
+      <div class="stock-extra">${s.etf ? '규모' : '시총'} ${escHtml(s.cap)} · 댓글 ${postCount}</div>
     </div>
   </div>`;
 }
@@ -266,7 +288,7 @@ function filterTab(type, btn) {
   renderTabNote();
   renderStocks(filteredList());
   fetchAllPrices();
-  loadSectorNews();
+  loadHomeNews();
 }
 
 // 업종 탭 종목: 시총·토론글·거래대금 순위 상위 최대 100개 (scripts/build.mjs, 시총순)
@@ -321,10 +343,12 @@ function openModal(code, tab = 'discuss') {
   const s = currentStock;
   // 업종 게시판: 가격·종목정보 탭 없이 토론 + 실시간 업종 뉴스
   document.getElementById('modal').classList.toggle('sector-mode', !!s.isSector);
+  document.getElementById('modal').classList.toggle('market-mode', !!s.isMarket);  // 운영자 칼럼 탭은 주식 시장 경제 게시판에만
+  delete document.getElementById('discussTab').dataset.board;
   document.getElementById('modal').classList.toggle('us-mode', !!s.us);  // 미국 종목: 보고서·공시 탭 없음
-  document.querySelector('.modal-tabs .tab[data-tab="news"]').textContent = s.isSector ? '실시간 업종 뉴스' : '실시간 종목 뉴스';
-  document.getElementById('modalStockName').textContent = s.isSector ? `${s.name} 게시판` : s.name;
-  document.getElementById('modalStockCode').textContent = s.isSector ? '업종 전체 토론' : s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : s.code;
+  document.querySelector('.modal-tabs .tab[data-tab="news"]').textContent = s.isMarket ? '실시간 시장 뉴스' : s.isSector ? '실시간 업종 뉴스' : '실시간 종목 뉴스';
+  document.getElementById('modalStockName').textContent = s.isMarket ? '주식 시장 경제 토론 게시판' : s.isSector ? `${s.name} 게시판` : s.name;
+  document.getElementById('modalStockCode').textContent = s.isMarket ? '시장·경제 전체 토론' : s.isSector ? '업종 전체 토론' : s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : s.code;
   const chgEl = document.getElementById('modalChange');
   if (s.isSector) {
     document.getElementById('modalPrice').textContent = '';
@@ -332,7 +356,7 @@ function openModal(code, tab = 'discuss') {
   } else {
     const up = s.change >= 0;
     document.getElementById('modalPrice').textContent = fmtPrice(s);
-    chgEl.textContent = `${up ? '+' : ''}${s.change}%`;
+    chgEl.innerHTML = `${up ? '+' : ''}${escHtml(s.change)}%${sessionTagHtml(s)}`;
     chgEl.className = 'modal-change ' + (up ? 'up' : 'down');
   }
 
@@ -364,6 +388,8 @@ function closeModal(e) {
 
 function hideModal() {
   document.getElementById('modalOverlay').classList.add('hidden');
+  if (new URLSearchParams(location.search).has('column')) syncColumnUrl(null);
+  currentStock = null;
   document.body.classList.remove('no-scroll');
   stopNewsRefresh();
 }
@@ -394,7 +420,13 @@ function switchModalTab(tab, btn) {
   currentModalTab = tab;
   document.querySelectorAll('.modal-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   if (btn) btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  document.getElementById('discussTab').classList.toggle('hidden', tab !== 'discuss');
+  document.getElementById('discussTab').classList.toggle('hidden', tab !== 'discuss' && tab !== 'column');
+  // 토론 ↔ 운영자 칼럼: 같은 글 목록 화면을 쓰므로, 불러온 게시판(renderPosts가 기록)과 다르면 다시 불러옴
+  if ((tab === 'discuss' || tab === 'column') && currentStock) {
+    renderWriteBox();
+    const loaded = document.getElementById('discussTab').dataset.board;
+    if (loaded && loaded !== boardCodeNow()) renderPosts();
+  }
   DETAIL_TABS.forEach(t => document.getElementById(`${t}Tab`).classList.toggle('hidden', t !== tab));
 
   stopNewsRefresh();
@@ -405,6 +437,7 @@ function switchModalTab(tab, btn) {
       loadSectorNews(false, key);
       newsTimer = setInterval(whenVisible(() => loadSectorNews(true, key)), NEWS_REFRESH);
     }
+    if (tab === 'research') loadDetail(tab);  // 시장: 투자전략, 업종: 산업분석 리포트 (api/detail.js boardResearch)
     return;
   }
   if (DETAIL_TABS.includes(tab)) loadDetail(tab);
@@ -458,14 +491,17 @@ async function loadDetail(type, force = false) {
   panel.innerHTML = renderDetail(type, detailCache[key].data, detailCache[key].ts);
 }
 
-const naverUrl = s => s.us
+const naverUrl = s => s.isSector
+  ? `https://m.stock.naver.com/research/${s.isMarket ? 'invest' : 'industry'}`
+  : s.us
   ? `https://m.stock.naver.com/worldstock/${s.etf ? 'etf' : 'stock'}/${s.code}/total`
   : `https://m.stock.naver.com/domestic/stock/${s.code}/total`;
-const safeUrl = u => /^https:\/\//.test(u || '') ? escHtml(u) : '#';
+// 외부 https 링크 또는 우리 서버 경로(/api/report = 리포트 원문 PDF)
+const safeUrl = u => /^(https:\/\/|\/api\/)/.test(u || '') ? escHtml(u) : '#';
 
 function renderDetail(type, data, ts) {
   const s = currentStock;
-  const footer = `<div class="panel-footer">출처: ${type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}</div>`;
+  const footer = `<div class="panel-footer">출처: ${s.isSector ? `네이버 증권 리서치 · ${s.isMarket ? '투자전략' : s.sector === 'usa' ? '투자전략 (미국·글로벌 관련)' : '산업분석 (업종 분류·키워드로 선별, 최근 약 한 달)'}` : type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}</div>`;
 
   if (type === 'info') return renderPriceInfo(data) + footer;
 
@@ -487,7 +523,7 @@ function renderDetail(type, data, ts) {
           <div class="feed-summary">${escHtml(n.summary || '')}</div>
           <div class="feed-meta"><span class="news-src ${n.source === 'google' ? 'google' : 'naver'}">${n.source === 'google' ? 'G' : 'N'}</span>${escHtml(n.press || '')} · ${newsTime(n.datetime)}</div>
         </div>
-        ${n.thumb ? `<img class="feed-thumb" src="${safeUrl(n.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+        ${/^https:\/\//.test(n.thumb || '') ? `<img class="feed-thumb" src="${safeUrl(n.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
       </a>`).join('') + more + footer;
   }
 
@@ -497,7 +533,7 @@ function renderDetail(type, data, ts) {
         <div class="feed-main">
           <div class="feed-title">${escHtml(r.title)}</div>
           <div class="feed-summary">${escHtml(r.summary || '')}</div>
-          <div class="feed-meta"><span class="feed-tag">${escHtml(r.broker || '')}</span> ${escHtml(r.date || '')} · 조회 ${escHtml(String(r.views ?? 0))}</div>
+          <div class="feed-meta"><span class="feed-tag">${escHtml(r.broker || '')}</span>${r.category && r.category !== '기타' && r.category !== '투자전략' ? ` <span class="feed-tag">${escHtml(r.category)}</span>` : ''} ${escHtml(r.date || '')} · 조회 ${escHtml(String(r.views ?? 0))}</div>
         </div>
       </a>`).join('') + footer;
   }
@@ -551,6 +587,18 @@ function newsTime(dt) {
 
 // ── 게시글 · 좋아요 · 팔로우 (서버 DB: /api/posts) ──────
 const POST_MAX = 1000;     // 게시글 최대 글자 수
+// 운영자 칼럼: 주식 시장 경제 게시판의 '운영자 칼럼' 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 최대 2000자 (api/posts.js COLUMN_CODE)
+const COLUMN_CODE = 'COLMKT', COLUMN_MAX = 2000;
+const isColumnTab = () => currentModalTab === 'column' && Boolean(currentStock?.isMarket);
+const boardCodeNow = () => isColumnTab() ? COLUMN_CODE : currentStock.code;  // 지금 보고 있는 게시판 (토론 또는 칼럼)
+const postMax = () => isColumnTab() ? COLUMN_MAX : POST_MAX;
+let columnOpenId = null;   // 운영자 칼럼: 목록(제목만)에서 연 글 id, null이면 목록
+// 칼럼 본문 사진: 본문에 [사진:/img/{id}] 로 저장 → 화면에서 그림으로 (사진 주소 형식이 정확할 때만)
+const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
+const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="칼럼 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
+const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷');
+const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
+let columnPage = 1;
 const POST_PREVIEW = 500;  // 이 길이를 넘으면 '더 보기'로 접어서 표시
 const NICK_RE = /^[가-힣]{1,10}$/;  // 닉네임: 한글만, 최대 10자
 const PW_MIN = 4, PW_MAX = 20;      // 게시글 비밀번호 길이
@@ -619,29 +667,40 @@ const likeBtnHtml = p => `<span class="vote-btns" data-id="${escHtml(p.id)}">
 const memberBadgeHtml = p => p.official ? '<span class="member-badge official">운영자</span>'
   : p.member ? '<span class="member-badge">회원</span>' : '<span class="member-badge guest">비회원</span>';
 
-async function renderPosts() {
+async function renderPosts(keep = false) {
   const s = currentStock;
+  const keepOpen = keep ? columnOpenId : null, keepPage = keep ? columnPage : 1;
   if (!s) return;
   const el = document.getElementById('postList');
-  el.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
   postAction = null;
+  columnOpenId = null;
+  columnPage = 1;
+  const column = isColumnTab(), code = boardCodeNow();
+  document.getElementById('discussTab').dataset.board = code;
+  el.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
   try {
-    const { posts } = await api({ code: s.code });
-    if (currentStock !== s) return;
+    const { posts } = column ? await api({}, { action: 'columnList' }) : await api({ code });
+    if (currentStock !== s || boardCodeNow() !== code) return;
     currentPosts = posts;
   } catch (e) {
     if (currentStock === s) el.innerHTML = `<p class="empty-msg">게시글을 불러오지 못했습니다. (${escHtml(e.message)})</p>`;
     return;
   }
+  if (column && keep) { columnPage = keepPage; columnOpenId = currentPosts.some(p => p.id === keepOpen) ? keepOpen : null; }
   drawPosts();
-  countPostViews(s, currentPosts);
+  if (!column) countPostViews(s, currentPosts, code);  // 칼럼은 글을 열 때 셈
+  if (column && pendingColumnId) {
+    const id = pendingColumnId;
+    pendingColumnId = null;
+    if (currentPosts.some(p => p.id === id)) openColumn(id);
+  }
 }
 
 // 토론 창에 보인 글 조회수 +1 (같은 브라우저·게시판 1시간에 1회)
-async function countPostViews(s, posts) {
+async function countPostViews(s, posts, code = s.code) {
   if (!posts.length) return;
   try {
-    const { views } = await api({}, { action: 'viewBoard', code: s.code, ids: posts.map(p => p.id) });
+    const { views } = await api({}, { action: 'viewBoard', code, ids: posts.map(p => p.id) });
     if (currentStock !== s) return;
     currentPosts.forEach(p => { if (views[p.id] != null) p.views = views[p.id]; });
     document.querySelectorAll('#postList .post-views').forEach(el => {
@@ -654,15 +713,15 @@ const viewsHtml = p => `<span class="post-views" data-id="${escHtml(p.id)}" titl
 
 function drawPosts() {
   const el = document.getElementById('postList');
+  if (isColumnTab()) return drawColumn(el);
   if (!currentPosts.length) {
-    el.innerHTML = '<p class="empty-msg">첫 번째 의견을 남겨보세요!</p>';
+    el.innerHTML = isColumnTab() ? '<p class="empty-msg">아직 운영자 칼럼이 없습니다.</p>' : '<p class="empty-msg">첫 번째 의견을 남겨보세요!</p>';
     return;
   }
   el.innerHTML = currentPosts.map(p => `
     <div class="post-item">
       <div class="post-header">
         <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
-        <span class="post-sentiment ${p.sentiment}">${sentimentLabel(p.sentiment)}</span>
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
         ${p.member && !isMyPost(p) ? `<button class="btn-follow ${myFollowing.has(p.nick) ? 'following' : ''}" data-nick="${escHtml(p.nick)}" onclick="openAuthor(this.dataset.nick)">${myFollowing.has(p.nick) ? '팔로잉' : '팔로우'}</button>` : ''}
@@ -681,6 +740,172 @@ function drawPosts() {
   `).join('');
 }
 
+// ── 운영자 칼럼: 목록은 제목만, 누르면 본문 ──
+function drawColumn(el) {
+  document.querySelector('.write-box').classList.toggle('hidden', !isAdmin() || Boolean(columnOpenId));  // 글을 보는 중엔 글쓰기 숨김
+  const p = columnOpenId && currentPosts.find(x => x.id === columnOpenId);
+  if (!p) {
+    columnOpenId = null;
+    const pages = Math.max(1, Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE));
+    columnPage = Math.min(Math.max(1, columnPage), pages);
+    const shown = currentPosts.slice((columnPage - 1) * COLUMN_PAGE_SIZE, columnPage * COLUMN_PAGE_SIZE);
+    el.innerHTML = currentPosts.length ? `<div class="col-list">${shown.map(x => `
+      <button class="col-row" data-id="${escHtml(x.id)}" onclick="openColumn(this.dataset.id)">
+        <span class="col-title">${escHtml(x.title || stripColumnImgs(x.content).slice(0, 40))}</span>
+        <span class="col-meta">${colDate(x.ts)} · 👁 ${(x.views || 0).toLocaleString()}</span>
+      </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : '<p class="empty-msg">아직 운영자 칼럼이 없습니다.</p>';
+    return;
+  }
+  const editing = postAction?.id === p.id && postAction.mode === 'edit';
+  el.innerHTML = `
+    <div class="col-article">
+      <button class="btn-tool col-back" onclick="closeColumn()">← 목록</button>
+      ${editing ? '' : `<h3 class="col-article-title">${escHtml(p.title || '')}</h3>`}
+      <div class="post-header">
+        <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
+        <span class="post-time">${colDate(p.ts)}</span>${viewsHtml(p)}
+        ${likeBtnHtml(p)}
+      </div>
+      ${editing ? editFormHtml(p) : `<div class="post-body col-body">${columnBodyHtml(p.content)}</div>`}
+      <div class="post-tools">
+        ${p.editedTs ? `<span class="post-edited">수정됨 · ${timeAgo(p.editedTs)}</span>` : ''}
+        ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'edit')">수정</button>
+        <button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'delete')">삭제</button>` : ''}
+      </div>
+      ${postAction?.id === p.id && postAction.mode === 'delete' ? deleteFormHtml(p) : ''}
+      ${editing ? '' : columnNavHtml(p)}
+    </div>`;
+}
+// 글 아래: 이전 글(먼저 쓴 글) · 목록으로 · 다음 글(나중에 쓴 글) — 칼럼 목록은 먼저 쓴 글부터
+function columnNavHtml(p) {
+  const i = currentPosts.findIndex(x => x.id === p.id);
+  const prev = currentPosts[i - 1], next = currentPosts[i + 1];
+  const link = (x, label, cls) => x
+    ? `<button class="col-nav-btn ${cls}" data-id="${escHtml(x.id)}" onclick="openColumn(this.dataset.id)"><span class="col-nav-label">${label}</span><span class="col-nav-title">${escHtml(x.title || '')}</span></button>`
+    : `<span class="col-nav-btn ${cls} disabled"><span class="col-nav-label">${label}</span><span class="col-nav-title">${cls === 'prev' ? '이전 글이 없습니다' : '다음 글이 없습니다'}</span></span>`;
+  return `<nav class="col-nav">
+      ${link(prev, '← 이전 글', 'prev')}
+      <button class="col-nav-list" onclick="closeColumn()">목록으로</button>
+      ${link(next, '다음 글 →', 'next')}
+    </nav>`;
+}
+const colDate = ts => { const d = new Date(ts); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; };
+// 주소창에 지금 보는 칼럼 반영 (공유·새로고침하면 같은 글이 열림), 창을 닫으면 원래 주소로
+const syncColumnUrl = id => { try { history.replaceState(history.state, '', id ? `/?column=${encodeURIComponent(id)}` : location.pathname); } catch {} };
+function openColumn(id) {
+  columnOpenId = id;
+  syncColumnUrl(id);
+  postAction = null;
+  drawPosts();
+  document.getElementById('postList').scrollIntoView({ block: 'start' });  // 글 아래 버튼으로 넘어와도 새 글 맨 위부터
+  if (currentStock) countPostViews(currentStock, currentPosts.filter(p => p.id === id), COLUMN_CODE);
+  loadColumnVotes(id);
+}
+// 칼럼 글을 열면 그 글의 공감·비공감·내가 누른 것만 불러와 채움 (목록은 제목·본문·조회수만 받음)
+async function loadColumnVotes(id) {
+  const p = currentPosts.find(x => x.id === id);
+  if (!p || p.likes != null) return;  // 이미 받았으면 생략
+  try {
+    const { post } = await api({}, { action: 'columnPost', id });
+    const cur = currentPosts.find(x => x.id === id);
+    if (!cur) return;
+    Object.assign(cur, { likes: post.likes, dislikes: post.dislikes, liked: post.liked, disliked: post.disliked });
+    if (columnOpenId === id) document.querySelectorAll(`.vote-btns[data-id="${id}"]`).forEach(box => { box.outerHTML = likeBtnHtml(cur); });
+  } catch {}
+}
+let pendingColumnId = null;  // 칼럼 목록을 불러온 뒤 열 글 (바로가기·작성자 목록에서)
+function openColumnLink(id) {
+  pendingColumnId = id || null;
+  openModal('SECMKT', 'column');
+}
+// 페이지 표시: ‹ 1 2 3 … › (현재 페이지 앞뒤 2개씩, 처음·끝 페이지는 항상)
+function pagerHtml(page, pages, fn) {
+  if (pages <= 1) return '';
+  const nums = [...new Set([1, pages, ...Array.from({ length: 5 }, (_, i) => page - 2 + i)])].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+  let html = '', prev = 0;
+  for (const n of nums) {
+    if (n - prev > 1) html += '<span class="pager-gap">…</span>';
+    html += `<button class="pager-btn${n === page ? ' on' : ''}" onclick="${fn}(${n})"${n === page ? ' aria-current="page"' : ''}>${n}</button>`;
+    prev = n;
+  }
+  return `<nav class="pager" aria-label="페이지"><button class="pager-btn" onclick="${fn}(${page - 1})"${page === 1 ? ' disabled' : ''} aria-label="이전 페이지">‹</button>${html}<button class="pager-btn" onclick="${fn}(${page + 1})"${page === pages ? ' disabled' : ''} aria-label="다음 페이지">›</button></nav>`;
+}
+function goColumnPage(n) {
+  columnPage = n;
+  drawPosts();
+  document.getElementById('discussTab').scrollIntoView({ block: 'start' });
+}
+// ── 칼럼 사진 넣기 (관리자 모드): 사진 고르기 → 웹용 크기로 줄여 업로드 → 본문 커서 위치에 [사진:주소] ──
+const COLUMN_IMG_MAX_SIDE = 1600, COLUMN_IMG_MAX_BYTES = 5 * 1024 * 1024;
+let columnImgTarget = 'postContent';
+function pickColumnImage(targetId) {
+  if (!isAdmin()) return alert('관리자 모드에서만 사진을 넣을 수 있습니다.');
+  columnImgTarget = targetId;
+  const input = document.getElementById('colImgFile');
+  input.value = '';
+  input.onchange = () => { if (input.files[0]) uploadColumnImage(input.files[0]); };
+  input.click();
+}
+// GIF(움직이는 그림)는 그대로, 나머지는 긴 변 1600px 이하 WEBP(안 되는 브라우저는 JPG)로 줄임
+async function shrinkImage(file) {
+  if (file.type === 'image/gif') return file;
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' }).catch(() => null);
+  if (!bmp) return file;
+  const scale = Math.min(1, COLUMN_IMG_MAX_SIDE / Math.max(bmp.width, bmp.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bmp.width * scale); canvas.height = Math.round(bmp.height * scale);
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(bmp, 0, 0, canvas.width, canvas.height);
+  const toBlob = (type, q) => new Promise(r => canvas.toBlob(r, type, q));
+  let out = await toBlob('image/webp', 0.85);
+  if (!out || out.type !== 'image/webp') {
+    ctx.globalCompositeOperation = 'destination-over';
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    out = await toBlob('image/jpeg', 0.85);
+  }
+  bmp.close?.();
+  return out && out.size < file.size ? out : file;
+}
+async function uploadColumnImage(file) {
+  if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) return alert('JPG·PNG·WEBP·GIF 사진만 넣을 수 있습니다.');
+  const btns = document.querySelectorAll('.btn-col-img');
+  btns.forEach(b => { b.disabled = true; b.textContent = '사진 올리는 중...'; });
+  try {
+    const img = await shrinkImage(file);
+    if (img.size > COLUMN_IMG_MAX_BYTES) throw new Error('사진은 한 장에 5MB까지 넣을 수 있습니다');
+    const res = await fetch(`${API_BASE}/api/image`, {
+      method: 'POST', headers: { 'Content-Type': img.type || file.type, 'X-Admin-Key': adminKey || '' }, body: img,
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.error) throw new Error(json.error || `HTTP ${res.status}`);
+    const ta = document.getElementById(columnImgTarget);
+    if (!ta) return;
+    const tag = `[사진:${json.url}]`;
+    const before = ta.value.slice(0, ta.selectionStart), after = ta.value.slice(ta.selectionEnd);
+    const insert = (before && !before.endsWith('\n') ? '\n' : '') + tag + '\n';
+    ta.value = before + insert + after;
+    ta.focus();
+    ta.selectionStart = ta.selectionEnd = before.length + insert.length;
+    if (columnImgTarget === 'postContent') updateCharCount();
+  } catch (e) {
+    if (/관리자 (로그인|비밀번호)/.test(e.message)) adminLogout();  // 관리자 로그인 만료 → 로그아웃 후 다시 로그인 안내
+    alert(`사진을 넣지 못했습니다: ${e.message}`);
+  } finally {
+    btns.forEach(b => { b.disabled = false; b.textContent = '🖼 사진 넣기'; });
+  }
+}
+
+function closeColumn() {
+  syncColumnUrl(null);
+  const i = currentPosts.findIndex(x => x.id === columnOpenId);
+  if (i >= 0) columnPage = Math.floor(i / COLUMN_PAGE_SIZE) + 1;  // 보던 글이 있는 페이지로 돌아감
+  columnOpenId = null;
+  postAction = null;
+  drawPosts();
+  document.getElementById('discussTab').scrollIntoView({ block: 'start' });  // 칼럼 전체 목록 처음부터
+}
+
 // ── 게시글 수정·삭제 (비회원 글: 작성 시 입력한 비밀번호 / 회원 글: 로그인한 본인) ────
 const isMyPost = p => Boolean(p.member && member && p.nick === member.nick);
 // 운영자 글은 관리자 모드에서만 수정·삭제 (비밀번호 입력 없음)
@@ -689,14 +914,11 @@ const noPassword = p => p.member || p.official;
 function editFormHtml(p) {
   return `
       <div class="post-form">
-        <textarea id="editContent" maxlength="${POST_MAX}" rows="4">${escHtml(p.content)}</textarea>
+        ${p.code === COLUMN_CODE ? `<input id="editTitle" type="text" maxlength="100" placeholder="칼럼 제목" value="${escHtml(p.title || '')}">` : ''}
+        <textarea id="editContent" maxlength="${postMax()}" rows="4">${escHtml(p.content)}</textarea>
         <div class="post-form-row">
-          <select id="editSentiment">
-            <option value="neutral" ${p.sentiment === 'neutral' ? 'selected' : ''}>-</option>
-            <option value="up" ${p.sentiment === 'up' ? 'selected' : ''}>📈 매수</option>
-            <option value="down" ${p.sentiment === 'down' ? 'selected' : ''}>📉 매도</option>
-          </select>
           ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
+          ${p.code === COLUMN_CODE && isAdmin() ? `<button type="button" class="btn-tool btn-col-img" onclick="pickColumnImage('editContent')">🖼 사진 넣기</button>` : ''}
           <button class="btn-submit" data-id="${escHtml(p.id)}" onclick="savePostEdit(this.dataset.id)">저장</button>
           <button class="btn-cancel" onclick="closePostAction()">취소</button>
         </div>
@@ -760,13 +982,15 @@ function actionPassword(id) {
 
 async function savePostEdit(id) {
   const content = document.getElementById('editContent').value.trim();
-  const sentiment = document.getElementById('editSentiment').value;
+  const titleEl = document.getElementById('editTitle');
+  const title = titleEl ? titleEl.value.trim() : undefined;
+  if (titleEl && !title) return alert('제목을 입력해주세요.');
   if (!content) return alert('내용을 입력해주세요.');
   const password = actionPassword(id);
   if (password === null) return;
   try {
-    const { post } = await api({}, { action: 'edit', id, password, content, sentiment, ...(isAdmin() ? { adminKey } : {}) });
-    currentPosts = currentPosts.map(p => p.id === id ? post : p);
+    const { post } = await api({}, { action: 'edit', id, password, content, ...(title !== undefined ? { title } : {}), ...(isAdmin() ? { adminKey } : {}) });
+    currentPosts = currentPosts.map(p => p.id === id ? { ...post, views: p.views } : p);
     postAction = null;
     drawPosts();
   } catch (e) {
@@ -782,6 +1006,7 @@ async function deletePost(id) {
     currentPosts = currentPosts.filter(p => p.id !== id);
     postCounts[r.code] = Math.max(0, (postCounts[r.code] || 1) - 1);
     postAction = null;
+    if (columnOpenId === id) columnOpenId = null;
     drawPosts();
     renderStocks(filteredList());
   } catch (e) {
@@ -794,7 +1019,8 @@ async function submitPost() {
   const nick = document.getElementById('postNickname').value.trim() || '익명';
   const password = document.getElementById('postPassword').value;
   const content = document.getElementById('postContent').value.trim();
-  const sentiment = document.getElementById('postSentiment').value;
+  const title = document.getElementById('postTitle').value.trim();
+  if (isColumnTab() && !title) return alert('제목을 입력해주세요.');
   if (member || isAdmin()) {
     if (!content) return alert('내용을 입력해주세요.');
   } else if (!NICK_RE.test(nick)) {
@@ -812,17 +1038,22 @@ async function submitPost() {
 
   const btn = document.querySelector('.write-box .btn-submit');
   btn.disabled = true;
+  const code = boardCodeNow();
   try {
     const { post } = await api({}, isAdmin()
-      ? { action: 'create', code: currentStock.code, content, sentiment, asOperator: true, adminKey }
+      ? { action: 'create', code, ...(isColumnTab() ? { title } : {}), content, asOperator: true, adminKey }
       : member
-      ? { action: 'create', code: currentStock.code, content, sentiment }
-      : { action: 'create', code: currentStock.code, nick, password, content, sentiment });
-    currentPosts.unshift(post);
-    postCounts[currentStock.code] = (postCounts[currentStock.code] || 0) + 1;
+      ? { action: 'create', code, content }
+      : { action: 'create', code, nick, password, content });
+    if (currentStock && boardCodeNow() === code) {
+      if (isColumnTab()) { currentPosts.push(post); columnPage = Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE); }  // 칼럼은 먼저 쓴 글부터라 새 글은 마지막 페이지
+      else currentPosts.unshift(post);
+    }
+    postCounts[code] = (postCounts[code] || 0) + 1;
     document.getElementById('postContent').value = '';
+    document.getElementById('postTitle').value = '';
     document.getElementById('postPassword').value = '';
-    document.getElementById('charCount').textContent = `0/${POST_MAX}`;
+    document.getElementById('charCount').textContent = `0/${postMax()}`;
     drawPosts();
     renderStocks(filteredList());
   } catch (e) {
@@ -851,16 +1082,23 @@ function feedPostHtml(p, showNick) {
     <div class="post-item">
       <div class="post-header">
         ${showNick ? `<button class="post-nick author-link" data-nick="${escHtml(p.nick)}" onclick="openAuthor(this.dataset.nick)">${escHtml(p.nick)}</button>` : ''}
-        <button class="author-stock" onclick="openModal('${escHtml(p.code)}')">${escHtml(s ? s.name : p.code)}</button>
-        <span class="post-sentiment ${p.sentiment}">${sentimentLabel(p.sentiment)}</span>
+        ${p.code === COLUMN_CODE
+          ? `<button class="author-stock" data-id="${escHtml(p.id)}" onclick="openColumnLink(this.dataset.id)">운영자 칼럼</button>`
+          : `<button class="author-stock" data-code="${escHtml(p.code)}" onclick="openModal(this.dataset.code)">${escHtml(s ? s.name : p.code)}</button>`}
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
         ${adminDeleteBtnHtml(p)}
       </div>
-      ${postBodyHtml(p)}
+      ${p.code === COLUMN_CODE && p.title ? `<div class="feed-col-title">${escHtml(p.title)}</div>` : ''}${postBodyHtml(p.code === COLUMN_CODE ? { ...p, content: stripColumnImgs(p.content) } : p)}
     </div>`;
 }
 
+let overlaySeq = 0;
+function overlayLoading(title) {
+  showAuthorOverlay(title, '불러오는 중...', '', '');
+  return ++overlaySeq;
+}
+const overlayStale = seq => seq !== overlaySeq || !isOpen('authorOverlay');
 function showAuthorOverlay(title, sub, actionHtml, bodyHtml) {
   document.getElementById('authorName').textContent = title;
   document.getElementById('authorCount').textContent = sub;
@@ -872,9 +1110,10 @@ function showAuthorOverlay(title, sub, actionHtml, bodyHtml) {
 }
 
 async function openAuthor(nick) {
-  showAuthorOverlay(nick, '불러오는 중...', '', '');
+  const seq = overlayLoading(nick);
   try {
     const r = await api({}, { action: 'author', nick });
+    if (overlayStale(seq)) return;
     if (member) r.following ? myFollowing.add(nick) : myFollowing.delete(nick);
     const mine = member && member.nick === nick;
     const action = !r.member || mine ? ''
@@ -882,11 +1121,12 @@ async function openAuthor(nick) {
       : `<button class="btn-follow-big" onclick="closeAuthor(); toggleLogin()">로그인 후 팔로우</button>`;
     showAuthorOverlay(
       nick,
-      r.member ? `회원 · 작성글 ${r.posts.length}개 · 팔로워 ${r.followers}명` : `${r.withdrawn ? '탈퇴한 회원' : '비회원'} · 작성글 ${r.posts.length}개`,
+      r.member ? `회원 · 작성글 ${r.posts.length}개 · 팔로워 ${r.followers}명` : `${r.posts.some(p => p.official) ? '운영자' : r.withdrawn ? '탈퇴한 회원' : '비회원'} · 작성글 ${r.posts.length}개`,
       action,
       r.posts.length ? r.posts.map(p => feedPostHtml(p, false)).join('') : '<p class="empty-msg">작성한 글이 없습니다.</p>'
     );
   } catch (e) {
+    if (overlayStale(seq)) return;
     showAuthorOverlay(nick, '', '', `<p class="empty-msg">불러오지 못했습니다. (${escHtml(e.message)})</p>`);
   }
 }
@@ -914,9 +1154,10 @@ async function openFeed() {
   if (!member) {
     return showAuthorOverlay('팔로잉', '회원 전용', '', '<p class="empty-msg">팔로우는 회원만 사용할 수 있습니다.<br><button class="link-btn" onclick="closeAuthor(); toggleLogin()">로그인</button> 또는 <button class="link-btn" onclick="closeAuthor(); toggleSignup()">회원가입</button> 후 다른 회원의 글에서 [팔로우]를 눌러보세요.</p>');
   }
-  showAuthorOverlay('팔로잉', '불러오는 중...', '', '');
+  const seq = overlayLoading('팔로잉');
   try {
     const r = await api({}, { action: 'feed' });
+    if (overlayStale(seq)) return;
     myFollowing = new Set(r.following);
     const chips = r.following.length
       ? `<div class="follow-chips">${r.following.map(n => `<button class="follow-chip" data-nick="${escHtml(n)}" onclick="openAuthor(this.dataset.nick)">${escHtml(n)}</button>`).join('')}</div>`
@@ -926,13 +1167,15 @@ async function openFeed() {
       : '<p class="empty-msg">아직 팔로우한 회원이 없습니다.<br>회원 글 옆의 [팔로우] 버튼으로 팔로우해 보세요.</p>';
     showAuthorOverlay('팔로잉', `${r.following.length}명 팔로우 중`, '', body);
   } catch (e) {
+    if (overlayStale(seq)) return;
     showAuthorOverlay('팔로잉', '', '', `<p class="empty-msg">불러오지 못했습니다. (${escHtml(e.message)})</p>`);
   }
 }
 
 // ── 관리자: 로그인 후 모든 글에 [관리자 삭제] 버튼 표시 ──
 // 관리자 비밀번호는 서버 환경변수(ADMIN_PASSWORD)로 확인, 브라우저 탭을 닫으면 로그아웃
-let adminKey = (() => { try { return sessionStorage.getItem('adminKey'); } catch { return null; } })();
+// 관리자 세션 토큰(adm_…)만 보관. 예전 방식으로 저장된 비밀번호는 지움 (다시 로그인)
+let adminKey = (() => { try { const k = sessionStorage.getItem('adminKey'); if (k && !/^adm_[0-9a-f]{48}$/.test(k)) { sessionStorage.removeItem('adminKey'); return null; } return k; } catch { return null; } })();
 const isAdmin = () => Boolean(adminKey);
 
 const adminDeleteBtnHtml = p => isAdmin()
@@ -954,7 +1197,7 @@ function toggleAdminForm() {
 
 function renderAdminArea() {
   document.getElementById('adminArea').innerHTML = isAdmin()
-    ? '<p class="admin-tools"><button class="btn-tool" onclick="openReports()">🚨 신고된 글</button> <button class="btn-tool" onclick="openContacts()">✉️ 문의 내역</button></p>'
+    ? '<p class="admin-tools"><button class="btn-tool" onclick="openReports()">🚨 신고된 글</button> <button class="btn-tool" onclick="openContacts()">✉️ 문의 내역</button> <button class="btn-tool" onclick="openStats()">📊 화면 정보</button></p>'
     : '';
   document.getElementById('adminBadge')?.remove();
   if (isAdmin()) document.querySelector('footer').insertAdjacentHTML('beforeend',
@@ -966,9 +1209,9 @@ async function adminLogin() {
   const key = input.value;
   if (!key) return;
   try {
-    await api({}, { action: 'adminCheck', adminKey: key });
-    adminKey = key;
-    try { sessionStorage.setItem('adminKey', key); } catch {}
+    const { adminToken } = await api({}, { action: 'adminCheck', adminKey: key });
+    adminKey = adminToken;
+    try { sessionStorage.setItem('adminKey', adminToken); } catch {}
     input.value = '';
     document.getElementById('adminForm').classList.add('hidden');
     refreshAdminUi();
@@ -978,6 +1221,7 @@ async function adminLogin() {
 }
 
 function adminLogout() {
+  if (adminKey) api({}, { action: 'adminLogout', adminKey }).catch(() => {});  // 서버의 관리자 세션도 폐기
   adminKey = null;
   try { sessionStorage.removeItem('adminKey'); } catch {}
   refreshAdminUi();
@@ -988,11 +1232,20 @@ function refreshAdminUi() {
   document.getElementById('adminToggle').textContent = isAdmin() ? '관리자 로그아웃' : '관리자';
   renderAdminArea();
   renderWriteBox();
-  if (currentStock) drawPosts();
+  if (currentStock) isColumnTab() ? renderPosts(true) : drawPosts();
 }
 
 // 글쓰기 상자: 관리자 모드는 '운영자'로, 회원은 닉네임·비밀번호 입력 없이, 비회원은 닉네임·비밀번호 입력
 function renderWriteBox() {
+  const column = isColumnTab();
+  document.querySelector('.write-box').classList.toggle('hidden', column && (!isAdmin() || Boolean(columnOpenId)));  // 칼럼은 관리자 모드에서만 쓰기
+  const ta = document.getElementById('postContent');
+  ta.maxLength = postMax();
+  ta.placeholder = column ? '칼럼 본문을 작성하세요 (최대 2,000자)' : '의견을 남겨보세요...';
+  ta.rows = column ? 8 : 3;
+  document.getElementById('postTitle').classList.toggle('hidden', !column);
+  document.getElementById('btnColImg').classList.toggle('hidden', !(column && isAdmin()));
+  updateCharCount();
   const asMember = Boolean(member) || isAdmin();
   document.getElementById('writeGuest').classList.toggle('hidden', asMember);
   const wm = document.getElementById('writeMember');
@@ -1019,13 +1272,14 @@ async function adminDeletePost(id, btn) {
 
 // ── 관리자: 신고된 글 · 문의 내역 ──
 async function openReports() {
-  showAuthorOverlay('🚨 신고된 글', '불러오는 중...', '', '');
+  const seq = overlayLoading('🚨 신고된 글');
   try {
     const { posts } = await api({}, { action: 'adminReports', adminKey });
+    if (overlayStale(seq)) return;
     showAuthorOverlay('🚨 신고된 글', `${posts.length}건 · 신고 ${5}건 이상이면 자동 블라인드`, '', posts.length ? posts.map(p => `
       <div class="post-item">
         <div class="post-header">
-          <button class="author-stock" onclick="openModal('${escHtml(p.code)}')">${escHtml(findStock(p.code)?.name || p.code)}</button>
+          <button class="author-stock" data-code="${escHtml(p.code)}" onclick="openModal(this.dataset.code)">${escHtml(findStock(p.code)?.name || p.code)}</button>
           <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
           <span class="report-count">신고 ${p.reports}건${p.blind ? ' · 블라인드' : ''}</span>
           <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
@@ -1038,6 +1292,7 @@ async function openReports() {
         </div>
       </div>`).join('') : '<p class="empty-msg">신고된 글이 없습니다.</p>');
   } catch (e) {
+    if (overlayStale(seq)) return;
     showAuthorOverlay('🚨 신고된 글', '', '', `<p class="empty-msg">불러오지 못했습니다. (${escHtml(e.message)})</p>`);
   }
 }
@@ -1052,9 +1307,10 @@ async function adminUnblind(id) {
 }
 
 async function openContacts() {
-  showAuthorOverlay('✉️ 문의 내역', '불러오는 중...', '', '');
+  const seq = overlayLoading('✉️ 문의 내역');
   try {
     const { contacts } = await api({}, { action: 'adminContacts', adminKey });
+    if (overlayStale(seq)) return;
     showAuthorOverlay('✉️ 문의 내역', `최근 ${contacts.length}건`, '', contacts.length ? contacts.map(c => `
       <div class="post-item">
         <div class="post-header">
@@ -1065,28 +1321,104 @@ async function openContacts() {
         <div class="post-body">${escHtml(c.message)}</div>
       </div>`).join('') : '<p class="empty-msg">문의가 없습니다.</p>');
   } catch (e) {
+    if (overlayStale(seq)) return;
     showAuthorOverlay('✉️ 문의 내역', '', '', `<p class="empty-msg">불러오지 못했습니다. (${escHtml(e.message)})</p>`);
   }
+}
+
+// ── 관리자: 화면 정보 (사이트 통계) ──
+const tile = (label, value, sub = '') => `<div class="stat-tile"><div class="stat-label">${label}</div><div class="stat-value">${value}</div>${sub ? `<div class="stat-sub">${sub}</div>` : ''}</div>`;
+const fmtN = n => Number(n || 0).toLocaleString();
+const fmtDay = d => `${Number(d.slice(4, 6))}/${Number(d.slice(6, 8))}`;
+async function openStats() {
+  const seq = overlayLoading('📊 화면 정보');
+  try {
+    const r = await api({}, { action: 'adminStats', adminKey });
+    if (overlayStale(seq)) return;
+    const since = fmtDay(r.visits.visitorsSince);
+    const yday = r.days[1] || {};
+    const maxViews = Math.max(1, ...r.days.map(d => d.views));
+    const body = `<div class="stat-wrap">
+      <div class="stat-grid">
+        ${tile('오늘 방문', fmtN(r.visits.today), `어제 ${fmtN(yday.views)}`)}
+        ${tile('누적 방문', fmtN(r.visits.total))}
+        ${tile('오늘 신규 회원', fmtN(r.members.today), `어제 ${fmtN(yday.members)}`)}
+        ${tile('전체 회원', fmtN(r.members.total))}
+        ${tile('오늘 신규 게시글', fmtN(r.posts.today), `어제 ${fmtN(yday.posts)}`)}
+        ${tile('누적 게시글', fmtN(r.posts.total))}
+      </div>
+      <div class="stat-grid small">
+        ${tile('오늘 순방문자', fmtN(r.visits.todayVisitors), `${since}부터 집계`)}
+        ${tile('누적 순방문자', fmtN(r.visits.totalVisitors), `${since}부터 집계`)}
+        ${tile('조회수 합계', fmtN(r.posts.views))}
+        ${tile('신고된 글', fmtN(r.pending.reported))}
+        ${tile('문의', fmtN(r.pending.contacts))}
+      </div>
+      <h3 class="stat-h">최근 ${r.days.length}일</h3>
+      <table class="stat-table">
+        <thead><tr><th>날짜</th><th>방문</th><th>순방문자</th><th>신규 회원</th><th>게시글</th></tr></thead>
+        <tbody>${r.days.map(d => `<tr>
+          <td>${fmtDay(d.day)}</td>
+          <td class="stat-bar-cell"><span class="stat-bar" style="width:${Math.round(d.views / maxViews * 100)}%"></span><span>${fmtN(d.views)}</span></td>
+          <td>${d.day < r.visits.visitorsSince ? '-' : fmtN(d.visitors)}</td><td>${fmtN(d.members)}</td><td>${fmtN(d.posts)}</td></tr>`).join('')}</tbody>
+      </table>
+      <h3 class="stat-h">게시판별 게시글 TOP ${r.boards.length}</h3>
+      ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" onclick="${b.code === COLUMN_CODE ? `openModal('SECMKT', 'column')` : `openModal('${escHtml(b.code)}')`}">${b.code === COLUMN_CODE ? '운영자 칼럼' : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
+      <h3 class="stat-h">칼럼 사진 저장소</h3>
+      <div id="imgStats" class="stat-img"><p class="stat-note">불러오는 중...</p></div>
+      <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 게시글: 삭제된 글 제외 · 날짜는 한국시간</p></div>`;
+    showAuthorOverlay('📊 화면 정보', `${fmtDay(r.today)} 기준 사이트 통계`, '<button class="btn-tool" onclick="openStats()">새로고침</button>', body);
+    loadImageStats();
+  } catch (e) {
+    if (overlayStale(seq)) return;
+    if (/관리자 비밀번호/.test(e.message)) adminLogout();
+    showAuthorOverlay('📊 화면 정보', '', '', `<p class="empty-msg">불러오지 못했습니다. (${escHtml(e.message)})</p>`);
+  }
+}
+
+// 칼럼 사진 저장소 현황 (Cloudflare KV 무료 1GB) · 안 쓰는 사진 정리
+const fmtMB = b => (b / 1024 / 1024).toFixed(b < 10 * 1024 * 1024 ? 2 : 1) + 'MB';
+async function loadImageStats(cleanup = false) {
+  const el = () => document.getElementById('imgStats');
+  if (!el()) return;
+  try {
+    const r = await api({}, { action: 'adminImages', adminKey, ...(cleanup ? { cleanup: true } : {}) });
+    if (!el()) return;
+    if (!r.available) { el().innerHTML = '<p class="stat-note">사진 저장소가 연결되지 않았습니다.</p>'; return; }
+    const pct = r.bytes / r.limitBytes * 100;
+    el().innerHTML = `
+      <div class="stat-grid small">
+        ${tile('사진', fmtN(r.count) + '장', '칼럼에 쓰는 사진 ' + fmtN(r.used) + '장')}
+        ${tile('사용 용량', fmtMB(r.bytes), (pct < 0.1 ? '0.1% 미만' : pct.toFixed(1) + '%') + ' / 무료 1GB')}
+        ${tile('안 쓰는 사진', fmtN(r.unused) + '장', fmtMB(r.unusedBytes))}
+      </div>
+      ${r.deleted ? `<p class="stat-note">안 쓰는 사진 ${fmtN(r.deleted)}장을 정리했습니다.</p>` : ''}
+      ${r.unusedOld ? `<button class="btn-tool" onclick="cleanupImages(${r.unusedOld})">안 쓰는 사진 ${fmtN(r.unusedOld)}장 정리</button>` : ''}
+      <p class="stat-note">칼럼을 지우거나 수정에서 뺀 사진은 자동으로 지워집니다. 올렸다가 글에 쓰지 않은 사진은 하루가 지나면 여기서 정리할 수 있습니다.</p>`;
+  } catch (e) {
+    if (el()) el().innerHTML = `<p class="stat-note">불러오지 못했습니다. (${escHtml(e.message)})</p>`;
+  }
+}
+function cleanupImages(n) {
+  if (!confirm(`어느 칼럼에도 쓰이지 않는 사진 ${n}장을 지울까요?\n지운 사진은 되돌릴 수 없습니다.`)) return;
+  document.getElementById('imgStats').innerHTML = '<p class="stat-note">정리하는 중...</p>';
+  loadImageStats(true);
 }
 
 function closeAuthor(e) {
   if (e && e.target !== document.getElementById('authorOverlay')) return;
   if (!isOpen('authorOverlay')) return;
   document.getElementById('authorOverlay').classList.add('hidden');
+  overlaySeq++;
   leaveLayer();
 }
 
 function updateCharCount() {
   const len = document.getElementById('postContent').value.length;
-  document.getElementById('charCount').textContent = `${len}/${POST_MAX}`;
+  document.getElementById('charCount').textContent = `${len}/${postMax()}`;
 }
 
 // ── 유틸 ──────────────────────────────────────────────
-function sentimentLabel(s) {
-  if (s === 'up') return '📈 매수';
-  if (s === 'down') return '📉 매도';
-  return '🔍 중립';
-}
 
 function timeAgo(ts) {
   const diff = Math.floor((Date.now() - ts) / 1000);
@@ -1097,7 +1429,7 @@ function timeAgo(ts) {
 }
 
 function escHtml(str) {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // ── 회원: 로그인 · 회원가입 · 로그아웃 (세션 토큰은 이 브라우저에 30일 보관) ──
@@ -1127,7 +1459,7 @@ function setMember(user, token) {
   document.getElementById('memberTitle').textContent = user ? `${user.nick}님` : '';
   document.getElementById('memberSub').textContent = user ? `아이디 ${user.id} · 회원 글쓰기 사용 중` : '';
   renderWriteBox();
-  if (currentStock) drawPosts();
+  if (currentStock) isColumnTab() ? renderPosts(true) : drawPosts();
   loadFavs();
   loadFollowing();
 }
@@ -1143,9 +1475,10 @@ async function loadFollowing() {
 // ── 회원정보: 내 정보 · 팔로잉 · 비밀번호 변경 · 회원 탈퇴 ──
 async function openProfile() {
   if (!member) return toggleLogin();
-  showAuthorOverlay('회원정보', '불러오는 중...', '', '');
+  const seq = overlayLoading('회원정보');
   try {
     const r = await api({}, { action: 'profile' });
+    if (overlayStale(seq)) return;
     const joined = r.user.ts ? new Date(r.user.ts).toLocaleDateString('ko-KR') : '-';
     const chips = r.following.length
       ? `<div class="follow-chips">${r.following.map(n => `<button class="follow-chip" data-nick="${escHtml(n)}" onclick="openAuthor(this.dataset.nick)">${escHtml(n)}</button>`).join('')}</div>`
@@ -1178,6 +1511,7 @@ async function openProfile() {
         </div>
       </div>`);
   } catch (e) {
+    if (overlayStale(seq)) return;
     if (/로그인이 만료/.test(e.message)) setMember(null);
     showAuthorOverlay('회원정보', '', '', `<p class="empty-msg">불러오지 못했습니다. (${escHtml(e.message)})</p>`);
   }
@@ -1222,7 +1556,7 @@ async function loadFavs() {
     try { favs = new Set((await api({}, { action: 'favList' })).codes || []); } catch { favs = new Set(); }
   }
   refreshStars();
-  if (currentFilter === 'fav') { renderStocks(filteredList()); fetchAllPrices(); }
+  if (currentFilter === 'fav') { renderStocks(filteredList()); fetchAllPrices(); loadHomeNews(); }
 }
 
 function refreshStars() {
@@ -1330,7 +1664,8 @@ async function fetchAllPrices() {
       const s = STOCKS.find(x => x.code === d.code);
       if (!s || !d.price) return;
       s.price = d.price;
-      s.change = d.changeRate;
+      if (d.changeRate != null && !isNaN(d.changeRate)) s.change = d.changeRate;
+      s.session = d.session || null;  // 장 마감 후·시작 전 시간외 가격이면 PRE_MARKET/AFTER_MARKET
       if (d.volume) s.volume = d.volume;
       liveCodes.add(s.code);
       updateCard(s);
@@ -1341,7 +1676,7 @@ async function fetchAllPrices() {
       const up = currentStock.change >= 0;
       document.getElementById('modalPrice').textContent = fmtPrice(currentStock);
       const mc = document.getElementById('modalChange');
-      mc.textContent = `${up ? '+' : ''}${currentStock.change}%`;
+      mc.innerHTML = `${up ? '+' : ''}${escHtml(currentStock.change)}%${sessionTagHtml(currentStock)}`;
       mc.className = 'modal-change ' + (up ? 'up' : 'down');
     }
   } catch (e) {
@@ -1349,6 +1684,8 @@ async function fetchAllPrices() {
   }
 }
 
+// 시간외 가격 표시: 장 마감 후(애프터마켓)·장 시작 전(프리마켓) 가격일 때 종목 창에 '시간외'
+const sessionTagHtml = s => s.session ? ` <span class="session-tag" title="${s.session === 'PRE_MARKET' ? '장 시작 전' : '장 마감 후'} 시간외 거래 가격">시간외</span>` : '';
 function updateCard(s) {
   const up = s.change >= 0;
   // 목록·검색결과 양쪽 카드 모두 갱신

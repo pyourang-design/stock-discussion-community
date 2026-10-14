@@ -3,13 +3,13 @@
 // 실제 토론 참여(글쓰기)는 홈 화면의 종목 토론 창(/?stock={코드})에서 함.
 import { STOCKS, SECTORS, STOCKS_AS_OF, US_AS_OF } from './_stocks.js';
 import { redis, dbReady } from './_redis.js';
+import { pickPrice } from './_price.js';
 
 const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
 const UA = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', 'Referer': 'https://m.stock.naver.com/', 'Accept': 'application/json' };
 const POSTS_SHOWN = 20;
 const NEWS_SHOWN = 8;
-const SENTIMENT = { up: '📈 매수', down: '📉 매도', neutral: '🔍 중립' };
 const BLIND_TEXT = '신고가 누적되어 블라인드 처리된 글입니다.';
 
 const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -39,9 +39,14 @@ async function getJson(url) {
 // 시세 + 주요 지표
 async function quote(s) {
   if (s.us) {
-    const d = await getJson(`https://api.stock.naver.com/stock/${s.code}/basic`);
+    // 종목 정보는 basic, 가격은 시간외(프리·애프터마켓)까지 들어 있는 실시간 시세에서
+    const [d, live] = await Promise.all([
+      getJson(`https://api.stock.naver.com/stock/${s.code}/basic`),
+      getJson(`https://polling.finance.naver.com/api/realtime/worldstock/stock/${s.code}`).catch(() => null),
+    ]);
+    const q = pickPrice((live?.result?.datas ?? live?.datas ?? [])[0] || d);
     return {
-      price: d.closePrice, change: Number(d.fluctuationsRatio), diff: d.compareToPreviousClosePrice, time: d.localTradedAt,
+      price: q.price.toLocaleString('en-US', { maximumFractionDigits: 2 }), change: q.changeRate, diff: q.diff, time: q.time, session: q.session,
       infos: (d.stockItemTotalInfos ?? []).filter(x => x.value && x.value !== 'N/A').map(x => [x.key, x.value + (x.valueDesc ? ` (${x.valueDesc})` : '')]),
     };
   }
@@ -50,8 +55,9 @@ async function quote(s) {
     getJson(`https://m.stock.naver.com/api/stock/${s.code}/integration`).catch(() => null),
   ]);
   const d = (p.result?.datas ?? p.datas ?? [])[0] || {};
+  const q = pickPrice(d);
   return {
-    price: d.closePrice, change: Number(d.fluctuationsRatio), diff: d.compareToPreviousClosePrice, time: d.localTradedAt,
+    price: q.price.toLocaleString('ko-KR'), change: q.changeRate, diff: q.diff, time: q.time, session: q.session,
     infos: (integ?.totalInfos ?? []).filter(x => x.value).map(x => [x.key, x.value]),
   };
 }
@@ -65,7 +71,7 @@ async function news(s) {
   const data = await getJson(`https://m.stock.naver.com/api/news/stock/${s.code}?pageSize=${NEWS_SHOWN * 2}&page=1`);
   return data.flatMap(g => g.items ?? []).map(n => ({
     title: strip(n.titleFull || n.title), press: n.officeName, dt: n.datetime,
-    url: n.mobileNewsUrl || `https://n.news.naver.com/mnews/article/${n.officeId}/${n.articleId}`,
+    url: /^https:\/\//.test(n.mobileNewsUrl || '') ? n.mobileNewsUrl : `https://n.news.naver.com/mnews/article/${n.officeId}/${n.articleId}`,
   })).filter(n => n.title && !/(\.\.\.|…)$/.test(n.title)).slice(0, NEWS_SHOWN);
 }
 
@@ -74,11 +80,11 @@ async function posts(code) {
   const [ids, counts] = await redis([['LRANGE', `posts:${code}`, 0, POSTS_SHOWN - 1], ['HGET', 'postcount', code]]);
   if (!ids?.length) return { list: [], total: 0 };
   const raws = await redis(ids.map(id => ['GET', `post:${id}`]));
-  const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), sentiment: p.sentiment, ts: p.ts, content: p.blind ? BLIND_TEXT : p.content }));
+  const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content }));
   return { list, total: Number(counts) || list.length };
 }
 
-function layout({ title, desc, canonical, body, jsonld, status = 200 }) {
+function layout({ title, desc, canonical, body, jsonld, status = 200, image = null, ogType = 'website' }) {
   return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -87,21 +93,23 @@ function layout({ title, desc, canonical, body, jsonld, status = 200 }) {
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(desc)}" />
   ${status === 200 ? `<link rel="canonical" href="${esc(canonical)}" />` : '<meta name="robots" content="noindex" />'}
-  <meta property="og:type" content="website" />
+  <meta property="og:type" content="${esc(ogType)}" />
   <meta property="og:site_name" content="${NAME}" />
   <meta property="og:title" content="${esc(title)}" />
   <meta property="og:description" content="${esc(desc)}" />
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:locale" content="ko_KR" />
+  ${image ? `<meta property="og:image" content="${esc(image)}" />` : ''}
   ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>` : ''}
   <script src="/theme.js"></script>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
 <body>
 <header class="site-header">
   <div class="container header-inner">
-    <a class="logo" href="/"><span class="logo-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#f04452" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18l6-6 4 4 8-8"/><path d="M14 8h7v7"/></svg></span><span class="logo-text">${NAME}</span></a>
-    <nav class="main-nav page-nav"><a href="/">Home</a><button class="theme-toggle" onclick="toggleTheme()">Dark</button></nav>
+    <a class="logo" href="/"><span class="logo-icon"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#logoGrad)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg></span><span class="logo-text">${NAME}</span></a>
+    <nav class="main-nav page-nav"><a href="/">Home</a><a href="/?column=list">블로그</a><button class="theme-toggle" onclick="toggleTheme()">Dark</button></nav>
   </div>
 </header>
 <main class="container stock-page">
@@ -109,7 +117,7 @@ ${body}
 </main>
 <footer class="site-footer">
   <div class="container">
-    <nav class="policy-links"><a href="/about.html">사이트 소개</a><a href="/terms.html">이용약관</a><a href="/privacy.html"><b>개인정보처리방침</b></a><a href="/contact.html">연락처</a></nav>
+    <nav class="policy-links"><a href="/about.html">사이트 소개</a><a href="/terms.html">이용약관</a><a href="/privacy.html"><b>개인정보처리방침</b></a><a href="/contact.html">연락처</a><a class="footer-column-link" href="/column" onclick="location.href='/?column=list'; return false">운영자 칼럼</a></nav>
     <p>⚠️ 본 사이트 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
     <p>© 2026 ${NAME} · 운영자 김유랑 · <a href="mailto:tpsdurang@naver.com">tpsdurang@naver.com</a></p>
   </div>
@@ -179,7 +187,7 @@ export default async function handler(req, res) {
 
   <div class="sp-quote">
     <span class="sp-price">${esc(unit + price + won)}</span>
-    <span class="sp-change ${up ? 'up' : 'down'}">${up ? '+' : ''}${esc(change)}%</span>
+    <span class="sp-change ${up ? 'up' : 'down'}">${up ? '+' : ''}${esc(change)}%</span>${qt?.session ? ' <span class="session-tag">시간외</span>' : ''}
     <span class="sp-time">${qt?.time ? esc(String(qt.time).replace('T', ' ').slice(0, 16)) + ' 기준' : '시세는 토론 화면에서 실시간 확인'}</span>
   </div>
   <a class="btn-submit sp-cta" href="${esc(discussUrl)}">💬 ${esc(s.name)} 토론 참여하기 · 실시간 시세 보기</a>
@@ -192,7 +200,7 @@ export default async function handler(req, res) {
   <section class="sp-section">
     <h2>${esc(s.name)} 최근 토론글 <span>(${total}건)</span></h2>
     ${postList.length ? `<ul class="sp-posts">${postList.map(p => `
-      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <span class="post-sentiment ${esc(p.sentiment)}">${SENTIMENT[p.sentiment] || SENTIMENT.neutral}</span> <time>${kst(p.ts)}</time></div>
+      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
       <p>${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p></li>`).join('')}
     </ul>` : `<p class="sp-empty">아직 ${esc(s.name)} 토론글이 없습니다. 첫 번째 의견을 남겨보세요.</p>`}
     <a class="sp-more" href="${esc(discussUrl)}">${esc(s.name)} 토론 전체 보기 · 글쓰기 →</a>
@@ -229,3 +237,6 @@ export default async function handler(req, res) {
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600');
   res.status(200).send(layout({ title, desc, canonical, body, jsonld }));
 }
+
+// 운영자 칼럼 페이지(api/column.js)에서 같은 틀을 씀
+export { layout, esc, kst, SITE, NAME };

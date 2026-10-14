@@ -1,19 +1,6 @@
-.agents
-.claude
-skills-lock.json
-scripts
-WORK_SUMMARY.md
-MANUAL.md
-functions
-dist
-.wrangler
-wrangler.toml
-api/*
-!api/gnews.js
-*.html
-*.css
-*.xml
-*.txt
-app.js
-stocks.js
-theme.js
+# Vercel에는 구글 뉴스 중계(api/gnews.js)와 vercel.json만 올림 — 그 외(.dev.vars 비밀값, 문서, 소스) 전부 제외
+/*
+!/api
+/api/*
+!/api/gnews.js
+!/vercel.json

@@ -4,7 +4,14 @@
 // 결과 형식은 네이버 뉴스에 맞춤: { id, title, summary, press, datetime(YYYYMMDDHHmm KST), url, thumb, source: 'google' }
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 
-export const stripTags = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+const ENTITIES = { amp: '&', nbsp: ' ', middot: '·', hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', lt: '<', gt: '>', quot: '"', apos: "'" };
+// 한 번에 풀기: 숫자(&#8943; &#x2026;)·이름(&amp; &middot; …) 엔티티 — 풀린 결과를 다시 풀지 않음
+const decodeEntities = s => s.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z]+);/gi, (m, e) => {
+  if (e[0] !== '#') return ENTITIES[e.toLowerCase()] ?? m;
+  const c = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+  return c > 0 && c <= 0x10ffff ? String.fromCodePoint(c) : m;
+});
+export const stripTags = s => decodeEntities(String(s ?? '').replace(/<[^>]*>/g, '')).trim();
 
 // Date → 한국시간 YYYYMMDDHHmm (네이버 datetime 형식에 맞춤)
 const kstStamp = d => new Date(d.getTime() + 9 * 3600e3).toISOString().slice(0, 16).replace(/[-T:]/g, '');

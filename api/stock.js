@@ -1,20 +1,25 @@
 // GET /api/stock?code=207940            → 단일 종목 (기존 호환)
 // GET /api/stock?codes=207940,068270,... → 여러 종목 일괄 조회 { stocks: [...] }
 //   미국 종목은 네이버 해외주식 코드(TSLA.O, VOO, BRKb)로 함께 조회 가능
+import { pickPrice } from './_price.js';
+
 const toNum = v => {
   const n = Number(String(v ?? '0').replace(/,/g, ''));
   return Number.isFinite(n) ? n : 0;
 };
 
+// 장 마감 후·장 시작 전에는 시간외(넥스트레이드·미국 프리/애프터마켓) 가격이 더 최근이면 그 가격 (api/_price.js)
 function parse(d) {
+  const p = pickPrice(d);
   return {
     code:       d.itemCode ?? d.reutersCode,
-    price:      toNum(d.closePrice),
-    diff:       toNum(d.compareToPreviousClosePrice),
-    changeRate: toNum(d.fluctuationsRatio),
+    price:      p.price,
+    diff:       p.diff,
+    changeRate: p.changeRate,
     volume:     toNum(d.accumulatedTradingVolume),
     status:     d.marketStatus ?? null,
-    time:       d.localTradedAt ?? null,
+    time:       p.time,
+    session:    p.session,
   };
 }
 
@@ -24,7 +29,6 @@ export default async function handler(req, res) {
   const list = all.filter(c => /^[0-9][0-9A-Z]{5}$/.test(c)).slice(0, 50);
   const usList = all.filter(c => /^[A-Z][A-Za-z0-9]{0,6}(\.[A-Z])?$/.test(c)).slice(0, 50);
 
-  res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Cache-Control', 's-maxage=5, stale-while-revalidate=10');
 
   if (!list.length && !usList.length) return res.status(400).json({ error: '종목코드가 올바르지 않습니다' });

@@ -1,11 +1,12 @@
 // GET /api/detail?code=068270&type=news|research|disclosure|info (info = 시세 정보)
+// GET /api/detail?code=SECMKT|SECBIO…&type=research → 주식 시장(투자전략)·업종(산업분석) 증권사 리포트
 // 종목 상세 모달용 데이터 (네이버 금융 / WISEfn 프록시)
 // 미국 종목(code=TSLA.O 등)은 news·info만 (네이버 해외주식)
 // 뉴스 = 네이버 증권 최신 100건 + Google 뉴스 종목명 정확히 일치 검색(최근 7일) 50건 → 중복 제거 후 최신순 100건
 //        (화면에는 20건씩 '더보기'로 표시)
 //   네이버 국내: 20건×5쪽 (50건 단위로 받으면 2쪽이 1쪽과 겹침), 미국: 50건×2쪽 (한 번에 최대 50건)
 import { googleNews, dedupeByTitle } from './_google.js';
-import { STOCKS } from './_stocks.js';
+import { STOCKS, SECTORS } from './_stocks.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const NAVER = 'https://m.stock.naver.com/api';
@@ -18,7 +19,14 @@ async function getJson(url) {
 
 const NEWS_MAX = 100, KR_NEWS_PAGE = 20, US_NEWS_PAGE = 50, GOOGLE_MAX = 50, LIST_SIZE = 50;
 
-const stripTags = s => String(s ?? '').replace(/<[^>]*>/g, '').replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').trim();
+const ENTITIES = { amp: '&', nbsp: ' ', middot: '·', hellip: '…', lsquo: '‘', rsquo: '’', ldquo: '“', rdquo: '”', lt: '<', gt: '>', quot: '"', apos: "'" };
+// 한 번에 풀기: 숫자(&#8943; &#x2026;)·이름(&amp; &middot; …) 엔티티 — 풀린 결과를 다시 풀지 않음
+const decodeEntities = s => s.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z]+);/gi, (m, e) => {
+  if (e[0] !== '#') return ENTITIES[e.toLowerCase()] ?? m;
+  const c = e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : Number(e.slice(1));
+  return c > 0 && c <= 0x10ffff ? String.fromCodePoint(c) : m;
+});
+const stripTags = s => decodeEntities(String(s ?? '').replace(/<[^>]*>/g, '')).trim();
 
 // 종목명이 정확히 들어간 Google 뉴스 검색 (검색어는 서버의 종목 목록에서만 만듦)
 // 영어 4글자 이하 종목명(HLB, LS, SKC 등)은 다른 뜻으로 쓰이기 쉬워 주식 관련 단어가 함께 있는 기사만
@@ -65,8 +73,52 @@ async function research(code) {
     date: r.writeDate,
     views: r.readCount,
     summary: stripTags(r.previewContent),
-    url: `https://m.stock.naver.com/research/company/${r.researchId}`,
+    url: `/api/report?kind=company&id=${r.researchId}`,  // 원문 PDF 바로 보기 (api/report.js)
   }));
+}
+
+// ── 주식 시장·업종 게시판의 증권사 리포트 (네이버 증권 리서치) ──
+// 주식 시장(SECMKT): 투자전략 최신 50건
+// 업종(SECBIO 등): 산업분석은 업종 필터가 없어 최근 500건(약 한 달)을 받아 네이버 업종 분류 + 제목 키워드·업종 종목명으로 골라 최신 50건
+// 미국 주식(SECUSA): 산업분석이 국내 업종 위주라 투자전략에서 미국·글로벌 관련 리포트
+const MARKET_BOARD = 'SECMKT';
+const boardSector = code => SECTORS.find(s => 'SEC' + s.key.slice(0, 3).toUpperCase() === code)?.key;
+const INDUSTRY_RULES = {
+  bio: { cats: ['제약', '바이오'], words: ['바이오', '제약', '신약', '헬스케어', '임상', '의약', 'CDMO', '비만', 'ADC'] },
+  semi: { cats: ['반도체'], words: ['반도체', 'HBM', '메모리', '파운드리', 'D램', 'DRAM', '낸드', 'NAND', '칩', '패키지 기판', '기판', '웨이퍼', 'AI 서버'] },
+  battery: { cats: [], words: ['2차전지', '이차전지', '배터리', '양극재', '음극재', '전해질', '리튬', '전고체', 'ESS', '전기차', '로봇', '휴머노이드', '피지컬 AI', '자동화'] },
+  power: { cats: ['유틸리티'], words: ['전력', '변압기', '전선', '송전', '원전', '원자력', 'SMR', '가스터빈', '발전', '데이터센터', 'Power'] },
+  kbeauty: { cats: ['화장품', '미디어', '여행'], words: ['화장품', '뷰티', '코스메틱', '미용', '엔터', '아이돌', 'K팝', '콘텐츠', '드라마', '카지노', '면세', '호텔', '여행', '관광'] },
+  ship: { cats: ['조선'], words: ['조선', '선박', 'LNG선', '방산', '방위', '국방', '무기', '우주', '항공우주', 'MASGA'] },
+  auto: { cats: ['자동차', '타이어'], words: ['자동차', '완성차', '車', '타이어', '부품', '현대차', '기아'] },
+  finance: { cats: ['은행', '증권', '보험', '지주회사'], words: ['은행', '증권', '보험', '금융', '카드', '밸류업', '배당', '저PBR', '지주'] },
+};
+const USA_WORDS = ['미국', '美', '글로벌', 'Global', 'GLOBAL', '해외', 'ETF', 'S&P', '나스닥', '빅테크', '뉴욕', '연준', 'FOMC', 'US ', 'Fed'];
+// 영어 3자 이하 종목명(LS, HLB 등)은 다른 단어와 겹치기 쉬워 제외
+const sectorNames = key => STOCKS.filter(x => x.sectors?.[key] && x.name.length >= 3 && !/^[A-Za-z0-9&]{1,3}$/.test(x.name)).map(x => x.name);
+
+const researchList = async (kind, page, size) => (await getJson(`${NAVER}/research/${kind}?pageSize=${size}&page=${page}`)).map(r => ({
+  title: stripTags(r.title),
+  broker: r.brokerName,
+  date: r.writeDate,
+  views: r.readCount,
+  category: r.category,
+  url: `/api/report?kind=${kind}&id=${r.researchId}`,
+}));
+async function pages(kind, n) {
+  const results = await Promise.allSettled(Array.from({ length: n }, (_, i) => researchList(kind, i + 1, 100)));
+  if (results.every(r => r.status === 'rejected')) throw results[0].reason;
+  return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+}
+async function boardResearch(code) {
+  if (code === MARKET_BOARD) return researchList('invest', 1, LIST_SIZE);
+  const key = boardSector(code);
+  if (key === 'usa') return (await pages('invest', 3)).filter(r => USA_WORDS.some(w => r.title.includes(w))).slice(0, LIST_SIZE);
+  const rule = INDUSTRY_RULES[key];
+  const names = sectorNames(key);
+  return (await pages('industry', 5))
+    .filter(r => rule.cats.includes(r.category) || rule.words.some(w => r.title.includes(w)) || names.some(nm => r.title.includes(nm)))
+    .slice(0, LIST_SIZE);
 }
 
 // 공시 정보
@@ -144,9 +196,9 @@ const isUs = c => /^[A-Z][A-Za-z0-9]{0,6}(\.[A-Z])?$/.test(c);
 export default async function handler(req, res) {
   const code = String(req.query.code ?? '').trim();
   const type = String(req.query.type ?? '');
-  res.setHeader('Access-Control-Allow-Origin', '*');
 
-  const handlers = isDomestic(code) ? HANDLERS : isUs(code) ? US_HANDLERS : null;
+  const isBoard = code === MARKET_BOARD || !!boardSector(code);
+  const handlers = isBoard ? { research: boardResearch } : isDomestic(code) ? HANDLERS : isUs(code) ? US_HANDLERS : null;
   if (!handlers || !handlers[type]) {
     return res.status(400).json({ error: 'code 또는 type이 올바르지 않습니다' });
   }

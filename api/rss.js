@@ -7,13 +7,15 @@ import { redis, dbReady } from './_redis.js';
 const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
 const MAX_POSTS = 50, MAX_ITEMS = 100, PER_BOARD = 10;
-const SENTIMENT = { up: '매수', down: '매도', neutral: '중립' };
 
 const xml = s => String(s ?? '').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
   .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const stockUrl = code => `${SITE}/stock/${encodeURIComponent(code)}`;
 const sectorName = key => key === 'usa' ? '미국 주식' : `${SECTORS.find(s => s.key === key)?.name || ''} 업종`;
 // 업종 게시판 코드(SECBIO 등) → 업종 key
+// 주식 시장 경제 게시판 (업종과 무관한 전체 시장 토론)
+const MARKET_BOARD = 'SECMKT';
+const COLUMN_BOARD = 'COLMKT';  // 운영자 칼럼 (주식 시장 경제 게시판의 칼럼 탭)
 const boardSector = code => SECTORS.find(s => 'SEC' + s.key.slice(0, 3).toUpperCase() === code)?.key;
 
 async function recentPosts() {
@@ -34,17 +36,23 @@ export default async function handler(req, res) {
   let posts = [];
   try { posts = await recentPosts(); } catch { posts = []; }
 
-  const items = posts.map(p => {
+  const items = posts.filter(p => !isNaN(new Date(p.editedTs || p.ts))).map(p => {
+    // 운영자 칼럼: 제목 그대로, 링크는 해당 칼럼을 바로 여는 주소
+    if (p.code === COLUMN_BOARD) {
+      const link = `${SITE}/column/${encodeURIComponent(p.id)}`;
+      const text = String(p.content).replace(/\[사진:[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+      return { title: `[운영자 칼럼] ${p.title || text.slice(0, 40)}`, link, guid: link, desc: text.slice(0, 300), date: new Date(p.editedTs || p.ts), category: '운영자 칼럼' };
+    }
     const s = STOCKS.find(x => x.code === p.code);
     const sec = s ? null : boardSector(p.code);
-    const where = s ? `${s.name} 종목 토론방` : sec ? `${sectorName(sec)} 게시판` : '토론방';
-    const link = s ? stockUrl(s.code) : `${SITE}/?sector=${sec || ''}`;
+    const where = s ? `${s.name} 종목 토론방` : sec ? `${sectorName(sec)} 게시판` : p.code === MARKET_BOARD ? '주식 시장 경제 토론' : '토론방';
+    const link = s ? stockUrl(s.code) : sec ? `${SITE}/?sector=${sec}` : `${SITE}/`;
     const text = String(p.content).replace(/\s+/g, ' ').trim();
     return {
       title: `[${where}] ${text.slice(0, 40)}${text.length > 40 ? '…' : ''}`,
       link, guid: `${link}#post-${p.id}`,
-      desc: `${p.nick}님의 ${SENTIMENT[p.sentiment] || '중립'} 의견: ${text.slice(0, 300)}`,
-      date: new Date(p.editedTs || p.ts), category: s ? sectorName(Object.keys(s.sectors)[0]) : sec ? sectorName(sec) : '토론',
+      desc: `${p.nick}님의 의견: ${text.slice(0, 300)}`,
+      date: new Date(p.editedTs || p.ts), category: s ? sectorName(Object.keys(s.sectors)[0]) : sec ? sectorName(sec) : p.code === MARKET_BOARD ? '주식 시장 경제' : '토론',
     };
   });
 

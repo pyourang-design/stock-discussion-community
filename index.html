@@ -21,6 +21,7 @@
   <meta name="twitter:description" content="주식 종목 토론방 · 주식 종목 토론 게시판 - 바이오·반도체·2차전지·로봇·전력·원자력·K뷰티·K컬쳐·조선·방산·자동차·금융 업종별 주요 종목과 미국주식 100 종목토론방(종토방). 실시간 주가, 뉴스, 공시, 분석 보고서와 투자자 의견을 한곳에서 확인하세요." />
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"WebSite","name":"주식 업종 종목 토론방","alternateName":["주식 종목 토론방","주식 종목 토론 게시판","업종별 종목토론방","종토방","upjong"],"url":"https://upjong.com/","inLanguage":"ko-KR"}</script>
   <script src="/theme.js"></script>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -29,11 +30,12 @@
 <header class="site-header">
   <div class="container header-inner">
     <div class="logo">
-      <span class="logo-icon"><svg viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="#f04452" stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 18l6-6 4 4 8-8"/><path d="M14 8h7v7"/></svg></span>
+      <span class="logo-icon"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#logoGrad)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg></span>
       <span class="logo-text">주식 업종 종목 토론방</span>
     </div>
     <nav class="main-nav">
       <a href="/" class="active">Home</a>
+      <a href="/?column=list" onclick="event.preventDefault(); this.blur(); openColumnLink(null)">블로그</a>
       <button class="theme-toggle" onclick="toggleTheme()">Dark</button>
     </nav>
     <div class="header-actions">
@@ -56,7 +58,7 @@
       <h1>주식 종목 토론방·게시판</h1>
       <span class="site-stats" id="siteStats"></span>
     </div>
-    <p>바이오·반도체 등 업종별 종목 및 미국 주식의 실시간 뉴스와 투자자 의견을 한곳에서 보는 업종별 주식 종목 토론방 게시판입니다.</p>
+    <p>바이오·반도체 등 업종별 종목 및 미국 주식의 실시간 뉴스, 운영자 칼럼, 투자자 의견을 한곳에서 보는 업종별 주식 종목 토론방 게시판입니다.</p>
   </section>
 
   <!-- 마켓 인덱스 배너: 국내·환율 / 미국 지수 (20초마다 갱신, 탭 숨김 시 정지) -->
@@ -108,7 +110,8 @@
   <section class="seo-guide">
     <h2>주식 종목 토론 게시판 이용 안내</h2>
     <p>주식 업종 종목 토론방(upjong.com)은 종목마다 따로 열린 주식 종목 토론 게시판입니다. 업종 탭에서 종목을 고르면 그 종목의 토론방(종토방)에서 실시간 주가와 뉴스·공시·리포트를 보면서 다른 투자자와 의견을 나눌 수 있습니다.</p>
-    <p>업종 게시판에서는 바이오, 반도체, 2차전지·로봇, 전력·원자력, K뷰티·컬쳐, 조선·방산, 자동차, 금융, 미국 주식처럼 업종 전체 이야기를 나눌 수 있습니다. 회원가입 없이도 글을 쓸 수 있고, 회원은 관심 종목과 팔로우 기능을 쓸 수 있습니다.</p>
+    <p>업종 게시판에서는 바이오, 반도체, 2차전지·로봇, 전력·원자력, K뷰티·컬쳐, 조선·방산, 자동차, 금융 등 업종 전체 이야기를 나눌 수 있습니다. 회원가입 없이도 글을 쓸 수 있고, 회원은 관심 종목과 팔로우 기능을 쓸 수 있습니다.</p>
+    <p>주식 시장 경제 게시판의 <a class="guide-column-link" href="/column" onclick="event.preventDefault(); openColumnLink(null)">운영자 칼럼</a>에서는 PER·PBR 같은 투자 지표 읽는 법, 재무제표·공시 분석, 차트 보는 법 등 주식 투자에 필요한 기초 지식을 운영자가 쉽게 정리해 연재합니다. 칼럼은 누구나 읽을 수 있습니다.</p>
   </section>
 
   <!-- SEO:START (scripts/seo.mjs로 생성) -->
@@ -175,10 +178,11 @@
     </div>
 
     <div class="modal-tabs">
+      <button class="tab" data-tab="column" onclick="switchModalTab('column', this)">운영자 칼럼</button>
       <button class="tab active" data-tab="discuss" onclick="switchModalTab('discuss', this)">토론</button>
       <button class="tab" data-tab="news" onclick="switchModalTab('news', this)">실시간 종목 뉴스</button>
-      <button class="tab" data-tab="info" onclick="switchModalTab('info', this)">시세 정보</button>
       <button class="tab" data-tab="research" onclick="switchModalTab('research', this)">증권사 리포트</button>
+      <button class="tab" data-tab="info" onclick="switchModalTab('info', this)">시세 정보</button>
       <button class="tab" data-tab="disclosure" onclick="switchModalTab('disclosure', this)">공시</button>
     </div>
 
@@ -186,19 +190,17 @@
     <div id="discussTab">
       <div class="write-box">
         <p class="write-policy">🛡️ 욕설·광고·외부 유도 글은 금칙어 필터로 등록되지 않으며, 신고 5건이 쌓이면 자동 블라인드 후 운영자가 삭제합니다. <a href="terms.html#policy" target="_blank">운영정책</a></p>
-        <div class="write-member hidden" id="writeMember"></div>
-        <div class="write-ids" id="writeGuest">
-          <span class="write-guest-label">비회원 글쓰기</span>
-          <input id="postNickname" type="text" placeholder="닉네임 (한글 10자 이내)" maxlength="10" />
-          <input id="postPassword" type="password" placeholder="비밀번호 (수정·삭제용 4~20자)" maxlength="20" autocomplete="new-password" />
-        </div>
+        <input id="postTitle" class="hidden" type="text" maxlength="100" placeholder="칼럼 제목 (최대 100자)" />
         <textarea id="postContent" placeholder="의견을 남겨보세요..." maxlength="1000" rows="3"></textarea>
         <div class="write-footer">
-          <select id="postSentiment">
-            <option value="neutral">-</option>
-            <option value="up">📈 매수</option>
-            <option value="down">📉 매도</option>
-          </select>
+          <div class="write-ids" id="writeGuest">
+            <span class="write-guest-label">비회원 글쓰기</span>
+            <input id="postNickname" type="text" placeholder="닉네임 (10자 이내)" maxlength="10" />
+            <input id="postPassword" type="password" placeholder="비밀번호 (수정·삭제용)" maxlength="20" autocomplete="new-password" />
+          </div>
+          <div class="write-member hidden" id="writeMember"></div>
+          <button type="button" id="btnColImg" class="btn-tool btn-col-img hidden" onclick="pickColumnImage('postContent')">🖼 사진 넣기</button>
+          <input type="file" id="colImgFile" class="hidden" accept="image/jpeg,image/png,image/webp,image/gif" />
           <span id="charCount">0/1000</span>
           <button class="btn-submit" onclick="submitPost()">등록</button>
         </div>
@@ -269,7 +271,7 @@
 <footer class="site-footer">
   <div class="container">
     <nav class="policy-links">
-      <a href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a>
+      <a href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a><a class="footer-column-link" href="/column" onclick="event.preventDefault(); openColumnLink(null)">운영자 칼럼</a>
     </nav>
     <p>⚠️ 본 사이트 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
     <p>운영자 김유랑 · <a href="mailto:tpsdurang@naver.com">tpsdurang@naver.com</a></p>

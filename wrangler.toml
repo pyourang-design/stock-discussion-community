@@ -3,3 +3,8 @@ name = "stock-forum"
 pages_build_output_dir = "dist"
 compatibility_date = "2025-09-01"
 compatibility_flags = ["nodejs_compat"]
+
+# 운영자 칼럼 사진 저장소 (Workers KV, 결제수단 없이 무료 1GB) — functions/api/image.js 업로드, functions/img/[id].js 표시
+[[kv_namespaces]]
+binding = "IMAGES"
+id = "286e373318e14aecbd86bad965e3d18c"

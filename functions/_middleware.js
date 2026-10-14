@@ -10,5 +10,12 @@ export async function onRequest({ request, next }) {
     url.protocol = 'https:';
     return Response.redirect(url.toString(), 301);
   }
-  return next();
+  const res = await next();
+  const out = new Response(res.body, res);
+  out.headers.set('X-Frame-Options', 'DENY');
+  out.headers.set('Content-Security-Policy', "frame-ancestors 'none'; object-src 'none'; base-uri 'self'");
+  out.headers.set('Strict-Transport-Security', 'max-age=31536000');
+  out.headers.set('X-Content-Type-Options', 'nosniff');
+  if (url.hostname !== CANONICAL) out.headers.set('X-Robots-Tag', 'noindex');  // 미리보기 배포 주소
+  return out;
 }
