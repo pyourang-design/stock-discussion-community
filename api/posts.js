@@ -65,6 +65,7 @@
 //   postviews          게시글 id → 조회수 (hash)
 //   게시글의 uid(회원 아이디)는 서버에서만 쓰고 응답에서는 member: true 로만 표시
 import crypto from 'crypto';
+import { COLUMN_ORDER_KEY, sortColumns } from './_colorder.js';
 import { redis, dbReady } from './_redis.js';
 
 const MAX_CONTENT = 1000;
@@ -610,9 +611,9 @@ async function handlePost(b, env = {}) {
   if (b.action === 'columnList') {
     const [ids] = await redis([['LRANGE', `posts:${COLUMN_CODE}`, 0, LIST_LIMIT - 1]]);
     if (!ids?.length) return { posts: [] };
-    const [raws, views] = await redis([['MGET', ...ids.map(id => `post:${id}`)], ['HMGET', 'postviews', ...ids]]);
-    const posts = ids.map((id, i) => raws[i] ? { ...publicPost(JSON.parse(raws[i])), views: Number(views?.[i]) || 0 } : null).filter(Boolean)
-      .sort((a, b2) => a.ts - b2.ts);  // 칼럼은 먼저 쓴 글부터 (연재 순서)
+    const [raws, views, order] = await redis([['MGET', ...ids.map(id => `post:${id}`)], ['HMGET', 'postviews', ...ids], ['HGETALL', COLUMN_ORDER_KEY]]);
+    // 연재 순서: 운영자가 정한 순번(colorder) → 없으면 먼저 쓴 글부터 (api/_colorder.js)
+    const posts = sortColumns(ids.map((id, i) => raws[i] ? { ...publicPost(JSON.parse(raws[i])), views: Number(views?.[i]) || 0 } : null).filter(Boolean), order);
     return { posts };
   }
 

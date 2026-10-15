@@ -3,6 +3,7 @@
 // 검색 로봇이 자바스크립트 없이 제목·본문을 읽을 수 있도록 글자로 내보냄 (홈 화면의 칼럼 탭 /?column={id}는 같은 글의 토론 화면)
 import { redis, dbReady } from './_redis.js';
 import { layout, esc, kst, SITE, NAME } from './page.js';
+import { COLUMN_ORDER_KEY, sortColumns } from './_colorder.js';
 
 const COLUMN_CODE = 'COLMKT';
 const LIST_MAX = 200;
@@ -12,14 +13,14 @@ const isPostId = id => /^[0-9a-z]{6,20}$/.test(id || '');
 const IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
 const noImgs = text => String(text || '').replace(IMG_RE, ' ');
 
-// 칼럼 목록 (최신순, 삭제·블라인드 제외)
+// 칼럼 목록 (연재 순서, 삭제·블라인드 제외)
 async function loadColumns() {
   if (!dbReady()) return [];
   const [ids] = await redis([['LRANGE', `posts:${COLUMN_CODE}`, 0, LIST_MAX - 1]]);
   if (!ids?.length) return [];
-  const [raws] = await redis([['MGET', ...ids.map(id => `post:${id}`)]]);  // 칼럼 전체를 명령 하나로
-  return (raws || []).filter(Boolean).map(r => JSON.parse(r)).filter(p => p.code === COLUMN_CODE && !p.blind && Number.isFinite(p.ts))
-    .sort((a, b) => a.ts - b.ts);  // 먼저 쓴 글부터 (연재 순서)
+  const [raws, order] = await redis([['MGET', ...ids.map(id => `post:${id}`)], ['HGETALL', COLUMN_ORDER_KEY]]);  // 칼럼 전체를 한 번에
+  // 연재 순서: 운영자가 정한 순번(colorder) → 없으면 먼저 쓴 글부터 (api/_colorder.js)
+  return sortColumns((raws || []).filter(Boolean).map(r => JSON.parse(r)).filter(p => p.code === COLUMN_CODE && !p.blind && Number.isFinite(p.ts)), order);
 }
 
 // 본문: 빈 줄로 문단을 나누고, 문단 안 줄바꿈은 그대로
