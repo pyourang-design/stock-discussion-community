@@ -9,7 +9,7 @@ const API_BASE = location.protocol === 'file:' ? 'https://upjong.com' : '';
 document.addEventListener('DOMContentLoaded', () => {
   // 맨 앞 '관심 종목' 탭 (회원 전용), 처음 화면은 첫 업종 탭
   document.getElementById('tabBar').innerHTML = [FAV_TAB, ...SECTORS].map(sec =>
-    `<button class="tab${sec.key === currentFilter ? ' active' : ''}" onclick="filterTab('${sec.key}', this)">${tabLabel(sec)}</button>`).join('');
+    `<button class="tab${sec.key === currentFilter ? ' active' : ''}" data-act="filterTab" data-key="${sec.key}">${tabLabel(sec)}</button>`).join('');
   renderTabNote();
   renderStocks(filteredList());
   startRealtime();
@@ -22,7 +22,84 @@ document.addEventListener('DOMContentLoaded', () => {
   openFromUrl();
   countVisit();
   document.getElementById('postContent').addEventListener('input', updateCharCount);
+  document.getElementById('searchInput').addEventListener('input', searchStocks);
 });
+
+// ── 클릭·키 처리: 인라인 onclick 대신 data-act / data-enter / data-err (보안 헤더 CSP script-src 'self') ──
+// 버튼에 data-act="이름"을 달면 아래 ACTIONS[이름](요소, 이벤트)가 실행됨 (안쪽 요소 우선 — 카드 안 ☆는 ☆만)
+const ACTIONS = {
+  filterTab: el => filterTab(el.dataset.key, el),
+  columnLink: (el, e) => { e.preventDefault(); el.blur(); openColumnLink(el.dataset.id || null); },
+  openFeed: () => openFeed(),
+  toggleLogin: () => toggleLogin(),
+  toggleSignup: () => toggleSignup(),
+  openProfile: () => openProfile(),
+  profileFromMenu: () => { closeDropdowns(); openProfile(); },
+  feedFromMenu: () => { closeDropdowns(); openFeed(); },
+  closeDropdowns: () => closeDropdowns(),
+  loginFromAuthor: () => { closeAuthor(); toggleLogin(); },
+  signupFromAuthor: () => { closeAuthor(); toggleSignup(); },
+  doLogin: () => doLogin(),
+  doSignup: () => doSignup(),
+  doLogout: () => doLogout(),
+  modalOverlay: (el, e) => closeModal(e),
+  modalClose: () => closeModal(),
+  modalTab: el => switchModalTab(el.dataset.tab, el),
+  authorOverlay: (el, e) => closeAuthor(e),
+  authorClose: () => closeAuthor(),
+  openNews: el => openModal(el.dataset.code, 'news'),
+  openStock: el => openModal(el.dataset.code),
+  openColumnBoard: () => openModal('SECMKT', 'column'),
+  toggleFav: (el, e) => toggleFav(e, el.dataset.code),
+  moreSectorNews: el => moreSectorNews(el.dataset.key),
+  moreNews: () => moreNews(),
+  toggleMore: el => toggleMore(el),
+  vote: el => vote(el.parentNode.dataset.id, el.dataset.dir),
+  openAuthor: el => openAuthor(el.dataset.nick),
+  toggleFollow: el => toggleFollow(el.dataset.nick),
+  submitPost: () => submitPost(),
+  pickImage: el => pickColumnImage(el.dataset.target),
+  postAction: el => openPostAction(el.dataset.id, el.dataset.mode),
+  savePostEdit: el => savePostEdit(el.dataset.id),
+  closePostAction: () => closePostAction(),
+  deletePost: el => deletePost(el.dataset.id),
+  reportPost: el => reportPost(el.dataset.id),
+  openColumn: el => openColumn(el.dataset.id),
+  closeColumn: () => closeColumn(),
+  goColumnPage: el => goColumnPage(Number(el.dataset.page)),
+  toggleAdminForm: () => toggleAdminForm(),
+  adminLogin: () => adminLogin(),
+  adminLogout: () => adminLogout(),
+  adminDelete: el => adminDeletePost(el.dataset.id, el),
+  adminDeleteReported: el => adminDeletePost(el.dataset.id, el).then(openReports),
+  adminUnblind: el => adminUnblind(el.dataset.id),
+  openReports: () => openReports(),
+  openContacts: () => openContacts(),
+  openStats: () => openStats(),
+  cleanupImages: el => cleanupImages(Number(el.dataset.n)),
+  changePassword: () => changePassword(),
+  withdraw: () => withdraw(),
+  addToHome: () => addToHome(),
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest && e.target.closest('[data-act]');
+  const fn = el && ACTIONS[el.dataset.act];
+  if (fn) fn(el, e);
+});
+// 입력칸에서 Enter → data-enter 동작 (로그인·가입·관리자 비밀번호)
+document.addEventListener('keydown', e => {
+  const fn = e.key === 'Enter' && e.target.dataset && ACTIONS[e.target.dataset.enter];
+  if (fn) fn(e.target, e);
+});
+// 로그인·가입 폼은 Enter로 페이지가 다시 열리지 않게 (전송은 버튼·data-enter가 처리)
+document.addEventListener('submit', e => e.preventDefault());
+// 그림 못 불러오면: data-err="remove" 지움, "nologo" 종목 로고 자리 표시 (error는 버블링 안 돼서 캡처 단계)
+document.addEventListener('error', e => {
+  const img = e.target;
+  if (!(img instanceof HTMLImageElement) || !img.dataset.err) return;
+  if (img.dataset.err === 'nologo') img.parentNode?.classList.add('no-logo');
+  img.remove();
+}, true);
 
 // 사이트 조회수 (같은 브라우저 30분에 1회 집계) → 상단 "오늘 N · 누적 N"
 async function countVisit() {
@@ -77,7 +154,7 @@ function renderStocks(list) {
   if (currentFilter === 'fav') {
     // 관심 종목 탭: 회원은 맨 앞에 주식 시장 경제 뉴스·토론 카드, 이어서 등록한 관심 종목만 (비회원은 안내만)
     el.innerHTML = !member
-      ? '<p class="empty-msg">관심 종목은 회원 전용입니다.<br><button class="link-btn" onclick="toggleLogin()">로그인</button> 또는 <button class="link-btn" onclick="toggleSignup()">회원가입</button> 후 종목 카드의 ☆를 눌러 추가하세요.</p>'
+      ? '<p class="empty-msg">관심 종목은 회원 전용입니다.<br><button class="link-btn" data-act="toggleLogin">로그인</button> 또는 <button class="link-btn" data-act="toggleSignup">회원가입</button> 후 종목 카드의 ☆를 눌러 추가하세요.</p>'
       : newsCardHtml(MARKET_KEY) + (list.length ? list.map(s => stockCard(s)).join('') : '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>');
     return;
   }
@@ -149,7 +226,7 @@ function sectorNewsHtml(key) {
   if (!n.data.length) return '<p class="empty-msg">최근 뉴스가 없습니다.</p>' + foot;
   const shown = sectorShown[key] || NEWS_PAGE;
   const more = n.data.length > shown
-    ? `<button class="news-more" onclick="moreSectorNews('${key}')">더보기 (${shown} / ${n.data.length})</button>` : '';
+    ? `<button class="news-more" data-act="moreSectorNews" data-key="${key}">더보기 (${shown} / ${n.data.length})</button>` : '';
   return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신 · 최신 ${n.data.length}건</div>` + n.data.slice(0, shown).map(item => {
     const names = item.codes.map(c => STOCKS.find(s => s.code === c)?.name).filter(Boolean);
     // 종목 뉴스와 같은 모양: 제목 · 요약 · 출처 + 오른쪽 사진 미리보기 (구글 기사는 사진·요약 없음)
@@ -161,7 +238,7 @@ function sectorNewsHtml(key) {
           <div class="feed-meta"><span class="news-src ${item.source === 'google' ? 'google' : 'naver'}">${item.source === 'google' ? 'G' : 'N'}</span>${names.slice(0, 3).map(x => `<span class="news-stock">${escHtml(x)}</span>`).join('')}
             ${escHtml(item.press || '')} · ${newsTime(item.datetime)}</div>
         </div>
-        ${/^https:\/\//.test(item.thumb || '') ? `<img class="feed-thumb" src="${safeUrl(item.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+        ${/^https:\/\//.test(item.thumb || '') ? `<img class="feed-thumb" src="${safeUrl(item.thumb)}" alt="" loading="lazy" data-err="remove">` : ''}
       </a>`;
   }).join('') + more + foot;
 }
@@ -182,7 +259,7 @@ function newsCardHtml(key) {
   // 두 줄 고정 (업종명이 길어도 줄바꿈은 한 번만): 첫 줄 이름, 둘째 줄 '실시간 뉴스 토론'
   const label = `<span>${escHtml(key === MARKET_KEY ? '주식 시장 경제' : board.name)}</span><br><span>실시간 뉴스 토론</span>`;
   return `
-  <div class="stock-card sector-card ${key === MARKET_KEY ? 'market' : 'news'}" id="news-${key}" data-code="${board.code}" onclick="openModal(this.dataset.code, 'news')">
+  <div class="stock-card sector-card ${key === MARKET_KEY ? 'market' : 'news'}" id="news-${key}" data-code="${board.code}" data-act="openNews">
     <div class="sector-icon">${key === MARKET_KEY ? '🌐' : '📰'}</div>
     <div class="sector-label">${label}</div>
     <div class="sector-sub">${sub}</div>
@@ -251,11 +328,11 @@ function stockCard(s) {
   const sign = up ? '+' : '';
   const postCount = postCounts[s.code] || 0;
   return `
-  <div class="stock-card" data-code="${escHtml(s.code)}" onclick="openModal(this.dataset.code, 'news')">
+  <div class="stock-card" data-code="${escHtml(s.code)}" data-act="openNews">
     <div class="card-top">
       <div class="stock-avatar ${up ? 'up' : 'down'}">
         <img class="stock-logo" src="${escHtml(s.logo || LOGO_URL(s.code))}" alt="${escHtml(s.name)} CI" loading="lazy"
-             onerror="this.parentNode.classList.add('no-logo'); this.remove()">
+             data-err="nologo">
         <span class="avatar-letter">${escHtml(s.name[0])}</span>
       </div>
       <div class="card-quote">
@@ -263,7 +340,7 @@ function stockCard(s) {
         <div class="price-change ${up ? 'up' : 'down'}">${sign}${s.change}%</div>
       </div>
       <div class="card-marks">
-        <button class="fav-star${favs.has(s.code) ? ' on' : ''}" title="관심 종목" data-code="${escHtml(s.code)}" onclick="toggleFav(event, this.dataset.code)">${favs.has(s.code) ? '★' : '☆'}</button>
+        <button class="fav-star${favs.has(s.code) ? ' on' : ''}" title="관심 종목" data-code="${escHtml(s.code)}" data-act="toggleFav">${favs.has(s.code) ? '★' : '☆'}</button>
       </div>
     </div>
     <div class="stock-meta">
@@ -347,6 +424,7 @@ function openModal(code, tab = 'discuss') {
   delete document.getElementById('discussTab').dataset.board;
   document.getElementById('modal').classList.toggle('us-mode', !!s.us);  // 미국 종목: 보고서·공시 탭 없음
   document.querySelector('.modal-tabs .tab[data-tab="news"]').textContent = s.isMarket ? '실시간 시장 뉴스' : s.isSector ? '실시간 업종 뉴스' : '실시간 종목 뉴스';
+  document.querySelector('.modal-tabs .tab[data-tab="discuss"]').textContent = s.isMarket ? '시장 토론' : s.isSector ? '업종 토론' : '종목 토론';
   document.getElementById('modalStockName').textContent = s.isMarket ? '주식 시장 경제 토론 게시판' : s.isSector ? `${s.name} 게시판` : s.name;
   document.getElementById('modalStockCode').textContent = s.isMarket ? '시장·경제 전체 토론' : s.isSector ? '업종 전체 토론' : s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : s.code;
   const chgEl = document.getElementById('modalChange');
@@ -414,7 +492,7 @@ window.addEventListener('popstate', () => {
 if (history.state?.layer) history.replaceState(null, '');
 
 // ── 모달 탭 전환 ─────────────────────────────────────
-const DETAIL_TABS = ['news', 'info', 'research', 'disclosure'];
+const DETAIL_TABS = ['news', 'research', 'disclosure'];
 
 function switchModalTab(tab, btn) {
   currentModalTab = tab;
@@ -446,7 +524,7 @@ function switchModalTab(tab, btn) {
 
 // ── 상세 데이터 (뉴스·종목정보·보고서·공시) ────────────
 const detailCache = {};
-const DETAIL_TTL = { news: 60000, info: 60000, research: 600000, disclosure: 300000 };
+const DETAIL_TTL = { news: 60000, research: 600000, disclosure: 300000 };
 // 종목 뉴스는 최대 100건을 받아 20건씩 '더보기'로 표시 (자동 갱신해도 펼친 개수 유지)
 const NEWS_PAGE = 20;
 const newsShown = {};
@@ -503,7 +581,6 @@ function renderDetail(type, data, ts) {
   const s = currentStock;
   const footer = `<div class="panel-footer">출처: ${s.isSector ? `네이버 증권 리서치 · ${s.isMarket ? '투자전략' : s.sector === 'usa' ? '투자전략 (미국·글로벌 관련)' : '산업분석 (업종 분류·키워드로 선별, 최근 약 한 달)'}` : type === 'news' ? '<span class="news-src naver">N</span>네이버 증권 · <span class="news-src google">G</span>Google 뉴스 (종목명 검색)' : '네이버 증권'}</div>`;
 
-  if (type === 'info') return renderPriceInfo(data) + footer;
 
   if (!data || !data.length) {
     const label = { news: '뉴스가', research: '증권사 리포트가', disclosure: '공시가' }[type];
@@ -514,7 +591,7 @@ function renderDetail(type, data, ts) {
     const updated = new Date(ts).toLocaleTimeString('ko-KR', { hour12: false });
     const shown = newsShown[s.code] || NEWS_PAGE;
     const more = data.length > shown
-      ? `<button class="news-more" onclick="moreNews()">더보기 (${shown} / ${data.length})</button>` : '';
+      ? `<button class="news-more" data-act="moreNews">더보기 (${shown} / ${data.length})</button>` : '';
     return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신 · 최신 ${data.length}건</div>` +
       data.slice(0, shown).map(n => `
       <a class="feed-item" href="${safeUrl(n.url)}" target="_blank" rel="noopener">
@@ -523,7 +600,7 @@ function renderDetail(type, data, ts) {
           <div class="feed-summary">${escHtml(n.summary || '')}</div>
           <div class="feed-meta"><span class="news-src ${n.source === 'google' ? 'google' : 'naver'}">${n.source === 'google' ? 'G' : 'N'}</span>${escHtml(n.press || '')} · ${newsTime(n.datetime)}</div>
         </div>
-        ${/^https:\/\//.test(n.thumb || '') ? `<img class="feed-thumb" src="${safeUrl(n.thumb)}" alt="" loading="lazy" onerror="this.remove()">` : ''}
+        ${/^https:\/\//.test(n.thumb || '') ? `<img class="feed-thumb" src="${safeUrl(n.thumb)}" alt="" loading="lazy" data-err="remove">` : ''}
       </a>`).join('') + more + footer;
   }
 
@@ -546,36 +623,6 @@ function renderDetail(type, data, ts) {
           <div class="feed-meta">${escHtml((d.datetime || '').replace('T', ' ').slice(0, 16))} · ${escHtml(d.source || '')}</div>
         </div>
       </a>`).join('') + footer;
-}
-
-// 시세 정보: 최근 10거래일 종가·등락률 + 외국인·기관·개인 순매수 수량 (미국 종목은 종가·등락률만)
-function renderPriceInfo(d) {
-  const days = d?.days || [];
-  if (!days.length) return '<p class="empty-msg">시세 정보가 없습니다.</p>';
-  const sign = v => {
-    const t = String(v ?? '').trim();
-    if (!t || t === '-') return { text: '-', cls: '' };
-    const neg = t.startsWith('-'), zero = /^[+-]?0(\.0+)?$/.test(t.replace(/,/g, ''));
-    return { text: zero ? t.replace(/^[+-]/, '') : neg || t.startsWith('+') ? t : '+' + t, cls: zero ? '' : neg ? 'down' : 'up' };
-  };
-  const cell = (v, suffix = '') => {
-    if (v == null) return '<td class="muted">집계 전</td>';
-    const x = sign(v);
-    return `<td class="${x.cls}">${escHtml(x.text)}${x.text === '-' ? '' : suffix}</td>`;
-  };
-  const date = s => String(s).slice(5).replace('-', '.');
-  const kr = !d.us;
-  return `
-    <div class="price-wrap">
-      <table class="price-table">
-        <thead><tr><th>날짜</th><th>종가</th><th>등락률</th>${kr ? '<th>외국인</th><th>기관</th><th>개인</th>' : ''}</tr></thead>
-        <tbody>${days.map(r => {
-          const rate = sign(r.rate);
-          return `<tr><th>${escHtml(date(r.date))}</th><td class="${rate.cls}">${escHtml(String(r.close))}</td>${cell(r.rate, '%')}${kr ? cell(r.foreign) + cell(r.organ) + cell(r.individual) : ''}</tr>`;
-        }).join('')}</tbody>
-      </table>
-    </div>
-    <p class="info-sub price-note">${kr ? '외국인·기관·개인: 순매수 수량(주), + 순매수 / − 순매도 · 당일 수량은 장 마감 후 집계돼요' : '미국 종목은 투자자별 매매 정보가 제공되지 않아 종가·등락률만 보여드려요 (현지 날짜 기준)'}</p>`;
 }
 
 // 뉴스 시각 (YYYYMMDDHHmm) → "N분 전"
@@ -649,7 +696,7 @@ function postBodyHtml(p) {
   const text = String(p.content || '');
   if (text.length <= POST_PREVIEW) return `<div class="post-body">${escHtml(text)}</div>`;
   return `<div class="post-body">${escHtml(text.slice(0, POST_PREVIEW))}<span class="post-ellipsis">…</span><span class="post-rest hidden">${escHtml(text.slice(POST_PREVIEW))}</span></div>
-      <button class="btn-more" onclick="toggleMore(this)">더 보기</button>`;
+      <button class="btn-more" data-act="toggleMore">더 보기</button>`;
 }
 
 function toggleMore(btn) {
@@ -661,8 +708,8 @@ function toggleMore(btn) {
 
 // 공감·비공감 버튼 (같은 걸 다시 누르면 취소, 한 브라우저에 하나만)
 const likeBtnHtml = p => `<span class="vote-btns" data-id="${escHtml(p.id)}">
-  <button class="btn-vote up ${p.liked ? 'on' : ''}" onclick="vote(this.parentNode.dataset.id, 'up')">공감 <b>${p.likes || 0}</b></button>
-  <button class="btn-vote down ${p.disliked ? 'on' : ''}" onclick="vote(this.parentNode.dataset.id, 'down')">비공감 <b>${p.dislikes || 0}</b></button>
+  <button class="btn-vote up ${p.liked ? 'on' : ''}" data-act="vote" data-dir="up">공감 <b>${p.likes || 0}</b></button>
+  <button class="btn-vote down ${p.disliked ? 'on' : ''}" data-act="vote" data-dir="down">비공감 <b>${p.dislikes || 0}</b></button>
 </span>`;
 const memberBadgeHtml = p => p.official ? '<span class="member-badge official">운영자</span>'
   : p.member ? '<span class="member-badge">회원</span>' : '<span class="member-badge guest">비회원</span>';
@@ -724,14 +771,14 @@ function drawPosts() {
         <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
-        ${p.member && !isMyPost(p) ? `<button class="btn-follow ${myFollowing.has(p.nick) ? 'following' : ''}" data-nick="${escHtml(p.nick)}" onclick="openAuthor(this.dataset.nick)">${myFollowing.has(p.nick) ? '팔로잉' : '팔로우'}</button>` : ''}
+        ${p.member && !isMyPost(p) ? `<button class="btn-follow ${myFollowing.has(p.nick) ? 'following' : ''}" data-nick="${escHtml(p.nick)}" data-act="openAuthor">${myFollowing.has(p.nick) ? '팔로잉' : '팔로우'}</button>` : ''}
       </div>
       ${postAction?.id === p.id && postAction.mode === 'edit' ? editFormHtml(p) : p.blind ? `<div class="post-body post-blind">🚫 ${escHtml(p.content)}</div>` : postBodyHtml(p)}
       <div class="post-tools">
         ${p.editedTs ? `<span class="post-edited">수정됨 · ${timeAgo(p.editedTs)}</span>` : ''}
-        ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'edit')">수정</button>
-        <button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'delete')">삭제</button>` : ''}
-        ${isMyPost(p) || p.blind || p.official ? '' : `<button class="btn-tool btn-report" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'report')">신고</button>`}
+        ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="edit">수정</button>
+        <button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="delete">삭제</button>` : ''}
+        ${isMyPost(p) || p.blind || p.official ? '' : `<button class="btn-tool btn-report" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="report">신고</button>`}
         ${adminDeleteBtnHtml(p)}
       </div>
       ${postAction?.id === p.id && postAction.mode === 'delete' ? deleteFormHtml(p) : ''}
@@ -750,7 +797,7 @@ function drawColumn(el) {
     columnPage = Math.min(Math.max(1, columnPage), pages);
     const shown = currentPosts.slice((columnPage - 1) * COLUMN_PAGE_SIZE, columnPage * COLUMN_PAGE_SIZE);
     el.innerHTML = currentPosts.length ? `<div class="col-list">${shown.map(x => `
-      <button class="col-row" data-id="${escHtml(x.id)}" onclick="openColumn(this.dataset.id)">
+      <button class="col-row" data-id="${escHtml(x.id)}" data-act="openColumn">
         <span class="col-title">${escHtml(x.title || stripColumnImgs(x.content).slice(0, 40))}</span>
         <span class="col-meta">${colDate(x.ts)} · 👁 ${(x.views || 0).toLocaleString()}</span>
       </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : '<p class="empty-msg">아직 운영자 칼럼이 없습니다.</p>';
@@ -758,8 +805,8 @@ function drawColumn(el) {
   }
   const editing = postAction?.id === p.id && postAction.mode === 'edit';
   el.innerHTML = `
-    <div class="col-article">
-      <button class="btn-tool col-back" onclick="closeColumn()">← 목록</button>
+    <div class="col-article${isAdmin() ? '' : ' no-copy'}">
+      <button class="btn-tool col-back" data-act="closeColumn">← 목록</button>
       ${editing ? '' : `<h3 class="col-article-title">${escHtml(p.title || '')}</h3>`}
       <div class="post-header">
         <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
@@ -769,8 +816,8 @@ function drawColumn(el) {
       ${editing ? editFormHtml(p) : `<div class="post-body col-body">${columnBodyHtml(p.content)}</div>`}
       <div class="post-tools">
         ${p.editedTs ? `<span class="post-edited">수정됨 · ${timeAgo(p.editedTs)}</span>` : ''}
-        ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'edit')">수정</button>
-        <button class="btn-tool" data-id="${escHtml(p.id)}" onclick="openPostAction(this.dataset.id, 'delete')">삭제</button>` : ''}
+        ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="edit">수정</button>
+        <button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="delete">삭제</button>` : ''}
       </div>
       ${postAction?.id === p.id && postAction.mode === 'delete' ? deleteFormHtml(p) : ''}
       ${editing ? '' : columnNavHtml(p)}
@@ -781,11 +828,11 @@ function columnNavHtml(p) {
   const i = currentPosts.findIndex(x => x.id === p.id);
   const prev = currentPosts[i - 1], next = currentPosts[i + 1];
   const link = (x, label, cls) => x
-    ? `<button class="col-nav-btn ${cls}" data-id="${escHtml(x.id)}" onclick="openColumn(this.dataset.id)"><span class="col-nav-label">${label}</span><span class="col-nav-title">${escHtml(x.title || '')}</span></button>`
+    ? `<button class="col-nav-btn ${cls}" data-id="${escHtml(x.id)}" data-act="openColumn"><span class="col-nav-label">${label}</span><span class="col-nav-title">${escHtml(x.title || '')}</span></button>`
     : `<span class="col-nav-btn ${cls} disabled"><span class="col-nav-label">${label}</span><span class="col-nav-title">${cls === 'prev' ? '이전 글이 없습니다' : '다음 글이 없습니다'}</span></span>`;
   return `<nav class="col-nav">
       ${link(prev, '← 이전 글', 'prev')}
-      <button class="col-nav-list" onclick="closeColumn()">목록으로</button>
+      <button class="col-nav-list" data-act="closeColumn">목록으로</button>
       ${link(next, '다음 글 →', 'next')}
     </nav>`;
 }
@@ -797,7 +844,7 @@ function openColumn(id) {
   syncColumnUrl(id);
   postAction = null;
   drawPosts();
-  document.getElementById('postList').scrollIntoView({ block: 'start' });  // 글 아래 버튼으로 넘어와도 새 글 맨 위부터
+  scrollColumnTop();  // 글 아래 이전·다음 버튼으로 넘어와도 새 글 맨 위부터
   if (currentStock) countPostViews(currentStock, currentPosts.filter(p => p.id === id), COLUMN_CODE);
   loadColumnVotes(id);
 }
@@ -825,14 +872,19 @@ function pagerHtml(page, pages, fn) {
   let html = '', prev = 0;
   for (const n of nums) {
     if (n - prev > 1) html += '<span class="pager-gap">…</span>';
-    html += `<button class="pager-btn${n === page ? ' on' : ''}" onclick="${fn}(${n})"${n === page ? ' aria-current="page"' : ''}>${n}</button>`;
+    html += `<button class="pager-btn${n === page ? ' on' : ''}" data-act="${fn}" data-page="${n}"${n === page ? ' aria-current="page"' : ''}>${n}</button>`;
     prev = n;
   }
-  return `<nav class="pager" aria-label="페이지"><button class="pager-btn" onclick="${fn}(${page - 1})"${page === 1 ? ' disabled' : ''} aria-label="이전 페이지">‹</button>${html}<button class="pager-btn" onclick="${fn}(${page + 1})"${page === pages ? ' disabled' : ''} aria-label="다음 페이지">›</button></nav>`;
+  return `<nav class="pager" aria-label="페이지"><button class="pager-btn" data-act="${fn}" data-page="${page - 1}"${page === 1 ? ' disabled' : ''} aria-label="이전 페이지">‹</button>${html}<button class="pager-btn" data-act="${fn}" data-page="${page + 1}"${page === pages ? ' disabled' : ''} aria-label="다음 페이지">›</button></nav>`;
 }
 function goColumnPage(n) {
   columnPage = n;
   drawPosts();
+  scrollColumnTop();
+}
+// 칼럼 글·목록을 바꿀 때 맨 위로: 스크롤되는 곳은 글 목록 칸(#postList) 안이라 그 안의 위치를 0으로 (scrollIntoView만으로는 안쪽 스크롤이 남음)
+function scrollColumnTop() {
+  for (const id of ['postList', 'discussTab']) document.getElementById(id).scrollTop = 0;
   document.getElementById('discussTab').scrollIntoView({ block: 'start' });
 }
 // ── 칼럼 사진 넣기 (관리자 모드): 사진 고르기 → 웹용 크기로 줄여 업로드 → 본문 커서 위치에 [사진:주소] ──
@@ -903,7 +955,7 @@ function closeColumn() {
   columnOpenId = null;
   postAction = null;
   drawPosts();
-  document.getElementById('discussTab').scrollIntoView({ block: 'start' });  // 칼럼 전체 목록 처음부터
+  scrollColumnTop();  // 칼럼 전체 목록 처음부터
 }
 
 // ── 게시글 수정·삭제 (비회원 글: 작성 시 입력한 비밀번호 / 회원 글: 로그인한 본인) ────
@@ -918,9 +970,9 @@ function editFormHtml(p) {
         <textarea id="editContent" maxlength="${postMax()}" rows="4">${escHtml(p.content)}</textarea>
         <div class="post-form-row">
           ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
-          ${p.code === COLUMN_CODE && isAdmin() ? `<button type="button" class="btn-tool btn-col-img" onclick="pickColumnImage('editContent')">🖼 사진 넣기</button>` : ''}
-          <button class="btn-submit" data-id="${escHtml(p.id)}" onclick="savePostEdit(this.dataset.id)">저장</button>
-          <button class="btn-cancel" onclick="closePostAction()">취소</button>
+          ${p.code === COLUMN_CODE && isAdmin() ? `<button type="button" class="btn-tool btn-col-img" data-act="pickImage" data-target="editContent">🖼 사진 넣기</button>` : ''}
+          <button class="btn-submit" data-id="${escHtml(p.id)}" data-act="savePostEdit">저장</button>
+          <button class="btn-cancel" data-act="closePostAction">취소</button>
         </div>
       </div>`;
 }
@@ -930,8 +982,8 @@ function deleteFormHtml(p) {
       <div class="post-form post-form-row">
         <span class="post-form-label">${noPassword(p) ? '이 글을 삭제할까요?' : '삭제하려면 비밀번호를 입력하세요'}</span>
         ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
-        <button class="btn-danger" data-id="${escHtml(p.id)}" onclick="deletePost(this.dataset.id)">삭제</button>
-        <button class="btn-cancel" onclick="closePostAction()">취소</button>
+        <button class="btn-danger" data-id="${escHtml(p.id)}" data-act="deletePost">삭제</button>
+        <button class="btn-cancel" data-act="closePostAction">취소</button>
       </div>`;
 }
 
@@ -943,8 +995,8 @@ function reportFormHtml(p) {
       <div class="post-form post-form-row">
         <span class="post-form-label">신고 사유</span>
         <select id="reportReason">${REPORT_REASONS.map(r => `<option>${r}</option>`).join('')}</select>
-        <button class="btn-danger" data-id="${escHtml(p.id)}" onclick="reportPost(this.dataset.id)">신고</button>
-        <button class="btn-cancel" onclick="closePostAction()">취소</button>
+        <button class="btn-danger" data-id="${escHtml(p.id)}" data-act="reportPost">신고</button>
+        <button class="btn-cancel" data-act="closePostAction">취소</button>
       </div>`;
 }
 
@@ -1081,10 +1133,10 @@ function feedPostHtml(p, showNick) {
   return `
     <div class="post-item">
       <div class="post-header">
-        ${showNick ? `<button class="post-nick author-link" data-nick="${escHtml(p.nick)}" onclick="openAuthor(this.dataset.nick)">${escHtml(p.nick)}</button>` : ''}
+        ${showNick ? `<button class="post-nick author-link" data-nick="${escHtml(p.nick)}" data-act="openAuthor">${escHtml(p.nick)}</button>` : ''}
         ${p.code === COLUMN_CODE
-          ? `<button class="author-stock" data-id="${escHtml(p.id)}" onclick="openColumnLink(this.dataset.id)">운영자 칼럼</button>`
-          : `<button class="author-stock" data-code="${escHtml(p.code)}" onclick="openModal(this.dataset.code)">${escHtml(s ? s.name : p.code)}</button>`}
+          ? `<button class="author-stock" data-id="${escHtml(p.id)}" data-act="columnLink">운영자 칼럼</button>`
+          : `<button class="author-stock" data-code="${escHtml(p.code)}" data-act="openStock">${escHtml(s ? s.name : p.code)}</button>`}
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
         ${adminDeleteBtnHtml(p)}
@@ -1117,8 +1169,8 @@ async function openAuthor(nick) {
     if (member) r.following ? myFollowing.add(nick) : myFollowing.delete(nick);
     const mine = member && member.nick === nick;
     const action = !r.member || mine ? ''
-      : member ? `<button class="btn-follow-big ${r.following ? 'following' : ''}" data-nick="${escHtml(nick)}" onclick="toggleFollow(this.dataset.nick)">${r.following ? '팔로잉 ✓' : '+ 팔로우'}</button>`
-      : `<button class="btn-follow-big" onclick="closeAuthor(); toggleLogin()">로그인 후 팔로우</button>`;
+      : member ? `<button class="btn-follow-big ${r.following ? 'following' : ''}" data-nick="${escHtml(nick)}" data-act="toggleFollow">${r.following ? '팔로잉 ✓' : '+ 팔로우'}</button>`
+      : `<button class="btn-follow-big" data-act="loginFromAuthor">로그인 후 팔로우</button>`;
     showAuthorOverlay(
       nick,
       r.member ? `회원 · 작성글 ${r.posts.length}개 · 팔로워 ${r.followers}명` : `${r.posts.some(p => p.official) ? '운영자' : r.withdrawn ? '탈퇴한 회원' : '비회원'} · 작성글 ${r.posts.length}개`,
@@ -1152,7 +1204,7 @@ async function toggleFollow(nick) {
 // ── 팔로잉 피드: 내가 팔로우한 작성자들의 최신 글 ──────
 async function openFeed() {
   if (!member) {
-    return showAuthorOverlay('팔로잉', '회원 전용', '', '<p class="empty-msg">팔로우는 회원만 사용할 수 있습니다.<br><button class="link-btn" onclick="closeAuthor(); toggleLogin()">로그인</button> 또는 <button class="link-btn" onclick="closeAuthor(); toggleSignup()">회원가입</button> 후 다른 회원의 글에서 [팔로우]를 눌러보세요.</p>');
+    return showAuthorOverlay('팔로잉', '회원 전용', '', '<p class="empty-msg">팔로우는 회원만 사용할 수 있습니다.<br><button class="link-btn" data-act="loginFromAuthor">로그인</button> 또는 <button class="link-btn" data-act="signupFromAuthor">회원가입</button> 후 다른 회원의 글에서 [팔로우]를 눌러보세요.</p>');
   }
   const seq = overlayLoading('팔로잉');
   try {
@@ -1160,7 +1212,7 @@ async function openFeed() {
     if (overlayStale(seq)) return;
     myFollowing = new Set(r.following);
     const chips = r.following.length
-      ? `<div class="follow-chips">${r.following.map(n => `<button class="follow-chip" data-nick="${escHtml(n)}" onclick="openAuthor(this.dataset.nick)">${escHtml(n)}</button>`).join('')}</div>`
+      ? `<div class="follow-chips">${r.following.map(n => `<button class="follow-chip" data-nick="${escHtml(n)}" data-act="openAuthor">${escHtml(n)}</button>`).join('')}</div>`
       : '';
     const body = r.following.length
       ? chips + (r.posts.length ? r.posts.map(p => feedPostHtml(p, true)).join('') : '<p class="empty-msg">팔로우한 회원의 글이 아직 없습니다.</p>')
@@ -1179,7 +1231,7 @@ let adminKey = (() => { try { const k = sessionStorage.getItem('adminKey'); if (
 const isAdmin = () => Boolean(adminKey);
 
 const adminDeleteBtnHtml = p => isAdmin()
-  ? `<button class="btn-admin-del" data-id="${escHtml(p.id)}" onclick="adminDeletePost(this.dataset.id, this)">관리자 삭제</button>`
+  ? `<button class="btn-admin-del" data-id="${escHtml(p.id)}" data-act="adminDelete">관리자 삭제</button>`
   : '';
 
 // 관리자 로그인 창·관리 버튼·모드 표시는 HTML에 두지 않고 필요할 때만 만듦 (일반 방문자·검색 로봇에게 관리 화면 문구가 보이지 않게)
@@ -1189,19 +1241,19 @@ function toggleAdminForm() {
   if (document.getElementById('adminForm')) { area.innerHTML = ''; return; }
   area.innerHTML = `<div class="admin-form" id="adminForm">
       <input type="password" id="adminPassword" name="admin-key" placeholder="관리자 비밀번호" autocomplete="new-password" data-lpignore="true" data-1p-ignore
-             onkeydown="if (event.key === 'Enter') adminLogin()" />
-      <button class="btn-submit" onclick="adminLogin()">확인</button>
+             data-enter="adminLogin" />
+      <button class="btn-submit" data-act="adminLogin">확인</button>
     </div>`;
   document.getElementById('adminPassword').focus();
 }
 
 function renderAdminArea() {
   document.getElementById('adminArea').innerHTML = isAdmin()
-    ? '<p class="admin-tools"><button class="btn-tool" onclick="openReports()">🚨 신고된 글</button> <button class="btn-tool" onclick="openContacts()">✉️ 문의 내역</button> <button class="btn-tool" onclick="openStats()">📊 화면 정보</button></p>'
+    ? '<p class="admin-tools"><button class="btn-tool" data-act="openReports">🚨 신고된 글</button> <button class="btn-tool" data-act="openContacts">✉️ 문의 내역</button> <button class="btn-tool" data-act="openStats">📊 화면 정보</button></p>'
     : '';
   document.getElementById('adminBadge')?.remove();
   if (isAdmin()) document.querySelector('footer').insertAdjacentHTML('beforeend',
-    '<div class="admin-badge" id="adminBadge">관리자 모드 · <button onclick="adminLogout()">로그아웃</button></div>');
+    '<div class="admin-badge" id="adminBadge">관리자 모드 · <button data-act="adminLogout">로그아웃</button></div>');
 }
 
 async function adminLogin() {
@@ -1279,7 +1331,7 @@ async function openReports() {
     showAuthorOverlay('🚨 신고된 글', `${posts.length}건 · 신고 ${5}건 이상이면 자동 블라인드`, '', posts.length ? posts.map(p => `
       <div class="post-item">
         <div class="post-header">
-          <button class="author-stock" data-code="${escHtml(p.code)}" onclick="openModal(this.dataset.code)">${escHtml(findStock(p.code)?.name || p.code)}</button>
+          <button class="author-stock" data-code="${escHtml(p.code)}" data-act="openStock">${escHtml(findStock(p.code)?.name || p.code)}</button>
           <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
           <span class="report-count">신고 ${p.reports}건${p.blind ? ' · 블라인드' : ''}</span>
           <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
@@ -1287,8 +1339,8 @@ async function openReports() {
         <div class="post-body">${escHtml(p.content)}</div>
         <div class="post-tools">
           <span class="post-edited">${Object.entries(p.reasons || {}).map(([k, v]) => `${escHtml(k)} ${v}`).join(' · ')}</span>
-          <button class="btn-tool" data-id="${escHtml(p.id)}" onclick="adminUnblind(this.dataset.id)">문제없음(신고 초기화)</button>
-          <button class="btn-admin-del" data-id="${escHtml(p.id)}" onclick="adminDeletePost(this.dataset.id, this).then(openReports)">관리자 삭제</button>
+          <button class="btn-tool" data-id="${escHtml(p.id)}" data-act="adminUnblind">문제없음(신고 초기화)</button>
+          <button class="btn-admin-del" data-id="${escHtml(p.id)}" data-act="adminDeleteReported">관리자 삭제</button>
         </div>
       </div>`).join('') : '<p class="empty-msg">신고된 글이 없습니다.</p>');
   } catch (e) {
@@ -1337,7 +1389,8 @@ async function openStats() {
     if (overlayStale(seq)) return;
     const since = fmtDay(r.visits.visitorsSince);
     const yday = r.days[1] || {};
-    const maxViews = Math.max(1, ...r.days.map(d => d.views));
+    const pvSince = r.posts.viewsSince || '20261015';  // 날짜별 글 조회수 집계 시작일
+    const maxViews = Math.max(1, ...r.days.map(d => d.postViews || 0));
     const body = `<div class="stat-wrap">
       <div class="stat-grid">
         ${tile('오늘 방문', fmtN(r.visits.today), `어제 ${fmtN(yday.views)}`)}
@@ -1350,24 +1403,26 @@ async function openStats() {
       <div class="stat-grid small">
         ${tile('오늘 순방문자', fmtN(r.visits.todayVisitors), `${since}부터 집계`)}
         ${tile('누적 순방문자', fmtN(r.visits.totalVisitors), `${since}부터 집계`)}
-        ${tile('조회수 합계', fmtN(r.posts.views))}
+        ${tile('오늘 조회수', fmtN(r.posts.viewsToday), `어제 ${yday.day < pvSince ? '-' : fmtN(yday.postViews)}`)}
+        ${tile('누적 조회수', fmtN(r.posts.views))}
         ${tile('신고된 글', fmtN(r.pending.reported))}
         ${tile('문의', fmtN(r.pending.contacts))}
       </div>
       <h3 class="stat-h">최근 ${r.days.length}일</h3>
       <table class="stat-table">
-        <thead><tr><th>날짜</th><th>방문</th><th>순방문자</th><th>신규 회원</th><th>게시글</th></tr></thead>
+        <thead><tr><th>날짜</th><th>순방문자</th><th>조회수</th><th>신규 회원</th><th>게시글<br><small>(댓글 포함)</small></th></tr></thead>
         <tbody>${r.days.map(d => `<tr>
           <td>${fmtDay(d.day)}</td>
-          <td class="stat-bar-cell"><span class="stat-bar" style="width:${Math.round(d.views / maxViews * 100)}%"></span><span>${fmtN(d.views)}</span></td>
-          <td>${d.day < r.visits.visitorsSince ? '-' : fmtN(d.visitors)}</td><td>${fmtN(d.members)}</td><td>${fmtN(d.posts)}</td></tr>`).join('')}</tbody>
+          <td>${d.day < r.visits.visitorsSince ? '-' : fmtN(d.visitors)}</td>
+          <td class="stat-bar-cell">${d.day < pvSince ? '-' : `<span class="stat-bar" style="width:${Math.round((d.postViews || 0) / maxViews * 100)}%"></span><span>${fmtN(d.postViews)}</span>`}</td>
+          <td>${fmtN(d.members)}</td><td>${fmtN(d.posts)}</td></tr>`).join('')}</tbody>
       </table>
       <h3 class="stat-h">게시판별 게시글 TOP ${r.boards.length}</h3>
-      ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" onclick="${b.code === COLUMN_CODE ? `openModal('SECMKT', 'column')` : `openModal('${escHtml(b.code)}')`}">${b.code === COLUMN_CODE ? '운영자 칼럼' : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
+      ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" ${b.code === COLUMN_CODE ? 'data-act="openColumnBoard"' : `data-act="openStock" data-code="${escHtml(b.code)}"`}>${b.code === COLUMN_CODE ? '운영자 칼럼' : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
       <h3 class="stat-h">칼럼 사진 저장소</h3>
       <div id="imgStats" class="stat-img"><p class="stat-note">불러오는 중...</p></div>
-      <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 게시글: 삭제된 글 제외 · 날짜는 한국시간</p></div>`;
-    showAuthorOverlay('📊 화면 정보', `${fmtDay(r.today)} 기준 사이트 통계`, '<button class="btn-tool" onclick="openStats()">새로고침</button>', body);
+      <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 조회수: 게시판 글 조회수(같은 브라우저·게시판 1시간에 1회, 날짜별은 ${fmtDay(pvSince)}부터 집계) · 게시글: 게시판 글(카드의 '댓글') 수, 삭제된 글 제외 · 날짜는 한국시간</p></div>`;
+    showAuthorOverlay('📊 화면 정보', `${fmtDay(r.today)} 기준 사이트 통계`, '<button class="btn-tool" data-act="openStats">새로고침</button>', body);
     loadImageStats();
   } catch (e) {
     if (overlayStale(seq)) return;
@@ -1393,7 +1448,7 @@ async function loadImageStats(cleanup = false) {
         ${tile('안 쓰는 사진', fmtN(r.unused) + '장', fmtMB(r.unusedBytes))}
       </div>
       ${r.deleted ? `<p class="stat-note">안 쓰는 사진 ${fmtN(r.deleted)}장을 정리했습니다.</p>` : ''}
-      ${r.unusedOld ? `<button class="btn-tool" onclick="cleanupImages(${r.unusedOld})">안 쓰는 사진 ${fmtN(r.unusedOld)}장 정리</button>` : ''}
+      ${r.unusedOld ? `<button class="btn-tool" data-act="cleanupImages" data-n="${r.unusedOld}">안 쓰는 사진 ${fmtN(r.unusedOld)}장 정리</button>` : ''}
       <p class="stat-note">칼럼을 지우거나 수정에서 뺀 사진은 자동으로 지워집니다. 올렸다가 글에 쓰지 않은 사진은 하루가 지나면 여기서 정리할 수 있습니다.</p>`;
   } catch (e) {
     if (el()) el().innerHTML = `<p class="stat-note">불러오지 못했습니다. (${escHtml(e.message)})</p>`;
@@ -1481,16 +1536,16 @@ async function openProfile() {
     if (overlayStale(seq)) return;
     const joined = r.user.ts ? new Date(r.user.ts).toLocaleDateString('ko-KR') : '-';
     const chips = r.following.length
-      ? `<div class="follow-chips">${r.following.map(n => `<button class="follow-chip" data-nick="${escHtml(n)}" onclick="openAuthor(this.dataset.nick)">${escHtml(n)}</button>`).join('')}</div>`
+      ? `<div class="follow-chips">${r.following.map(n => `<button class="follow-chip" data-nick="${escHtml(n)}" data-act="openAuthor">${escHtml(n)}</button>`).join('')}</div>`
       : '<span class="info-sub">팔로우한 회원이 없습니다</span>';
     showAuthorOverlay('회원정보', `${r.user.nick}님`, '', `
       <table class="info-table profile-table">
         <tr><td class="info-key">아이디</td><td class="info-val">${escHtml(r.user.id)}</td></tr>
         <tr><td class="info-key">닉네임</td><td class="info-val">${escHtml(r.user.nick)}</td></tr>
         <tr><td class="info-key">가입일</td><td class="info-val">${joined}</td></tr>
-        <tr><td class="info-key">작성글</td><td class="info-val"><button class="link-btn" data-nick="${escHtml(r.user.nick)}" onclick="openAuthor(this.dataset.nick)">${r.posts}개 보기</button></td></tr>
+        <tr><td class="info-key">작성글</td><td class="info-val"><button class="link-btn" data-nick="${escHtml(r.user.nick)}" data-act="openAuthor">${r.posts}개 보기</button></td></tr>
         <tr><td class="info-key">팔로워</td><td class="info-val">${r.followers}명</td></tr>
-        <tr><td class="info-key">팔로잉</td><td class="info-val">${r.following.length}명 ${chips}</td></tr>
+        <tr><td class="info-key">팔로잉</td><td class="info-val"><button class="link-btn follow-count" data-act="openFeed" title="팔로잉 보기">${r.following.length}명</button> ${chips}</td></tr>
         <tr><td class="info-key">관심 종목</td><td class="info-val">${r.favs}개</td></tr>
       </table>
       <div class="profile-section">
@@ -1498,7 +1553,7 @@ async function openProfile() {
         <div class="post-form-row">
           <input id="pfCurPw" type="password" placeholder="현재 비밀번호" maxlength="30" autocomplete="current-password">
           <input id="pfNewPw" type="password" placeholder="새 비밀번호 (6~30자)" maxlength="30" autocomplete="new-password">
-          <button class="btn-submit" onclick="changePassword()">변경</button>
+          <button class="btn-submit" data-act="changePassword">변경</button>
         </div>
         <p class="info-sub">변경하면 다른 기기의 로그인은 모두 해제됩니다.</p>
       </div>
@@ -1507,7 +1562,7 @@ async function openProfile() {
         <p class="info-sub">계정·관심 종목·팔로우 정보가 삭제되며 되돌릴 수 없습니다. 작성한 글은 남으니 지우려면 탈퇴 전에 직접 삭제해주세요. 닉네임은 사칭 방지를 위해 다른 사람이 쓸 수 없게 남겨둡니다.</p>
         <div class="post-form-row">
           <input id="pfOutPw" type="password" placeholder="비밀번호 확인" maxlength="30" autocomplete="current-password">
-          <button class="btn-danger" onclick="withdraw()">탈퇴하기</button>
+          <button class="btn-danger" data-act="withdraw">탈퇴하기</button>
         </div>
       </div>`);
   } catch (e) {
@@ -1752,3 +1807,47 @@ document.addEventListener('keydown', e => {
     closeDropdowns();
   }
 });
+
+// ── 홈 화면 바로가기 (휴대폰 헤더 📲 버튼, PC에서는 CSS로 숨김) ──
+// 안드로이드 크롬·삼성 인터넷·엣지: 브라우저 설치 창(beforeinstallprompt)을 띄움 (manifest.webmanifest + 아이콘)
+// 아이폰(사파리·크롬)·설치 창을 못 받은 브라우저: '홈 화면에 추가' 방법 안내, 카카오톡 안 브라우저: 외부 브라우저로 열기
+let installPrompt = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; });  // 브라우저 자동 배너 대신 버튼으로
+window.addEventListener('appinstalled', () => { installPrompt = null; updateA2hsButton(); });
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+function updateA2hsButton() {
+  const b = document.getElementById('btnA2hs');
+  if (b) b.classList.toggle('hidden', isStandalone());  // 이미 홈 화면 앱으로 연 경우 숨김
+}
+document.addEventListener('DOMContentLoaded', updateA2hsButton);
+
+async function addToHome() {
+  if (installPrompt) {
+    const p = installPrompt;
+    installPrompt = null;  // 한 번만 쓸 수 있음
+    try {
+      await p.prompt();
+      await p.userChoice;
+      return;
+    } catch {}  // 설치 창을 못 띄우면 아래 안내로
+  }
+  const ua = navigator.userAgent;
+  const ios = /iPhone|iPad|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  const step = (n, html) => `<li class="a2hs-step"><b>${n}</b><span>${html}</span></li>`;
+  let body;
+  if (/KAKAOTALK/i.test(ua)) {
+    body = `<p class="a2hs-note">카카오톡 안에서는 홈 화면에 추가할 수 없어요. 아래 버튼으로 ${ios ? '사파리' : '크롬'}에서 연 뒤 📲 버튼을 다시 눌러주세요.</p>
+      <p><a class="btn-submit a2hs-open" href="kakaotalk://web/openExternal?url=${encodeURIComponent(location.origin + '/')}">다른 브라우저로 열기</a></p>`;
+  } else if (/NAVER\(inapp|Instagram|FBAN|FBAV|Line\//i.test(ua)) {
+    body = `<p class="a2hs-note">앱 안 브라우저에서는 홈 화면에 추가할 수 없어요. 메뉴에서 <b>${ios ? 'Safari로 열기' : '다른 브라우저로 열기'}</b>를 누른 뒤 📲 버튼을 다시 눌러주세요.</p>`;
+  } else if (/SamsungBrowser/i.test(ua)) {
+    // 삼성 인터넷의 '앱 설치'는 Play 프로텍트가 막으므로 일반 바로가기로 (theme.js가 삼성 인터넷엔 manifest를 안 줌)
+    body = `<ol class="a2hs-steps">${step(1, '화면 아래 오른쪽 <b>메뉴</b> <span class="a2hs-ico">⋮</span> 또는 <span class="a2hs-ico">≡</span> 를 누르세요')}${step(2, '<b>현재 페이지 추가</b>를 누르세요')}${step(3, '<b>홈 화면</b>을 고르고 <b>추가</b>를 누르면 끝!')}</ol>`;
+  } else if (ios) {
+    body = `<ol class="a2hs-steps">${step(1, '화면 아래(또는 주소창 옆) <b>공유 버튼</b> <span class="a2hs-ico">⬆︎</span> 을 누르세요')}${step(2, '목록을 내려 <b>홈 화면에 추가</b>를 누르세요')}${step(3, '오른쪽 위 <b>추가</b>를 누르면 끝!')}</ol>`;
+  } else {
+    body = `<ol class="a2hs-steps">${step(1, '브라우저 오른쪽 위(삼성 인터넷은 아래) <b>메뉴</b> <span class="a2hs-ico">⋮</span> 를 누르세요')}${step(2, '<b>홈 화면에 추가</b> 또는 <b>앱 설치</b>를 누르세요 (삼성 인터넷: <b>현재 페이지 추가 → 홈 화면</b>)')}${step(3, '<b>추가</b>를 누르면 끝!')}</ol>`;
+  }
+  showAuthorOverlay('홈 화면에 바로가기 추가', '업종닷컴을 앱처럼 바로 열 수 있어요', '',
+    `<div class="a2hs-box"><img class="a2hs-icon" src="/icon-192.png" alt="" width="56" height="56">${body}</div>`);
+}

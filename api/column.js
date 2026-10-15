@@ -94,7 +94,7 @@ export default async function handler(req, res) {
   const others = cols.filter(x => x.id !== c.id).slice(0, 10);
   const body = `
   <nav class="sp-sub"><a href="/">홈</a> › <a href="/column">운영자 칼럼</a></nav>
-  <article class="col-page">
+  <article class="col-page no-copy">
     <h1>${esc(c.title || '')}</h1>
     <p class="sp-sub">운영자 · ${day(c.ts)}${c.editedTs ? ` · 수정 ${day(c.editedTs)}` : ''}</p>
     <div class="col-page-body">

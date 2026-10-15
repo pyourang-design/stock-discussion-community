@@ -84,6 +84,7 @@ async function posts(code) {
   return { list, total: Number(counts) || list.length };
 }
 
+// image 없으면(종목 페이지·사진 없는 칼럼) 사이트 공유 이미지 /og-image.png (카카오톡·SNS 미리보기, 원본 scripts/og/og.html)
 function layout({ title, desc, canonical, body, jsonld, status = 200, image = null, ogType = 'website' }) {
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -99,9 +100,13 @@ function layout({ title, desc, canonical, body, jsonld, status = 200, image = nu
   <meta property="og:description" content="${esc(desc)}" />
   <meta property="og:url" content="${esc(canonical)}" />
   <meta property="og:locale" content="ko_KR" />
-  ${image ? `<meta property="og:image" content="${esc(image)}" />` : ''}
+  <meta property="og:image" content="${esc(image || SITE + '/og-image.png?v=6')}" />${image ? '' : `
+  <meta property="og:image:width" content="2400" />
+  <meta property="og:image:height" content="1260" />`}
   ${jsonld ? `<script type="application/ld+json">${JSON.stringify(jsonld).replace(/</g, '\\u003c')}</script>` : ''}
   <script src="/theme.js"></script>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="업종닷컴" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
 </head>
@@ -109,7 +114,7 @@ function layout({ title, desc, canonical, body, jsonld, status = 200, image = nu
 <header class="site-header">
   <div class="container header-inner">
     <a class="logo" href="/"><span class="logo-icon"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#logoGrad)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg></span><span class="logo-text">${NAME}</span></a>
-    <nav class="main-nav page-nav"><a href="/">Home</a><a href="/?column=list">블로그</a><button class="theme-toggle" onclick="toggleTheme()">Dark</button></nav>
+    <nav class="main-nav page-nav"><a href="/">Home</a><a class="nav-lecture" href="/?column=list">주식 강의</a><button class="theme-toggle" type="button">Dark</button></nav>
   </div>
 </header>
 <main class="container stock-page">
@@ -117,18 +122,12 @@ ${body}
 </main>
 <footer class="site-footer">
   <div class="container">
-    <nav class="policy-links"><a href="/about.html">사이트 소개</a><a href="/terms.html">이용약관</a><a href="/privacy.html"><b>개인정보처리방침</b></a><a href="/contact.html">연락처</a><a class="footer-column-link" href="/column" onclick="location.href='/?column=list'; return false">운영자 칼럼</a></nav>
+    <nav class="policy-links"><a class="footer-about-link" href="/about.html">사이트 소개</a><a href="/terms.html">이용약관</a><a href="/privacy.html"><b>개인정보처리방침</b></a><a href="/contact.html">연락처</a><a class="footer-column-link" href="/column" data-go="/?column=list">운영자 칼럼</a></nav>
     <p>⚠️ 본 사이트 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
-    <p>© 2026 ${NAME} · 운영자 김유랑 · <a href="mailto:tpsdurang@naver.com">tpsdurang@naver.com</a></p>
+    <p>© 2026 ${NAME}</p>
   </div>
 </footer>
-<script>
-try {
-  let id = localStorage.getItem('cid');
-  if (!id) { id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('cid', id); }
-  fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'visit', cid: id }) });
-} catch (e) {}
-</script>
+<script src="/visit.js"></script>
 </body>
 </html>`;
 }

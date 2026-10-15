@@ -1,0 +1,55 @@
+<!doctype html>
+<!-- 카카오톡·SNS 공유 이미지 원본 (/og-image.png). 만들기: 헤드리스 크롬으로 1200x630 화면을 2배 해상도(2400x1260)로 캡처
+     "C:/Program Files/Google/Chrome/Application/chrome.exe" --headless=new --hide-scrollbars --force-device-scale-factor=2 --window-size=1200,630 --screenshot=og-image.png file:///D:/claude/homepage/scripts/og/og.html
+     이미지를 바꾸면 index.html·scripts/pages.mjs·api/page.js의 og-image.png?v= 숫자를 올릴 것 (카카오톡 캐시) -->
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+  html, body { margin: 0; width: 1200px; height: 630px; }
+  body {
+    font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif;
+    background: radial-gradient(circle at 85% 15%, #2a2f55 0%, transparent 45%), linear-gradient(135deg, #14151f 0%, #1c1d2b 100%);
+    color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 0 40px; box-sizing: border-box; position: relative; overflow: hidden;
+  }
+  .brand { display: flex; align-items: flex-start; gap: 30px; height: 132px; }
+  .brand svg { width: 132px; height: 132px; filter: drop-shadow(0 10px 30px rgba(224, 47, 75, .45)); }
+  .name { font-size: 140px; font-weight: 800; letter-spacing: -4px; line-height: 1; }
+  .tag { margin-top: 40px; font-size: 50px; font-weight: 700; letter-spacing: -1.5px; color: #e8eaf6; }
+  .tag b { color: #fff; }
+  .brand-ko { margin-top: 36px; font-size: 50px; font-weight: 800; letter-spacing: -1.5px; color: #fff; }
+  .chips { margin-top: 34px; display: flex; gap: 12px; justify-content: center; }
+  .chip { font-size: 32px; font-weight: 800; padding: 15px 24px; border-radius: 44px; border: 3px solid; color: #fff; letter-spacing: -.5px; }
+  .c1 { background: rgba(91, 140, 255, .3); border-color: #5b8cff; }
+  .c2 { background: rgba(34, 195, 142, .3); border-color: #22c38e; }
+  .c3 { background: rgba(255, 140, 66, .3); border-color: #ff8c42; }
+  .c4 { background: rgba(176, 108, 255, .3); border-color: #b06cff; }
+  .bars { position: absolute; right: 56px; top: 20px; display: flex; gap: 18px; align-items: flex-end; opacity: .14; }
+  .bars i { display: block; width: 34px; background: #ff6a5c; border-radius: 6px; }
+  .content { position: relative; display: flex; flex-direction: column; align-items: center; }
+</style></head>
+<body>
+  <div class="bars"><i style="height:32px"></i><i style="height:50px"></i><i style="height:43px"></i><i style="height:70px"></i><i style="height:90px"></i></div>
+  <div class="content">
+    <div class="brand">
+      <svg viewBox="0 0 32 32" aria-hidden="true"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#g)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg>
+      <div class="name">upjong.com</div>
+    </div>
+    <div class="tag">주식 종목 토론방 게시판 · <b>업종별 종토방</b></div>
+    <div class="chips"><span class="chip c1">실시간 뉴스</span><span class="chip c2">무료 증권사 리포트</span><span class="chip c3">종목 토론</span><span class="chip c4">무료 주식 강의</span></div>
+    <div class="brand-ko">업종닷컴</div>
+  </div>
+<script>
+// upjong.com 글자의 실제 잉크(맨 위 j 점 ~ 맨 아래 p·j·g 꼬리)를 로고 높이(132px)에 딱 맞춤: 글자 크기 조정 후 윗변 정렬
+(() => {
+  const LOGO = 132, el = document.querySelector('.name');
+  const ink = () => { const c = document.createElement('canvas').getContext('2d'); const cs = getComputedStyle(el); c.font = cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily; const m = c.measureText(el.textContent); return { a: m.actualBoundingBoxAscent, d: m.actualBoundingBoxDescent, fa: m.fontBoundingBoxAscent, fd: m.fontBoundingBoxDescent }; };
+  let m = ink();
+  el.style.fontSize = (parseFloat(getComputedStyle(el).fontSize) * LOGO / (m.a + m.d)) + 'px';
+  m = ink();
+  const size = parseFloat(getComputedStyle(el).fontSize);
+  el.style.lineHeight = size + 'px';
+  const baseline = (size - (m.fa + m.fd)) / 2 + m.fa;  // 줄 상자 안 기준선 위치
+  el.style.marginTop = -(baseline - m.a) + 'px';        // 잉크 윗변 = 로고 윗변
+  el.style.height = (baseline - m.a + LOGO) + 'px';
+})();
+</script>
+</body></html>

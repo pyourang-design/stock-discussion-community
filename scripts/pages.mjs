@@ -18,7 +18,7 @@ const PAGES = [
 ];
 
 const footerLinks = () => `<nav class="policy-links">
-      <a href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a><a class="footer-column-link" href="/column" onclick="location.href='/?column=list'; return false">운영자 칼럼</a>
+      <a class="footer-about-link" href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a><a class="footer-column-link" href="/column" data-go="/?column=list">운영자 칼럼</a>
     </nav>`;
 
 const page = (p, body, extraScript = '') => `<!DOCTYPE html>
@@ -35,7 +35,12 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
   <meta property="og:description" content="${p.desc}" />
   <meta property="og:url" content="${SITE}${p.file.replace(/\.html$/, '')}" />
   <meta property="og:locale" content="ko_KR" />
+  <meta property="og:image" content="${SITE}og-image.png?v=6" />
+  <meta property="og:image:width" content="2400" />
+  <meta property="og:image:height" content="1260" />
   <script src="/theme.js"></script>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="업종닷컴" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -49,14 +54,17 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
     </a>
     <nav class="main-nav page-nav">
       <a href="./">Home</a>
-      <a href="/?column=list">블로그</a>
-      <button class="theme-toggle" onclick="toggleTheme()">Dark</button>
+      <a class="nav-lecture" href="/?column=list">주식 강의</a>
+      <button class="theme-toggle" type="button">Dark</button>
     </nav>
   </div>
 </header>
 
 <main class="container policy-page">
-  <h1>${p.title}</h1>
+  <div class="policy-head">
+    <h1>${p.title}</h1>
+    <button type="button" class="modal-close" data-close-page title="닫기 — 이전 화면으로 돌아가요" aria-label="닫기"><span class="x" aria-hidden="true">✕</span>닫기</button>
+  </div>
 ${body}
 </main>
 
@@ -64,7 +72,7 @@ ${body}
   <div class="container">
     ${footerLinks()}
     <p>⚠️ 본 사이트 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
-    <p>© 2026 ${NAME} · 운영자 ${OWNER} · ${mail}</p>
+    <p>© 2026 ${NAME}</p>
   </div>
 </footer>
 ${extraScript}
@@ -73,26 +81,26 @@ ${extraScript}
 `;
 
 const about = `
-  <p class="policy-lead">${NAME}은 국내 주요 업종과 미국주식의 <b>실시간 시세·뉴스·공시·증권사 리포트</b>를 한 화면에서 보고, 같은 종목에 관심 있는 투자자끼리 의견을 나누는 주식 커뮤니티입니다.</p>
+  <p class="policy-lead">주식 실시간 뉴스, 무료 증권사 리포트, 종목 토론방… 아직도 여기저기 찾아다니세요?<br>업종닷컴은 <b>실시간 뉴스부터 무료 증권사 리포트, 업종별·종목별 토론방, 주식 강의까지</b> 한곳에 모은 주식 투자 정보 플랫폼이자 커뮤니티입니다.</p>
 
   <h2>무엇을 볼 수 있나요</h2>
   <ul>
-    <li><b>업종별 주요 종목</b> — 바이오, 반도체, 2차전지·로봇, 전력·원자력, K뷰티컬쳐, 조선·방산, 자동차, 금융 업종마다 시가총액 상위 20, 네이버 종목토론방 최근 1년 글 수 상위 20, 최근 6개월 거래대금 상위 10 종목을 모았습니다.</li>
-    <li><b>미국주식 100</b> — 한국예탁결제원 통계 기준으로 국내 투자자가 가장 많이 보유한 미국주식(ETF 포함)입니다.</li>
-    <li><b>실시간 시세와 뉴스</b> — 화면에 보이는 종목의 주가가 10초마다, 업종·종목 뉴스가 1분마다 갱신됩니다.</li>
-    <li><b>시세 정보·증권사 리포트·공시</b> — 최근 10거래일 종가·등락률과 외국인·기관·개인 순매수 수량, 증권사 리포트, 공시를 종목별로 정리했습니다.</li>
+    <li><b>실시간 종목·업종 뉴스</b> — 종목·업종·시장 뉴스는 1분마다, 화면에 보이는 종목의 주가는 10초마다 갱신됩니다.</li>
+    <li><b>무료 증권사 리포트·공시</b> — 종목·산업·투자전략 리포트와 공시를 종목·업종·시장별로 모아 원문까지 무료로 볼 수 있습니다.</li>
+    <li><b>업종별 주요 종목·미국주식 100</b> — 바이오, 반도체, 2차전지·로봇, 전력·원자력, K뷰티컬쳐, 조선·방산, 자동차, 금융 업종의 주요 종목과 국내 투자자가 가장 많이 보유한 미국주식(ETF 포함, 한국예탁결제원 기준)을 모았습니다.</li>
+    <li><b>운영자 주식 강의</b> — 기업 분석과 투자 지표 읽는 법, 차트 보는 법 등을 운영자 칼럼으로 쉽게 정리합니다. 상단 「주식 강의」 메뉴에서 볼 수 있습니다.</li>
   </ul>
 
   <h2>토론 게시판</h2>
   <ul>
-    <li>종목마다, 그리고 업종 전체에 대한 게시판이 있습니다.</li>
+    <li>네이버·토스 등 주요 종목토론방의 장점을 참고해, 뉴스·리포트를 보며 바로 의견을 나누도록 시장·업종·종목 토론 게시판을 두었습니다.</li>
     <li>회원은 닉네임·비밀번호 입력 없이 바로 글을 쓰고, 관심 종목을 저장할 수 있습니다. 비회원도 닉네임과 비밀번호를 정해 글을 쓸 수 있습니다.</li>
     <li>깨끗한 토론 환경을 위해 <b>금칙어 필터</b>, <b>이용자 신고</b>(5건 누적 시 자동 블라인드), <b>운영자 삭제</b>로 게시판을 관리합니다. 자세한 기준은 <a href="terms.html#policy">게시판 운영정책</a>을 확인하세요.</li>
   </ul>
 
   <h2>데이터 출처</h2>
   <ul>
-    <li>시세·투자자별 매매동향·뉴스·공시·증권사 리포트: 네이버 증권</li>
+    <li>시세·뉴스·공시·증권사 리포트: 네이버 증권</li>
     <li>기업 개요(최대주주·외국인지분율): WISEfn</li>
     <li>업종·종목 뉴스: 네이버 증권, Google 뉴스</li>
     <li>미국주식 보유 순위: 한국예탁결제원 증권정보포털(SEIBro)</li>
@@ -303,7 +311,7 @@ const contact = `
     <label>문의 내용
       <textarea id="cMessage" rows="7" maxlength="2000" placeholder="게시물 신고는 종목명과 글 내용(또는 작성자 닉네임)을 함께 적어주세요."></textarea>
     </label>
-    <button class="btn-submit" id="cSubmit" onclick="sendContact()">문의 보내기</button>
+    <button class="btn-submit" id="cSubmit" type="button">문의 보내기</button>
     <p class="contact-result" id="cResult"></p>
   </div>
 
@@ -315,31 +323,8 @@ const contact = `
   </ul>
 `;
 
-const contactScript = `<script>
-// 문의 보내기 → /api/posts { action: 'contact' } (운영자만 관리자 모드에서 확인)
-const CID = (() => { try { let id = localStorage.getItem('cid'); if (!id) { id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('cid', id); } return id; } catch { return 'tmp-' + Date.now().toString(36); } })();
-async function sendContact() {
-  const msg = document.getElementById('cMessage').value.trim();
-  const email = document.getElementById('cEmail').value.trim();
-  const out = document.getElementById('cResult');
-  if (msg.length < 5) { out.textContent = '문의 내용을 5자 이상 입력해주세요.'; return; }
-  if (email && !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) { out.textContent = '이메일 형식을 확인해주세요.'; return; }
-  const btn = document.getElementById('cSubmit');
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'contact', cid: CID, type: document.getElementById('cType').value, name: document.getElementById('cName').value.trim(), email, message: msg }) });
-    const j = await res.json();
-    if (!res.ok || j.error) throw new Error(j.error || res.status);
-    out.textContent = '문의가 접수되었습니다. 감사합니다.';
-    document.getElementById('cMessage').value = '';
-  } catch (e) {
-    out.textContent = '보내지 못했습니다: ' + e.message;
-  } finally {
-    btn.disabled = false;
-  }
-}
-</script>`;
+// 문의 보내기 스크립트는 /contact.js (CSP script-src 'self' — 인라인 스크립트 금지)
+const contactScript = '<script src="/contact.js"></script>';
 
 const bodies = { 'about.html': about, 'terms.html': terms, 'privacy.html': privacy, 'contact.html': contact };
 for (const p of PAGES) fs.writeFileSync(DIR + p.file, page(p, bodies[p.file], p.file === 'contact.html' ? contactScript : ''));

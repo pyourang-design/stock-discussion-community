@@ -208,29 +208,49 @@ async function authorize(id, password, token, adminKey, ip) {
 
 // ── 관리자 사이트 통계 ──
 // 방문: views:{날짜}(30분 안 재방문 제외한 방문 수), 순방문자: uv:{날짜}
-// 회원: user:* 전체를 훑어 가입 시각(ts)으로 날짜별 집계 (회원 수가 많아지면 별도 카운터로 바꿀 것)
+// 회원: 카운터 members:total(가입 +1, 탈퇴 -1), members:{날짜}(그날 가입 수, 400일) — 가입·탈퇴 때 갱신
+//   카운터가 생기기 전(2026-10-15) 회원은 처음 통계를 열 때 한 번만 user:*를 훑어 채움(initMemberCounters)
 // 게시글: 게시판별 목록(posts:{코드})의 글 id 앞부분이 작성 시각(Date.now 36진수)이라 날짜별로 셈 (삭제된 글 제외)
 const STATS_DAYS = 14;
 const kstDayOf = ts => new Date(ts + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '');
 const postTs = id => parseInt(id.slice(0, -6), 36);
+async function initMemberCounters() {
+  const [lock] = await redis([['SET', 'members:init', '1', 'NX']]);
+  if (lock !== 'OK') return;  // 이미 채웠음 (또는 다른 요청이 채우는 중)
+  try {
+    const keys = [];
+    let cursor = '0';
+    do {
+      const [[next, found]] = await redis([['SCAN', cursor, 'MATCH', 'user:*', 'COUNT', 1000]]);
+      cursor = String(next);
+      keys.push(...found);
+    } while (cursor !== '0');
+    const users = [];
+    for (let i = 0; i < keys.length; i += 500) {
+      const [vals] = await redis([['MGET', ...keys.slice(i, i + 500)]]);
+      users.push(...vals.filter(Boolean).map(x => JSON.parse(x)));
+    }
+    const perDay = {};
+    for (const u of users) { const d = kstDayOf(u.ts || 0); perDay[d] = (perDay[d] || 0) + 1; }
+    // 훑는 사이 가입·탈퇴가 INCR/DECR 했어도 user:* 실제 개수로 맞춤
+    await redis([['SET', 'members:total', users.length],
+      ...Object.entries(perDay).map(([d, n]) => ['SET', `members:${d}`, n, 'EX', 400 * 86400])]);
+  } catch (e) {
+    await redis([['DEL', 'members:init']]);  // 실패하면 다음에 다시
+    throw e;
+  }
+}
+
 async function siteStats() {
   const now = Date.now();
   const days = Array.from({ length: STATS_DAYS }, (_, i) => kstDayOf(now - i * 86400e3));
   const today = days[0];
 
-  const keys = [];
-  let cursor = '0';
-  do {
-    const [[next, found]] = await redis([['SCAN', cursor, 'MATCH', 'user:*', 'COUNT', 1000]]);
-    cursor = String(next);
-    keys.push(...found);
-  } while (cursor !== '0' && keys.length < 100000);
-  const users = keys.length ? (await redis([['MGET', ...keys]]))[0].filter(Boolean).map(x => JSON.parse(x)) : [];
-  const joinDays = users.map(u => kstDayOf(u.ts || 0));
+  await initMemberCounters();
 
-  const [countsFlat, reported, contacts, pvFlat, uvTotal, viewsTotal, ...daily] = await redis([
-    ['HGETALL', 'postcount'], ['ZCARD', 'reported'], ['LLEN', 'contacts'], ['HVALS', 'postviews'], ['PFCOUNT', 'uv:total'], ['GET', 'views:total'],
-    ...days.flatMap(d => [['GET', `views:${d}`], ['PFCOUNT', `uv:${d}`]]),
+  const [countsFlat, reported, contacts, pvFlat, uvTotal, viewsTotal, membersTotal, ...daily] = await redis([
+    ['HGETALL', 'postcount'], ['ZCARD', 'reported'], ['LLEN', 'contacts'], ['HVALS', 'postviews'], ['PFCOUNT', 'uv:total'], ['GET', 'views:total'], ['GET', 'members:total'],
+    ...days.flatMap(d => [['GET', `views:${d}`], ['PFCOUNT', `uv:${d}`], ['GET', `members:${d}`], ['GET', `pv:${d}`]]),
   ]);
   const boards = [];
   for (let i = 0; i < (countsFlat || []).length; i += 2) if (Number(countsFlat[i + 1]) > 0) boards.push({ code: countsFlat[i], count: Number(countsFlat[i + 1]) });
@@ -239,16 +259,17 @@ async function siteStats() {
 
   const per = days.map((d, i) => ({
     day: d,
-    views: Number(daily[i * 2]) || 0,
-    visitors: Number(daily[i * 2 + 1]) || 0,
-    members: joinDays.filter(x => x === d).length,
+    views: Number(daily[i * 4]) || 0,
+    visitors: Number(daily[i * 4 + 1]) || 0,
+    members: Number(daily[i * 4 + 2]) || 0,
+    postViews: Number(daily[i * 4 + 3]) || 0,  // 글 조회수 (pv:{날짜})
     posts: postDays.filter(x => x === d).length,
   }));
   return {
     today,
     visits: { today: per[0].views, total: Number(viewsTotal) || 0, todayVisitors: per[0].visitors, totalVisitors: Number(uvTotal) || 0, visitorsSince: '20261014' },
-    members: { today: per[0].members, total: users.length },
-    posts: { today: per[0].posts, total: boards.reduce((a, x) => a + x.count, 0), views: (pvFlat || []).reduce((a, v) => a + (Number(v) || 0), 0) },
+    members: { today: per[0].members, total: Math.max(0, Number(membersTotal) || 0) },
+    posts: { today: per[0].posts, total: boards.reduce((a, x) => a + x.count, 0), views: (pvFlat || []).reduce((a, v) => a + (Number(v) || 0), 0), viewsToday: per[0].postViews, viewsSince: '20261015' },
     pending: { reported: Number(reported) || 0, contacts: Number(contacts) || 0 },
     days: per,
     boards: boards.sort((a, b) => b.count - a.count).slice(0, 10),
@@ -351,6 +372,8 @@ async function signup(b) {
     await redis([['DEL', `user:${key}`]]);
     throw new BadRequest('이미 사용 중인 닉네임입니다');
   }
+  const joinKey = `members:${kstDay()}`;
+  await redis([['INCR', 'members:total'], ['INCR', joinKey], ['EXPIRE', joinKey, 400 * 86400]]);
   return newSession(user);
 }
 
@@ -473,11 +496,14 @@ async function handlePost(b, env = {}) {
 
     // 회원 탈퇴: 계정·세션·관심 종목·팔로우 관계 삭제 (작성한 글은 남음)
     const [following, followers] = await redis([['SMEMBERS', `mfollowing:${uid}`], ['SMEMBERS', `mfollowers:${user.nick}`]]);
+    // 계정을 실제로 지운 요청만 회원 수 감소 (동시에 두 번 눌러도 한 번만)
+    const [removed] = await redis([['DEL', `user:${uid}`]]);
+    if (Number(removed)) await redis([['DECR', 'members:total']]);
     const cmds = [
       // 탈퇴한 닉네임은 다른 사람이 쓰지 못하게 예약만 남김 (사칭 방지)
       ['SET', `nickowner:${user.nick}`, '-'],
       ['SET', `uidgone:${uid}`, '1'],
-      ['DEL', `user:${uid}`, `fav:${uid}`, `mfollowing:${uid}`, `mfollowers:${user.nick}`, `usess:${uid}`, ...sessKeys],
+      ['DEL', `fav:${uid}`, `mfollowing:${uid}`, `mfollowers:${user.nick}`, `usess:${uid}`, ...sessKeys],
       ...(following || []).map(n => ['SREM', `mfollowers:${n}`, uid]),
       ...(followers || []).map(f => ['SREM', `mfollowing:${f}`, user.nick]),
     ];
@@ -506,6 +532,8 @@ async function handlePost(b, env = {}) {
     if (b.code === COLUMN_CODE) ids.length = 1;
     const [ok] = await redis([['SET', viewKey, '1', 'NX', 'EX', BOARD_VIEW_GAP]]);
     const res = await redis(ids.map(id => ok === 'OK' ? ['HINCRBY', 'postviews', id, 1] : ['HGET', 'postviews', id]));
+    // 날짜별 글 조회수 (관리자 화면 정보 '오늘 조회수'·최근 14일, 2026-10-15부터)
+    if (ok === 'OK') await redis([['INCRBY', `pv:${kstDay()}`, ids.length], ['EXPIRE', `pv:${kstDay()}`, 400 * 86400]]);
     return { views: Object.fromEntries(ids.map((id, i) => [id, Number(res[i]) || 0])) };
   }
 

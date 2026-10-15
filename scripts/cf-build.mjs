@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { execFileSync } from 'child_process';
 import { fileURLToPath } from 'url';
 // 배포 전 문법 검사: 화면 JS·서버 코드에 문법 오류가 있으면 빌드를 멈춤 (깨진 파일이 배포되지 않게)
-const CHECK = ['app.js', 'stocks.js', 'theme.js',
+const CHECK = ['app.js', 'stocks.js', 'theme.js', 'contact.js', 'visit.js',
   ...fs.readdirSync(new URL('../api/', import.meta.url)).filter(x => x.endsWith('.js')).map(x => 'api/' + x),
   ...fs.readdirSync(new URL('../functions/', import.meta.url), { recursive: true }).map(x => String(x).replace(/\\/g, '/')).filter(x => x.endsWith('.js')).map(x => 'functions/' + x)];
 for (const f of CHECK) {
@@ -18,12 +18,12 @@ for (const f of CHECK) {
 }
 const root = new URL('../', import.meta.url);
 const dist = new URL('dist/', root);
-const STATIC = /\.(html|js|css|xml|txt|ico|png|jpg|jpeg|svg|webp|json)$/;
+const STATIC = /\.(html|js|css|xml|txt|ico|png|jpg|jpeg|svg|webp|json|webmanifest)$/;
 const SKIP = new Set(['skills-lock.json', 'package.json', 'package-lock.json', 'vercel.json']);
-const ASSETS = ['styles.css', 'app.js', 'stocks.js', 'theme.js'];
+const ASSETS = ['styles.css', 'app.js', 'stocks.js', 'theme.js', 'contact.js', 'visit.js'];
 const ver = Object.fromEntries(ASSETS.map(a => [a, crypto.createHash('md5').update(fs.readFileSync(new URL(a, root))).digest('hex').slice(0, 8)]));
 // href="styles.css" · src="/app.js" → ...?v=해시
-const versioned = html => html.replace(/((?:src|href)=")(\/?)(styles\.css|app\.js|stocks\.js|theme\.js)"/g, (_, a, slash, f) => `${a}${slash}${f}?v=${ver[f]}"`);
+const versioned = html => html.replace(/((?:src|href)=")(\/?)(styles\.css|app\.js|stocks\.js|theme\.js|contact\.js|visit\.js)"/g, (_, a, slash, f) => `${a}${slash}${f}?v=${ver[f]}"`);
 
 fs.rmSync(dist, { recursive: true, force: true });
 fs.mkdirSync(dist);

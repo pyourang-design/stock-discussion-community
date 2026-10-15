@@ -75,7 +75,7 @@ export async function runVercelHandler(name, context, extraQuery = {}) {
 
   // 서버 렌더링 HTML의 CSS·JS 링크에도 버전(?v=)을 붙임 (브라우저 캐시에 남은 옛 파일 방지)
   if ((response.headers.get('Content-Type') || '').startsWith('text/html')) {
-    const html = (await response.text()).replace(/((?:src|href)="\/?)(styles\.css|app\.js|stocks\.js|theme\.js)"/g, (_, a, f) => `${a}${f}?v=${ASSET_VERSION[f]}"`);
+    const html = (await response.text()).replace(/((?:src|href)="\/?)(styles\.css|app\.js|stocks\.js|theme\.js|contact\.js|visit\.js)"/g, (_, a, f) => `${a}${f}?v=${ASSET_VERSION[f]}"`);
     response = new Response(html, response);
   }
 

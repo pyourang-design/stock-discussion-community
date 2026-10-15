@@ -12,7 +12,12 @@
   <meta property="og:description" content="주식 업종 종목 토론방 운영자에게 문의·신고·제휴를 남기는 페이지입니다." />
   <meta property="og:url" content="https://upjong.com/contact" />
   <meta property="og:locale" content="ko_KR" />
+  <meta property="og:image" content="https://upjong.com/og-image.png?v=6" />
+  <meta property="og:image:width" content="2400" />
+  <meta property="og:image:height" content="1260" />
   <script src="/theme.js"></script>
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-title" content="업종닷컴" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
 </head>
@@ -26,14 +31,17 @@
     </a>
     <nav class="main-nav page-nav">
       <a href="./">Home</a>
-      <a href="/?column=list">블로그</a>
-      <button class="theme-toggle" onclick="toggleTheme()">Dark</button>
+      <a class="nav-lecture" href="/?column=list">주식 강의</a>
+      <button class="theme-toggle" type="button">Dark</button>
     </nav>
   </div>
 </header>
 
 <main class="container policy-page">
-  <h1>연락처</h1>
+  <div class="policy-head">
+    <h1>연락처</h1>
+    <button type="button" class="modal-close" data-close-page title="닫기 — 이전 화면으로 돌아가요" aria-label="닫기"><span class="x" aria-hidden="true">✕</span>닫기</button>
+  </div>
 
   <p class="policy-lead">사이트 이용 문의, 오류 제보, 게시물 신고, 개인정보 열람·삭제 요청, 제휴 문의를 남겨주세요. 운영자가 확인 후 답변이 필요한 경우 남겨주신 이메일로 회신합니다.</p>
 
@@ -63,7 +71,7 @@
     <label>문의 내용
       <textarea id="cMessage" rows="7" maxlength="2000" placeholder="게시물 신고는 종목명과 글 내용(또는 작성자 닉네임)을 함께 적어주세요."></textarea>
     </label>
-    <button class="btn-submit" id="cSubmit" onclick="sendContact()">문의 보내기</button>
+    <button class="btn-submit" id="cSubmit" type="button">문의 보내기</button>
     <p class="contact-result" id="cResult"></p>
   </div>
 
@@ -79,36 +87,12 @@
 <footer class="site-footer">
   <div class="container">
     <nav class="policy-links">
-      <a href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a><a class="footer-column-link" href="/column" onclick="location.href='/?column=list'; return false">운영자 칼럼</a>
+      <a class="footer-about-link" href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a><a class="footer-column-link" href="/column" data-go="/?column=list">운영자 칼럼</a>
     </nav>
     <p>⚠️ 본 사이트 정보는 투자 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
-    <p>© 2026 주식 업종 종목 토론방 · 운영자 김유랑 · <a href="mailto:tpsdurang@naver.com">tpsdurang@naver.com</a></p>
+    <p>© 2026 주식 업종 종목 토론방</p>
   </div>
 </footer>
-<script>
-// 문의 보내기 → /api/posts { action: 'contact' } (운영자만 관리자 모드에서 확인)
-const CID = (() => { try { let id = localStorage.getItem('cid'); if (!id) { id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('cid', id); } return id; } catch { return 'tmp-' + Date.now().toString(36); } })();
-async function sendContact() {
-  const msg = document.getElementById('cMessage').value.trim();
-  const email = document.getElementById('cEmail').value.trim();
-  const out = document.getElementById('cResult');
-  if (msg.length < 5) { out.textContent = '문의 내용을 5자 이상 입력해주세요.'; return; }
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { out.textContent = '이메일 형식을 확인해주세요.'; return; }
-  const btn = document.getElementById('cSubmit');
-  btn.disabled = true;
-  try {
-    const res = await fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'contact', cid: CID, type: document.getElementById('cType').value, name: document.getElementById('cName').value.trim(), email, message: msg }) });
-    const j = await res.json();
-    if (!res.ok || j.error) throw new Error(j.error || res.status);
-    out.textContent = '문의가 접수되었습니다. 감사합니다.';
-    document.getElementById('cMessage').value = '';
-  } catch (e) {
-    out.textContent = '보내지 못했습니다: ' + e.message;
-  } finally {
-    btn.disabled = false;
-  }
-}
-</script>
+<script src="/contact.js"></script>
 </body>
 </html>

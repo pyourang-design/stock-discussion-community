@@ -1,0 +1,16 @@
+{
+  "name": "업종닷컴 - 주식 업종 종목 토론방",
+  "short_name": "업종닷컴",
+  "description": "업종별·종목별 실시간 뉴스, 증권사 리포트, 공시를 보며 토론하는 주식 종목 토론방",
+  "lang": "ko",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#14151f",
+  "theme_color": "#14151f",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

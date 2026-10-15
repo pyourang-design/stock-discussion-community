@@ -13,6 +13,15 @@ function applyTheme() {
 }
 applyTheme();
 
+// 홈 화면 앱 정보(manifest)는 삼성 인터넷에는 주지 않음: 삼성 인터넷이 만드는 설치 앱(APK)은 구형 안드로이드 기준이라
+// 최신 갤럭시의 Play 프로텍트가 "안전하지 않은 앱 차단"으로 막음 → 삼성 인터넷은 '현재 페이지 추가 → 홈 화면' 일반 바로가기로 (app.js addToHome 안내)
+if (!/SamsungBrowser/i.test(navigator.userAgent)) {
+  const m = document.createElement('link');
+  m.rel = 'manifest';
+  m.href = '/manifest.webmanifest';
+  document.head.appendChild(m);
+}
+
 // 직접 고른 적이 없으면 기기 설정이 바뀔 때(예: 밤에 자동 다크) 따라감
 try {
   window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
@@ -40,3 +49,37 @@ function toggleTheme() {
 }
 
 document.addEventListener('DOMContentLoaded', renderThemeButtons);
+
+// 인라인 onclick 없이 처리 (보안 헤더 CSP script-src 'self'): 테마 버튼, data-go 링크(누르면 그 주소로 — 검색엔진엔 href 주소를 보여줌)
+document.addEventListener('click', e => {
+  const t = e.target.closest && e.target.closest('.theme-toggle, a[data-go]');
+  if (!t) return;
+  if (t.classList.contains('theme-toggle')) return toggleTheme();
+  e.preventDefault();
+  location.href = t.dataset.go;
+});
+
+// 운영자 칼럼 보호(.no-copy): 글 선택·복사·잘라내기, 오른쪽 버튼(사진 저장), 사진 끌어다 저장 막기
+// (사이트 칼럼 탭과 /column/{id} 페이지 공통. 관리자 모드에서는 app.js가 .no-copy를 붙이지 않음)
+function inNoCopy(node) {
+  const el = node && (node.nodeType === 1 ? node : node.parentElement);
+  return !!(el && el.closest && el.closest('.no-copy'));
+}
+['contextmenu', 'dragstart', 'selectstart'].forEach(type => document.addEventListener(type, e => {
+  if (inNoCopy(e.target)) e.preventDefault();
+}));
+['copy', 'cut'].forEach(type => document.addEventListener(type, e => {
+  const sel = window.getSelection && window.getSelection();
+  // 칼럼 바깥에서 드래그해 칼럼까지 걸친 선택(전체 선택 Ctrl+A 포함)도 막음
+  const touches = sel && !sel.isCollapsed && ([...document.querySelectorAll('.no-copy')].some(el => sel.containsNode(el, true)) || inNoCopy(sel.anchorNode));
+  if (inNoCopy(e.target) || touches) e.preventDefault();
+}));
+
+// 소개·약관·개인정보·연락처 페이지 오른쪽 위 '닫기': 사이트 안에서 왔으면 이전 화면으로, 주소로 바로 들어왔으면 홈으로
+document.addEventListener('click', e => {
+  if (!(e.target.closest && e.target.closest('[data-close-page]'))) return;
+  let fromSite = false;
+  try { fromSite = !!document.referrer && new URL(document.referrer).origin === location.origin; } catch (err) {}
+  if (fromSite && history.length > 1) history.back();
+  else location.href = '/';
+});
