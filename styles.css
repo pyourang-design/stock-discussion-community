@@ -71,6 +71,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .member-badge { padding: 0 5px; border-radius: 4px; font-size: 0.66rem; font-weight: 700; background: rgba(91,140,255,.2); color: var(--accent); }
 .member-badge.guest { background: rgba(160,160,180,.2); color: var(--text-muted); }
 .member-badge.official { background: rgba(240,68,82,.15); color: var(--up); }
+.member-badge.ai { background: rgba(124,92,255,.18); color: #8b6cff; }
 
 /* ── 마켓 배너 ───────────────────────────────────── */
 .market-banner { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px 12px; margin: 16px 0 14px; }
@@ -202,9 +203,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
 /* ── 게시글 ──────────────────────────────────────── */
 .post-list { flex: 1; overflow-y: auto; }
-.post-item { padding: 14px 20px; border-bottom: 1px solid var(--border); }
+.post-item { padding: 10px 16px; border-bottom: 1px solid var(--border); }  /* 글 사이 여백 최소 */
 .post-item:last-child { border-bottom: none; }
-.post-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+.post-header { display: flex; align-items: center; gap: 8px; margin-bottom: 3px; flex-wrap: wrap; }
 .post-nick { font-weight: 700; font-size: 0.88rem; }
 .post-sentiment { font-size: 0.75rem; padding: 2px 8px; border-radius: 10px; }
 .post-sentiment.up { background: rgba(240,68,82,.15); color: var(--up); }
@@ -212,21 +213,23 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .post-sentiment.neutral { background: var(--surface2); color: var(--text-muted); }
 .post-time { font-size: 0.75rem; color: var(--text-muted); margin-left: auto; }
 .vote-btns { display: inline-flex; gap: 4px; }
-.btn-vote { font-size: 0.76rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 10px; padding: 2px 9px; transition: all .2s; white-space: nowrap; }
+.btn-vote { font-size: 0.76rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 10px; padding: 0 6px; transition: all .2s; white-space: nowrap; }
+/* 공감·비공감·팔로우 세 버튼은 같은 크기 (숫자가 커지면 그만큼만 늘어남) */
+.btn-vote, .btn-follow { box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; min-width: 66px; height: 24px; line-height: 1; }
 .btn-vote b { font-weight: 700; margin-left: 2px; }
 .btn-vote.up:hover, .btn-vote.up.on { background: rgba(240,68,82,.12); color: var(--up); border-color: var(--up); }
 .btn-vote.down:hover, .btn-vote.down.on { background: rgba(52,133,250,.12); color: var(--down); border-color: var(--down); }
-.post-body { font-size: 1rem; line-height: 1.6; color: var(--text); white-space: pre-wrap; word-break: break-word; }
-.btn-more { margin-top: 4px; font-size: 0.8rem; font-weight: 600; color: var(--accent); }
+.post-body { font-size: 1rem; line-height: 1.5; color: var(--text); white-space: pre-wrap; word-break: break-word; }
+.btn-more { margin-top: 2px; font-size: 0.8rem; font-weight: 600; color: var(--accent); }
 .btn-more:hover { text-decoration: underline; }
-.btn-follow { font-size: 0.8rem; color: var(--text-muted); border: 1px solid var(--border); border-radius: 10px; padding: 2px 10px; transition: all .2s; }
-.btn-follow:hover { background: rgba(255,140,66,.15); color: var(--hot); border-color: var(--hot); }
+.btn-follow { font-size: 0.76rem; font-weight: 600; color: var(--hot); border: 1px solid var(--hot); border-radius: 10px; padding: 0 6px; transition: all .2s; white-space: nowrap; }  /* 공감·비공감과 같은 크기, 주황 */
+.btn-follow:hover { background: rgba(255,140,66,.15); }
 .author-overlay { z-index: 300; }
 .author-modal { max-width: 640px; height: 80vh; }
 .author-modal .post-list { overflow-y: auto; }
 .author-stock { font-weight: 700; font-size: 0.85rem; color: var(--accent); }
 .author-stock:hover { text-decoration: underline; }
-.btn-follow.following { color: var(--hot); border-color: var(--hot); }
+.btn-follow.following { background: var(--hot); color: #fff; }
 .btn-follow-big { padding: 7px 16px; border-radius: 20px; font-size: 0.88rem; font-weight: 700; background: var(--hot); color: #fff; transition: opacity .2s; }
 .btn-follow-big.following { background: none; color: var(--hot); border: 1px solid var(--hot); }
 .btn-follow-big:hover { opacity: .85; }
@@ -235,9 +238,13 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .follow-chip { padding: 3px 12px; border-radius: 14px; font-size: 0.8rem; background: rgba(255,140,66,.15); color: var(--hot); font-weight: 600; }
 .follow-chip:hover { background: rgba(255,140,66,.3); }
 .btn-submit:disabled { opacity: .5; cursor: wait; }
-.post-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 6px; }
+.post-tools { display: flex; align-items: center; justify-content: flex-end; gap: 4px; margin-top: 0; }
+.post-tools:not(:has(*)) { display: none; }  /* 버튼 없는 줄은 자리 차지 안 함 */
+/* '더 보기'가 있으면 수정·삭제·신고를 같은 줄 오른쪽에 (한 줄 절약) */
+.btn-more + .post-tools { margin-top: -22px; pointer-events: none; }
+.btn-more + .post-tools > * { pointer-events: auto; }
 .post-edited { font-size: 0.72rem; color: var(--text-muted); margin-right: auto; }
-.btn-tool { font-size: 0.75rem; color: var(--text-muted); padding: 2px 8px; border-radius: 6px; }
+.btn-tool { font-size: 0.75rem; color: var(--text-muted); padding: 1px 8px; border-radius: 6px; }
 .btn-tool:hover { color: var(--text); background: var(--surface2); }
 .post-form { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; }
 .post-form textarea { width: 100%; resize: vertical; }
@@ -294,7 +301,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .login-dropdown { position: fixed; top: 62px; right: 16px; z-index: 300; }
 .login-box { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; display: flex; flex-direction: column; gap: 10px; width: 260px; box-shadow: 0 8px 32px rgba(0,0,0,.4); }
 .login-box h3 { font-size: 1rem; margin-bottom: 4px; }
-/* 회원 메뉴(닉네임님) 오른쪽 위 닫기 */
+/* 로그인·회원가입·회원 메뉴 오른쪽 위 닫기 */
 .login-box { position: relative; }
 .dropdown-close { position: absolute; top: 10px; right: 10px; width: 30px; height: 30px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; font-size: 0.95rem; color: var(--text-muted); border: 1px solid var(--border); background: var(--surface2); transition: all .2s; }
 #memberTitle { padding-right: 36px; }
@@ -360,6 +367,7 @@ body.admin-mode .admin-badge { display: block; }
 .write-policy a, .policy-page a { color: var(--accent); text-decoration: underline; }
 .btn-report { color: var(--text-muted); }
 .btn-report:hover { color: var(--danger); }
+.btn-report-head { padding: 1px 4px; }  /* 닉네임 줄, 공감 왼쪽 */
 .post-blind { color: var(--text-muted); font-style: italic; }
 .report-count { font-size: 0.7rem; font-weight: 700; color: var(--danger); background: rgba(240,68,82,.12); padding: 0 6px; border-radius: 4px; }
 .admin-tools { display: none; }
@@ -627,3 +635,39 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
 /* 정책 페이지 제목 줄: 제목 + 오른쪽 '닫기'(운영자 칼럼 창 닫기 버튼과 같은 모양) */
 .policy-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
 .policy-page .policy-head h1 { margin-bottom: 0; }
+
+/* AI 운영자 실적 글 (토론글·종목 페이지 공용) */
+.ai-headline { font-weight: 700; font-size: 1.02rem; margin: 2px 0 8px; line-height: 1.45; }
+.ai-table-wrap { margin: 0 0 10px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.ai-table-title { font-size: 0.82rem; font-weight: 700; margin-bottom: 4px; }
+.ai-table-title span { font-weight: 400; color: var(--text-muted); margin-left: 4px; }
+.ai-table { border-collapse: collapse; font-size: 0.82rem; white-space: nowrap; min-width: 100%; }
+.ai-table th, .ai-table td { border: 1px solid var(--border); padding: 5px 8px; text-align: right; font-variant-numeric: tabular-nums; }
+.ai-table thead th { background: var(--surface2); text-align: center; font-weight: 600; }
+.ai-table tbody th { text-align: left; font-weight: 600; background: var(--surface); }
+.ai-table td.up { color: var(--up); font-weight: 600; }
+.ai-table td.down { color: var(--down); font-weight: 600; }
+.ai-src { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
+.ai-src a { color: inherit; text-decoration: underline; }
+.ai-detail > .btn-more { display: block; margin-top: 6px; }
+/* 긴 토론글은 4줄까지만 (app.js postTextHtml · '더 보기'로 펼침) */
+.post-body.clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+.ai-summary { font-size: 0.9rem; color: var(--text-muted); line-height: 1.5; }
+.ai-detail { margin-top: 8px; }
+.ai-detail .post-body { margin-top: 4px; }
+/* 종목 페이지(서버 렌더링): 토론글 4줄, AI 글 표는 접어서 (내용은 HTML에 있어 검색엔진이 읽음) */
+.sp-posts p.sp-clamp { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 4; line-clamp: 4; overflow: hidden; }
+.sp-posts details.ai-more summary { cursor: pointer; font-size: 0.8rem; font-weight: 600; color: var(--accent); margin: 4px 0; }
+.sp-posts details.ai-more[open] summary { margin-bottom: 8px; }
+/* 휴대폰: 닉네임 줄이 한 줄을 넘지 않게 — 버튼 폭·간격을 줄이고, 긴 닉네임은 …으로 */
+@media (max-width: 600px) {
+  .post-header { flex-wrap: nowrap; gap: 4px; }
+  .post-header > * { flex-shrink: 0; }
+  .post-header .post-nick { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .post-time, .post-views { font-size: 0.68rem; white-space: nowrap; }
+  .vote-btns { gap: 3px; }
+  .btn-vote, .btn-follow { min-width: 48px; height: 22px; padding: 0 4px; font-size: 0.68rem; letter-spacing: -0.04em; }
+  .btn-vote b { margin-left: 1px; }
+  .post-header .member-badge { font-size: 0.6rem; padding: 0 3px; }
+  .btn-report-head { padding: 0 2px; font-size: 0.7rem; }
+}

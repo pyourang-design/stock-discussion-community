@@ -1,0 +1,9 @@
+# AI 운영자 예약 실행 — 5분마다 https://upjong.com/api/ai {op:'run'} 호출 (실제 일은 Pages 함수가 함)
+# 배포: cd workers/ai-cron && npx wrangler deploy  ·  시크릿: npx wrangler secret put CRON_KEY (Pages의 CRON_KEY와 같은 값)
+name = "upjong-ai-cron"
+main = "index.js"
+compatibility_date = "2025-09-01"
+workers_dev = false
+
+[triggers]
+crons = ["*/5 * * * *"]

@@ -1,5 +1,5 @@
 // ── 상태 ──────────────────────────────────────────────
-let currentFilter = SECTORS[0].key;  // 현재 업종 탭
+let currentFilter = 'semi';  // 현재 업종 탭 (처음 들어오면 반도체)
 let currentStock = null;
 let currentModalTab = 'discuss';
 // index.html을 파일로 직접 열었을 때(file://)는 운영 서버 API 사용
@@ -54,6 +54,8 @@ const ACTIONS = {
   moreSectorNews: el => moreSectorNews(el.dataset.key),
   moreNews: () => moreNews(),
   toggleMore: el => toggleMore(el),
+  toggleAi: el => toggleAi(el),
+  foldAi: el => foldAi(el),
   vote: el => vote(el.parentNode.dataset.id, el.dataset.dir),
   openAuthor: el => openAuthor(el.dataset.nick),
   toggleFollow: el => toggleFollow(el.dataset.nick),
@@ -115,7 +117,7 @@ function openFromUrl() {
   const s = STOCKS.find(x => x.code === q.get('stock'));
   const key = s ? Object.keys(s.sectors)[0] : q.get('sector');
   if (key && SECTORS.some(x => x.key === key) && key !== currentFilter) {
-    const btn = [...document.querySelectorAll('#tabBar .tab')].find(b => b.getAttribute('onclick') === `filterTab('${key}', this)`);
+    const btn = document.querySelector(`#tabBar .tab[data-key="${key}"]`);
     if (btn) filterTab(key, btn);
   }
   if (s) openModal(s.code);
@@ -646,7 +648,7 @@ const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class=
 const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷');
 const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
 let columnPage = 1;
-const POST_PREVIEW = 500;  // 이 길이를 넘으면 '더 보기'로 접어서 표시
+const POST_PREVIEW = 120, POST_PREVIEW_LINES = 4;  // 이보다 길면 4줄로 접고 '더 보기' (실제로 4줄 안이면 버튼 숨김)
 const NICK_RE = /^[가-힣]{1,10}$/;  // 닉네임: 한글만, 최대 10자
 const PW_MIN = 4, PW_MAX = 20;      // 게시글 비밀번호 길이
 
@@ -691,27 +693,68 @@ async function loadForumMeta() {
   }
 }
 
-// 게시글 본문: 500자 초과 시 앞부분만 보여주고 '더 보기' 버튼
+// AI 운영자 실적 글: 제목 + 실적 표 (증가 빨강·감소 파랑) + 출처
+const aiChgClass = t => /^(\+|흑자)/.test(t) ? 'up' : /^(−|적자)/.test(t) ? 'down' : '';
+// 표 칸: 글자 또는 { t: 글자, u: DART 원문 주소 } (공시 모음)
+const aiCellHtml = c => c && typeof c === 'object' ? (/^https:\/\/dart\.fss\.or\.kr\//.test(c.u) ? `<a href="${escHtml(c.u)}" target="_blank" rel="noopener nofollow">${escHtml(c.t)}</a>` : escHtml(c.t)) : escHtml(c);
+const aiTablesHtml = p => (p.tables || []).map(t => `<div class="ai-table-wrap"><div class="ai-table-title">${escHtml(t.title)} <span>단위: ${escHtml(t.unit)}</span></div>
+  <table class="ai-table"><thead><tr>${t.cols.map(c => `<th>${escHtml(c)}</th>`).join('')}</tr></thead>
+  <tbody>${t.rows.map(r => `<tr>${r.map((c, i) => i === 0 ? `<th>${aiCellHtml(c)}</th>` : `<td class="${i === r.length - 1 && t.cols.at(-1) === '증감' ? aiChgClass(c) : ''}">${aiCellHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('');
+const aiSrcHtml = p => p.src ? `<div class="ai-src">📄 출처: <a href="${escHtml(p.src.url)}" target="_blank" rel="noopener nofollow">${escHtml(p.src.label)}</a> · DART 공시 숫자를 프로그램이 정리한 글이며 투자 권유가 아닙니다.</div>` : '';
+
+// AI 글 접힌 상태의 핵심 한 줄 (예전 글은 summary가 없어 본문 첫 문장)
+const aiSummary = p => p.summary || String(p.content || '').split(/(?<=다\.)\s/)[0];
+
+// 게시글 본문: 처음엔 4줄까지만 (styles.css .post-body.clamp), 넘치면 '더 보기' 버튼
+// AI 운영자 글은 제목 + 핵심 한 줄만 보이고 표·설명은 '실적 표 보기'로 펼침
 function postBodyHtml(p) {
+  if (p.ai && !p.blind) return `${p.headline ? `<div class="ai-headline">${escHtml(p.headline)}</div>` : ''}<div class="ai-summary">${escHtml(aiSummary(p))}</div>
+      <button class="btn-more" data-act="toggleAi">실적 표 보기 ▼</button>
+      <div class="ai-detail hidden">${aiTablesHtml(p)}<div class="post-body">${escHtml(p.content)}</div>${aiSrcHtml(p)}
+      <button class="btn-more" data-act="foldAi">접기 ▲</button></div>`;
+  return postTextHtml(p);
+}
+function postTextHtml(p) {
   const text = String(p.content || '');
-  if (text.length <= POST_PREVIEW) return `<div class="post-body">${escHtml(text)}</div>`;
-  return `<div class="post-body">${escHtml(text.slice(0, POST_PREVIEW))}<span class="post-ellipsis">…</span><span class="post-rest hidden">${escHtml(text.slice(POST_PREVIEW))}</span></div>
-      <button class="btn-more" data-act="toggleMore">더 보기</button>`;
+  const maybeLong = text.length > POST_PREVIEW || text.split('\n').length > POST_PREVIEW_LINES;
+  return `<div class="post-body${maybeLong ? ' clamp' : ''}">${escHtml(text)}</div>${maybeLong ? '<button class="btn-more" data-act="toggleMore">더 보기</button>' : ''}`;
 }
 
 function toggleMore(btn) {
-  const body = btn.previousElementSibling;
-  const open = body.querySelector('.post-rest').classList.toggle('hidden') === false;
-  body.querySelector('.post-ellipsis').classList.toggle('hidden', open);
+  const open = btn.previousElementSibling.classList.toggle('clamp') === false;
   btn.textContent = open ? '접기' : '더 보기';
 }
+function toggleAi(btn) {
+  const open = btn.nextElementSibling.classList.toggle('hidden') === false;
+  btn.textContent = open ? '접기 ▲' : '실적 표 보기 ▼';
+}
+// 펼친 글 맨 아래 '접기': 접은 뒤 글 제목이 화면 밖이면 제목 위치로 올려 줌 (보던 자리를 잃지 않게)
+function foldAi(btn) {
+  const top = btn.closest('.ai-detail').previousElementSibling;
+  toggleAi(top);
+  const item = top.closest('.post-item') || top;
+  if (item.getBoundingClientRect().top < 0) item.scrollIntoView({ block: 'start' });
+}
+// 4줄 안에 다 들어가는 글은 '더 보기' 버튼을 숨김 (화면에 그려진 뒤 실제 높이로 판단)
+let clampCheck = 0;
+function checkClamps() {
+  cancelAnimationFrame(clampCheck);
+  clampCheck = requestAnimationFrame(() => {
+    for (const b of document.querySelectorAll('.post-body.clamp')) {
+      if (!b.clientHeight || b.dataset.checked) continue;  // 안 보이는 곳(닫힌 창)은 나중에
+      b.dataset.checked = '1';
+      if (b.scrollHeight <= b.clientHeight + 2) { b.classList.remove('clamp'); b.nextElementSibling?.classList.contains('btn-more') && b.nextElementSibling.remove(); }
+    }
+  });
+}
+new MutationObserver(checkClamps).observe(document.body, { childList: true, subtree: true });
 
 // 공감·비공감 버튼 (같은 걸 다시 누르면 취소, 한 브라우저에 하나만)
 const likeBtnHtml = p => `<span class="vote-btns" data-id="${escHtml(p.id)}">
   <button class="btn-vote up ${p.liked ? 'on' : ''}" data-act="vote" data-dir="up">공감 <b>${p.likes || 0}</b></button>
   <button class="btn-vote down ${p.disliked ? 'on' : ''}" data-act="vote" data-dir="down">비공감 <b>${p.dislikes || 0}</b></button>
 </span>`;
-const memberBadgeHtml = p => p.official ? '<span class="member-badge official">운영자</span>'
+const memberBadgeHtml = p => p.ai ? '<span class="member-badge ai">🤖 자동</span>' : p.official ? '<span class="member-badge official">운영자</span>'
   : p.member ? '<span class="member-badge">회원</span>' : '<span class="member-badge guest">비회원</span>';
 
 async function renderPosts(keep = false) {
@@ -770,6 +813,7 @@ function drawPosts() {
       <div class="post-header">
         <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
+        ${isMyPost(p) || p.blind || p.official ? '' : `<button class="btn-tool btn-report btn-report-head" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="report">신고</button>`}
         ${likeBtnHtml(p)}
         ${p.member && !isMyPost(p) ? `<button class="btn-follow ${myFollowing.has(p.nick) ? 'following' : ''}" data-nick="${escHtml(p.nick)}" data-act="openAuthor">${myFollowing.has(p.nick) ? '팔로잉' : '팔로우'}</button>` : ''}
       </div>
@@ -778,7 +822,6 @@ function drawPosts() {
         ${p.editedTs ? `<span class="post-edited">수정됨 · ${timeAgo(p.editedTs)}</span>` : ''}
         ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="edit">수정</button>
         <button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="delete">삭제</button>` : ''}
-        ${isMyPost(p) || p.blind || p.official ? '' : `<button class="btn-tool btn-report" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="report">신고</button>`}
         ${adminDeleteBtnHtml(p)}
       </div>
       ${postAction?.id === p.id && postAction.mode === 'delete' ? deleteFormHtml(p) : ''}
@@ -1448,8 +1491,7 @@ async function loadImageStats(cleanup = false) {
         ${tile('안 쓰는 사진', fmtN(r.unused) + '장', fmtMB(r.unusedBytes))}
       </div>
       ${r.deleted ? `<p class="stat-note">안 쓰는 사진 ${fmtN(r.deleted)}장을 정리했습니다.</p>` : ''}
-      ${r.unusedOld ? `<button class="btn-tool" data-act="cleanupImages" data-n="${r.unusedOld}">안 쓰는 사진 ${fmtN(r.unusedOld)}장 정리</button>` : ''}
-      <p class="stat-note">칼럼을 지우거나 수정에서 뺀 사진은 자동으로 지워집니다. 올렸다가 글에 쓰지 않은 사진은 하루가 지나면 여기서 정리할 수 있습니다.</p>`;
+      ${r.unusedOld ? `<button class="btn-tool" data-act="cleanupImages" data-n="${r.unusedOld}">안 쓰는 사진 ${fmtN(r.unusedOld)}장 정리</button>` : ''}`;
   } catch (e) {
     if (el()) el().innerHTML = `<p class="stat-note">불러오지 못했습니다. (${escHtml(e.message)})</p>`;
   }

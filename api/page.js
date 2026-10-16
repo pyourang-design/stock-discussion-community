@@ -75,12 +75,23 @@ async function news(s) {
   })).filter(n => n.title && !/(\.\.\.|…)$/.test(n.title)).slice(0, NEWS_SHOWN);
 }
 
+// AI 운영자 실적 글: 제목·표·본문 전체·출처 (검색엔진이 표 숫자를 읽도록 서버에서 그림)
+const aiChgClass = t => /^(\+|흑자)/.test(t) ? 'up' : /^(−|적자)/.test(t) ? 'down' : '';
+const aiCellHtml = c => c && typeof c === 'object' ? (/^https:\/\/dart\.fss\.or\.kr\//.test(c.u) ? `<a href="${esc(c.u)}" target="_blank" rel="noopener nofollow">${esc(c.t)}</a>` : esc(c.t)) : esc(c);
+function aiPostHtml(p) {
+  const tables = (p.tables || []).map(t => `<div class="ai-table-wrap"><div class="ai-table-title">${esc(t.title)} <span>단위: ${esc(t.unit)}</span></div>
+  <table class="ai-table"><thead><tr>${t.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
+  <tbody>${t.rows.map(r => `<tr>${r.map((c, i) => i === 0 ? `<th>${aiCellHtml(c)}</th>` : `<td class="${i === r.length - 1 && t.cols.at(-1) === '증감' ? aiChgClass(c) : ''}">${aiCellHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('');
+  const summary = p.summary || String(p.content || '').split(/(?<=다\.)\s/)[0];
+  return `<h3 class="ai-headline">${esc(p.headline || '')}</h3><p class="ai-summary">${esc(summary)}</p><details class="ai-more"><summary>실적 표 보기</summary>${tables}<p>${esc(p.content)}</p>${p.src ? `<div class="ai-src">📄 출처: <a href="${esc(p.src.url)}" target="_blank" rel="noopener nofollow">${esc(p.src.label)}</a> · DART 공시 숫자를 프로그램이 정리한 글이며 투자 권유가 아닙니다.</div>` : ''}</details>`;
+}
+
 async function posts(code) {
   if (!dbReady()) return { list: [], total: 0 };
   const [ids, counts] = await redis([['LRANGE', `posts:${code}`, 0, POSTS_SHOWN - 1], ['HGET', 'postcount', code]]);
   if (!ids?.length) return { list: [], total: 0 };
   const raws = await redis(ids.map(id => ['GET', `post:${id}`]));
-  const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content }));
+  const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content, ...(p.ai && !p.blind ? { ai: true, headline: p.headline, summary: p.summary, tables: p.tables, src: p.src } : {}) }));
   return { list, total: Number(counts) || list.length };
 }
 
@@ -199,8 +210,8 @@ export default async function handler(req, res) {
   <section class="sp-section">
     <h2>${esc(s.name)} 최근 토론글 <span>(${total}건)</span></h2>
     ${postList.length ? `<ul class="sp-posts">${postList.map(p => `
-      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
-      <p>${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p></li>`).join('')}
+      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.ai ? ' <span class="member-badge ai">🤖 자동</span>' : p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
+      ${p.ai ? aiPostHtml(p) : `<p class="sp-clamp">${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p>`}</li>`).join('')}
     </ul>` : `<p class="sp-empty">아직 ${esc(s.name)} 토론글이 없습니다. 첫 번째 의견을 남겨보세요.</p>`}
     <a class="sp-more" href="${esc(discussUrl)}">${esc(s.name)} 토론 전체 보기 · 글쓰기 →</a>
   </section>
