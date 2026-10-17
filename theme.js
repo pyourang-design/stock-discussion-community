@@ -49,6 +49,12 @@ function toggleTheme() {
 }
 
 document.addEventListener('DOMContentLoaded', renderThemeButtons);
+// 이미 홈 화면 앱으로 연 경우 하단 메뉴 '앱 다운' 숨김 (모든 페이지)
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    if (window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true) document.querySelectorAll('.nav-app').forEach(b => b.classList.add('hidden'));
+  } catch (e) {}
+});
 
 // 인라인 onclick 없이 처리 (보안 헤더 CSP script-src 'self'): 테마 버튼, data-go 링크(누르면 그 주소로 — 검색엔진엔 href 주소를 보여줌)
 document.addEventListener('click', e => {

@@ -126,6 +126,7 @@ function openFromUrl() {
   }
   if (s) openModal(s.code);
   if (q.get('tab') === 'fav') { history.replaceState(null, '', '/'); openFavTab(); }
+  if (q.get('app') === '1') { history.replaceState(null, '', '/'); setTimeout(addToHome, 600); }  // 다른 페이지 하단 메뉴 '앱 다운' (설치 창 이벤트를 잠깐 기다림)
   const col = q.get('column');
   // 바로가기 주소는 처음 기록에서 지움 (창을 닫으면 홈 주소로 돌아가게, 열린 칼럼 주소는 창 안에서 다시 반영)
   if (col) syncColumnUrl(null);

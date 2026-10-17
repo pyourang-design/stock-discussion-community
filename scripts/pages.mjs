@@ -77,6 +77,7 @@ ${extraScript}
   <a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Home</span></a>
   <a class="nav-lecture" href="/?column=list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4h7a3 3 0 013 3v13a2 2 0 00-2-2H2z"/><path d="M22 4h-7a3 3 0 00-3 3v13a2 2 0 012-2h8z"/></svg><span>주식 강의</span></a>
   <button class="theme-toggle" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg><span class="nav-label">Dark</span></button>
+  <a class="nav-app" href="/?app=1" title="홈 화면에 바로가기 추가"><span class="nav-app-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v11"/><path d="M6.5 9.5 12 15l5.5-5.5"/><path d="M4.5 20h15"/></svg></span><span>앱 다운</span></a>
 </nav>
 </body>
 </html>

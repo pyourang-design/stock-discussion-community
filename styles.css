@@ -731,7 +731,6 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
   .search-wrap { grid-area: search; }
   #btnLogin { grid-area: login; }
   #btnSignup, #btnProfile { grid-area: signup; }
-  #btnA2hs { grid-area: a2hs; }
   .search-box { height: 42px; border-radius: 21px; }
   .search-btn { width: 32px; height: 32px; }
   .auth-stack .btn-login, .auth-stack .btn-signup { height: 29px; }
@@ -756,8 +755,7 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
    - 회원가입(회원정보)은 아랫변을 검색창 아랫변에 맞춤, 로그인은 16px 내려 회원가입과 4px 간격
    PC: 상단 박스 위아래 여백 더 줄임 (79→70px) */
 @media (max-width: 600px) {
-  .search-wrap, #btnA2hs { top: 5px; }
-  #btnA2hs { position: relative; }
+  .search-wrap { top: 5px; }
   #btnSignup, #btnProfile { align-self: end; position: relative; top: 5px; }
   #btnLogin { position: relative; top: 16px; }
 }
@@ -771,3 +769,12 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
   .search-box::placeholder { font-size: clamp(10.5px, 3.2vw, 0.92rem); }
 }
 @media (max-width: 359px) { .search-box::placeholder { font-size: max(10px, 2.95vw); } }
+/* 하단 메뉴 맨 오른쪽 '앱 다운' (홈 화면 바로가기, 예전 상단 빨간 버튼) — 예전처럼 휴대폰·터치 기기에서만, 홈 화면 앱으로 열면 숨김 */
+.bottom-nav > .nav-app { display: none; flex: 1; max-width: 160px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; background: none; border: 0; color: var(--text-muted); font-size: 0.74rem; font-weight: 600; line-height: 1.2; white-space: nowrap; letter-spacing: -0.02em; }
+@media (max-width: 600px), (hover: none) and (pointer: coarse) { .bottom-nav > .nav-app { display: flex; } }
+.nav-app-icon { width: 22px; height: 22px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #ff6a5c, #e02f4b); color: #fff; }
+.bottom-nav .nav-app-icon svg { width: 13px; height: 13px; stroke-width: 3.2; }
+/* 상단에서 바로가기 버튼을 뺐으므로 휴대폰 상단은 2칸 (검색창이 그만큼 넓어짐) */
+@media (max-width: 600px) {
+  .header-inner { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "logo login" "search signup"; }
+}
