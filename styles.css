@@ -751,3 +751,17 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 }
 @media (max-width: 380px) { .header-inner { height: 99px; } }
 @media (max-width: 480px) and (max-height: 699px) { .header-inner { height: 99px; } .login-dropdown { top: 106px; } }
+/* 휴대폰: 상단 박스(100px)는 그대로, 박스 안 위치만 조정 (자리는 그대로 두고 position: relative로 밀어 내림)
+   - 검색창(+돋보기·바로가기 버튼)을 5px 아래로: 제목과 사이 공간 확보
+   - 회원가입(회원정보)은 아랫변을 검색창 아랫변에 맞춤, 로그인은 16px 내려 회원가입과 4px 간격
+   PC: 상단 박스 위아래 여백 더 줄임 (79→70px) */
+@media (max-width: 600px) {
+  .search-wrap, #btnA2hs { top: 5px; }
+  #btnA2hs { position: relative; }
+  #btnSignup, #btnProfile { align-self: end; position: relative; top: 5px; }
+  #btnLogin { position: relative; top: 16px; }
+}
+@media (min-width: 601px) {
+  .header-inner { height: 69px; }
+  .login-dropdown { top: 77px; }
+}
