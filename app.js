@@ -158,7 +158,7 @@ function renderStocks(list) {
   if (currentFilter === 'fav') {
     // 관심 종목 탭: 회원은 맨 앞에 주식 시장 경제 뉴스·토론 카드와 관심 종목 모아보기 카드, 이어서 등록한 관심 종목만 (비회원은 안내만)
     el.innerHTML = !member
-      ? '<p class="empty-msg">관심 종목은 회원 전용입니다.<br><button class="link-btn" data-act="toggleLogin">로그인</button> 또는 <button class="link-btn" data-act="toggleSignup">회원가입</button> 후 종목 카드의 ☆를 눌러 추가하세요.</p>'
+      ? '<p class="empty-msg">관심 종목은 회원 전용입니다.<br><button class="link-btn" data-act="toggleLogin">로그인</button> 또는 <button class="link-btn" data-act="toggleSignup">회원가입</button> 후 종목 카드의 ☆를 눌러 추가하세요.<br>관심종목을 지정하면 지정한 관심종목들의 실시간 뉴스, 증권사 리포트, 공시 정보를 한꺼번에 볼 수 있습니다.</p>'
       : newsCardHtml(MARKET_KEY) + favAllCardHtml(list.length) + (list.length ? list.map(s => stockCard(s)).join('') : '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>');
     return;
   }

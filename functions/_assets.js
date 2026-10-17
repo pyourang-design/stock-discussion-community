@@ -1,2 +1,2 @@
 // scripts/cf-build.mjs가 생성 — 정적 파일 버전(내용 해시)
-export const ASSET_VERSION = {"styles.css":"52fcf54c","app.js":"8cd49d77","stocks.js":"666a74e9","theme.js":"5a620fdb","contact.js":"bf6d3d48","visit.js":"530f6f45"};
+export const ASSET_VERSION = {"styles.css":"0791f385","app.js":"e68dcd4b","stocks.js":"86e64b2c","theme.js":"089ceb48","contact.js":"ef7f425a","visit.js":"2726264b"};
