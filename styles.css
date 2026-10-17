@@ -686,3 +686,29 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 .bottom-nav > a.nav-lecture { color: #e02f4b; }  /* 주식 강의는 예전 상단 버튼처럼 빨강으로 강조 */
 @media (hover: hover) { .bottom-nav > a:hover, .bottom-nav > .theme-toggle:hover { color: var(--accent); } .bottom-nav > a.nav-lecture:hover { color: #ff6a5c; } }
 .admin-badge { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }
+/* 상단: 제목·검색창을 조금 키움, 검색창은 길게 + 끝에 동그란 돋보기 버튼(누르면 검색), 로그인 위·회원가입 아래로 쌓음 */
+.header-inner { padding-top: 14px; padding-bottom: 14px; }
+.logo { font-size: 1.42rem; }
+.logo-icon { font-size: 2rem; }
+.search-wrap { position: relative; display: flex; align-items: center; }
+.search-box { width: 380px; height: 46px; padding: 0 50px 0 18px; border-radius: 23px; font-size: 0.95rem; }
+.search-btn { position: absolute; right: 5px; width: 36px; height: 36px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; background: var(--accent); color: #fff; border: 0; }
+.search-btn svg { width: 19px; height: 19px; fill: none; stroke: currentColor; stroke-width: 2.6; stroke-linecap: round; }
+@media (hover: hover) { .search-btn:hover { opacity: .85; } }
+.search-box::-webkit-search-cancel-button { display: none; }  /* 돋보기와 겹치지 않게 지우기(×) 숨김 */
+.auth-stack { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.auth-stack .btn-login, .auth-stack .btn-signup { min-width: 76px; padding: 4px 12px; font-size: 0.8rem; text-align: center; }
+.search-results { scroll-margin-top: 150px; }
+@media (max-width: 600px) {
+  .header-inner { padding-top: 11px; padding-bottom: 11px; }
+  .logo { font-size: 1.18rem; }
+  .logo-icon { font-size: 1.6rem; }
+  .search-wrap { flex: 1; min-width: 0; }
+  .search-box { width: 100%; height: 44px; padding-left: 16px; font-size: 0.92rem; }
+  .auth-stack .btn-login, .auth-stack .btn-signup { min-width: 68px; padding: 3px 8px; font-size: 0.76rem; }
+}
+@media (max-width: 380px) { .logo { font-size: 1.06rem; } .logo-icon { font-size: 1.4rem; } }
+/* 로그인·회원가입 창: 높아진 헤더 바로 아래 (헤더 PC 약 87px · 휴대폰 약 112px, 세로 짧은 폰 약 109px) */
+.login-dropdown { top: 94px; }
+@media (max-width: 600px) { .login-dropdown { top: 118px; } }
+@media (max-width: 480px) and (max-height: 699px) { .login-dropdown { top: 115px; } }

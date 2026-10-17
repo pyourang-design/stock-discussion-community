@@ -31,6 +31,7 @@ const ACTIONS = {
   filterTab: el => filterTab(el.dataset.key, el),
   columnLink: (el, e) => { e.preventDefault(); el.blur(); openColumnLink(el.dataset.id || null); },
   navFav: (el, e) => { e.preventDefault(); el.blur(); openFavTab(); },
+  doSearch: () => doSearch(),
   openFeed: () => openFeed(),
   toggleLogin: () => toggleLogin(),
   toggleSignup: () => toggleSignup(),
@@ -420,6 +421,16 @@ function clearAutofilledSearch() {
 }
 window.addEventListener('pageshow', clearAutofilledSearch);
 [300, 1000, 2500].forEach(ms => setTimeout(clearAutofilledSearch, ms));
+
+// 돋보기 버튼·Enter: 지금 입력한 글자로 검색하고 결과로 이동 (휴대폰 자판 닫힘). 빈 칸이면 검색창에 커서만
+function doSearch() {
+  const input = document.getElementById('searchInput');
+  if (!input.value.trim()) return input.focus();
+  searchStocks();
+  input.blur();
+  document.getElementById('searchResults').scrollIntoView({ block: 'start', behavior: 'smooth' });
+}
+document.getElementById('searchInput').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); doSearch(); } });
 
 const HIDDEN_SEARCH_MAX = 30;
 let searchPriceTimer;

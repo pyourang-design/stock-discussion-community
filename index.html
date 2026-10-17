@@ -41,11 +41,18 @@
       <span class="logo-text">주식 업종 종목 토론방</span>
     </div>
     <div class="header-actions">
-      <input class="search-box" type="search" id="searchInput" name="stock-search" placeholder="종목명·코드 검색..."
-             autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other" />
-      <button class="btn-login" id="btnLogin" data-act="toggleLogin">로그인</button>
-      <button class="btn-signup" id="btnSignup" data-act="toggleSignup">회원가입</button>
-      <button class="btn-signup hidden" id="btnProfile" data-act="openProfile">회원정보</button>
+      <div class="search-wrap">
+        <input class="search-box" type="search" id="searchInput" name="stock-search" placeholder="종목명·코드 검색..." enterkeyhint="search"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" data-lpignore="true" data-1p-ignore data-form-type="other" />
+        <!-- 돋보기: 누르면 검색 (입력하는 동안에도 바로 검색됨) -->
+        <button class="search-btn" type="button" data-act="doSearch" title="검색" aria-label="검색"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg></button>
+      </div>
+      <!-- 로그인(회원은 닉네임) 위, 회원가입(회원은 회원정보) 아래 -->
+      <div class="auth-stack">
+        <button class="btn-login" id="btnLogin" data-act="toggleLogin">로그인</button>
+        <button class="btn-signup" id="btnSignup" data-act="toggleSignup">회원가입</button>
+        <button class="btn-signup hidden" id="btnProfile" data-act="openProfile">회원정보</button>
+      </div>
       <button class="btn-a2hs" id="btnA2hs" type="button" data-act="addToHome" title="홈 화면에 바로가기 추가" aria-label="홈 화면에 바로가기 추가"><svg viewBox="0 0 24 24" width="1em" height="1em" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3.5v11"/><path d="M6.5 9.5 12 15l5.5-5.5"/><path d="M4.5 20h15"/></svg></button>
     </div>
   </div>
