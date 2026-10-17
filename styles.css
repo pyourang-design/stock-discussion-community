@@ -417,6 +417,7 @@ a.logo { color: inherit; text-decoration: none; }
 .seo-guide { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--border); }
 .seo-guide h2 { font-size: 0.9rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
 .seo-guide p { font-size: 0.75rem; color: var(--text-muted); line-height: 1.6; margin-top: 4px; }
+.seo-guide .guide-hl { color: var(--accent); }  /* 관심 종목 모아보기 안내 강조 */
 .sector-directory { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border); }
 .sector-directory summary { cursor: pointer; font-size: 0.9rem; font-weight: 700; color: var(--text-muted); }
 .sector-directory summary span { font-weight: 400; }
