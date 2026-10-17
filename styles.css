@@ -778,3 +778,9 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 @media (max-width: 600px) {
   .header-inner { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "logo login" "search signup"; }
 }
+/* 휴대폰: 상단 박스 위 여백만 4px 줄임 (박스 100→96px, 박스 안 요소 간격·아래 여백은 그대로) → 로그인 창도 4px 위로 */
+@media (max-width: 600px) {
+  .header-inner { height: 95px; padding-top: 9px; padding-bottom: 0; align-content: start; }
+  .login-dropdown { top: 102px; }
+}
+@media (max-width: 480px) and (max-height: 699px) { .header-inner { height: 95px; } .login-dropdown { top: 102px; } }
