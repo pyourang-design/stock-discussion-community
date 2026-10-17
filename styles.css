@@ -712,3 +712,29 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 .login-dropdown { top: 94px; }
 @media (max-width: 600px) { .login-dropdown { top: 118px; } }
 @media (max-width: 480px) and (max-height: 699px) { .login-dropdown { top: 115px; } }
+/* 상단 박스 높이는 그대로 두고 안쪽만 조정 (박스 높이: PC 87.34px · 휴대폰 111.89px · 380px 이하 109px · 세로 짧은 폰 107px, 아래 테두리 1px 포함)
+   - 검색창 높이 약 5% 낮춤 (46→44px · 휴대폰 44→42px)
+   - 로그인은 제목(주식 업종 종목 토론방) 줄, 회원가입(회원은 회원정보)은 검색창 줄에 맞춤 — PC는 한 줄이라 둘을 나란히
+   - 로그인·회원가입 높이 약 30% 키움 (25→33px · 휴대폰 23→29px) */
+.search-box { height: 44px; border-radius: 22px; }
+.search-btn { width: 34px; height: 34px; }
+.auth-stack .btn-login, .auth-stack .btn-signup { display: inline-flex; align-items: center; justify-content: center; padding-top: 0; padding-bottom: 0; }
+@media (min-width: 601px) {
+  .header-inner { height: 86.34px; }
+  .auth-stack { flex-direction: row; gap: 6px; }
+  .auth-stack .btn-login, .auth-stack .btn-signup { height: 33px; }
+}
+@media (max-width: 600px) {
+  .header-inner { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; grid-template-areas: "logo login ." "search signup a2hs"; align-items: center; align-content: center; gap: 8px; height: 110.89px; }
+  .header-actions, .auth-stack { display: contents; }
+  .logo { grid-area: logo; }
+  .search-wrap { grid-area: search; }
+  #btnLogin { grid-area: login; }
+  #btnSignup, #btnProfile { grid-area: signup; }
+  #btnA2hs { grid-area: a2hs; }
+  .search-box { height: 42px; border-radius: 21px; }
+  .search-btn { width: 32px; height: 32px; }
+  .auth-stack .btn-login, .auth-stack .btn-signup { height: 29px; }
+}
+@media (max-width: 380px) { .header-inner { height: 108px; } }
+@media (max-width: 480px) and (max-height: 699px) { .header-inner { height: 106px; } }
