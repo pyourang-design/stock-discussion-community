@@ -1,14 +1,19 @@
 // AI 운영자 자동 글 — DART 실적 숫자로 표와 설명 글을 만듦 (AI API 없이 규칙으로 문장을 고름)
 //   소개글: 시가총액 큰 순으로 하루 10개 (한국시간 9~20시, 약 1시간 간격)
 //   실적 발표 글: 오늘 제출된 정기보고서(분기·반기·사업보고서)를 훑어 우리 종목이면 그날 올림
+//   숨은 종목(업종 탭에 없는 상장 종목, api/_hidden.js): 회원이 처음 관심 종목으로 담으면 소개글 1번,
+//     실적 글은 관심 종목으로 담은 회원이 있는 동안만 (api/posts.js countHiddenFav → favhidden·ai:introq)
 // DB 키
 //   ai:intro:i          다음 소개글 순번 (CORP_CODES 인덱스)
 //   ai:intro:{날짜}     그날 올린 소개글 수, ai:intro:last 마지막 소개글 시각
 //   ai:posted           종목코드 → AI 글을 올린 마지막 시각 (hash) — 실적 글이 먼저 나간 종목은 소개글 건너뜀
 //   ai:done             올렸거나 줄에 넣은 실적 보고서 '종목:기간' (set) — 같은 분기 중복 방지
 //   ai:queue            실적 글 대기열 (JSON 목록), ai:scan 공시 훑기 위치(JSON), ai:lock 겹침 방지
+//   ai:introq           숨은 종목 소개글 대기열 (종목코드 또는 JSON {code, tries}), ai:introseen 한 번 넣은 종목 (set)
+//   favhidden           숨은 종목코드 → 관심 종목으로 담은 회원 수 (hash), ai:corp 공시에서 알아낸 숨은 종목 DART 고유번호 (hash)
 import { redis } from './_redis.js';
-import { CORP_CODES } from './_corpcodes.js';
+import { CORP_CODES, CORP_HIDDEN } from './_corpcodes.js';
+import { HIDDEN } from './_hidden.js';
 import { STOCKS } from './_stocks.js';
 import { runMarketTasks } from './_aiMarket.js';
 
@@ -22,6 +27,10 @@ const JOBS_PER_RUN = 2;
 const SCAN_PAGES_PER_RUN = 2;
 const CORP = new Map(CORP_CODES);
 const NAME = new Map(STOCKS.map(s => [s.code, s.name]));
+const HIDDEN_NAME = new Map(HIDDEN);
+const HIDDEN_CORP = new Map(CORP_HIDDEN);
+// 숨은 종목 DART 고유번호: scripts/corpcodes.mjs로 만든 표 → 없으면 실적 공시를 훑다 알아둔 값
+const hiddenCorp = async code => HIDDEN_CORP.get(code) || (await redis([['HGET', 'ai:corp', code]]))[0] || null;
 
 export async function dart(path, params) {
   if (!DART_PATHS.has(path)) throw new Error('허용되지 않은 DART 경로');
@@ -312,8 +321,8 @@ const FIN_SECTOR = s => Boolean(s?.sectors?.finance);
 // kind 'intro': 가장 최근 사업보고서 + 그 뒤 분기·반기 보고서
 // kind 'earnings': report = { kind, y, m, rcept } 해당 보고서 중심
 export async function buildPost(code, kind = 'intro', report = null) {
-  const corp = CORP.get(code);
-  const stock = STOCKS.find(s => s.code === code);
+  const stock = STOCKS.find(s => s.code === code) || (HIDDEN_NAME.has(code) ? { code, name: HIDDEN_NAME.get(code) } : null);
+  const corp = CORP.get(code) || report?.corp || (HIDDEN_NAME.has(code) ? await hiddenCorp(code) : null);
   if (!corp || !stock) throw new Error('DART 연결 종목이 아닙니다');
   const name = stock.name;
   const lst = await dart('list.json', { corp_code: corp, bgn_de: ymd(Date.now() - 800 * 86400e3), end_de: ymd(Date.now()), pblntf_ty: 'A', page_count: '40' });
@@ -421,13 +430,22 @@ async function scan(now, log) {
   for (let i = 0; i < SCAN_PAGES_PER_RUN && !st.done; i++) {
     const j = await dart('list.json', { bgn_de: st.from, end_de: today, pblntf_ty: 'A', corp_cls: st.cls, page_no: String(st.page), page_count: '100' });
     const items = j.status === '000' ? j.list : [];
+    // 숨은 종목은 관심 종목으로 담은 회원이 있을 때만
+    const hiddenCodes = [...new Set(items.map(x => x.stock_code).filter(c => !CORP.has(c) && HIDDEN_NAME.has(c)))];
+    const favd = new Set();
+    if (hiddenCodes.length) {
+      const [cnts] = await redis([['HMGET', 'favhidden', ...hiddenCodes]]);
+      hiddenCodes.forEach((c, k) => { if (Number(cnts?.[k]) > 0) favd.add(c); });
+    }
     const add = [];
     for (const x of items) {
-      if (!CORP.has(x.stock_code) || /^\[/.test(x.report_nm)) continue;  // 정정·첨부 보고서는 건너뜀
+      if (!(CORP.has(x.stock_code) || favd.has(x.stock_code)) || /^\[/.test(x.report_nm)) continue;  // 정정·첨부 보고서는 건너뜀
       const rp = parseReport(x.report_nm);
       if (!rp || Date.UTC(rp.y, rp.m, 1) < recent) continue;
-      add.push({ code: x.stock_code, kind: rp.kind, y: rp.y, m: rp.m, rcept: x.rcept_no });
+      add.push({ code: x.stock_code, kind: rp.kind, y: rp.y, m: rp.m, rcept: x.rcept_no, ...(favd.has(x.stock_code) ? { corp: x.corp_code } : {}) });
     }
+    const learned = add.filter(a => a.corp);
+    if (learned.length) await redis([['HSET', 'ai:corp', ...learned.flatMap(a => [a.code, a.corp])]]);
     if (add.length) {
       const res = await redis(add.map(a => ['SADD', 'ai:done', `${a.code}:${a.y}.${a.m}`]));
       const fresh = add.filter((_, k) => Number(res[k]) === 1);
@@ -469,6 +487,26 @@ export async function runOnce(now) {
         job.tries = (job.tries || 0) + 1;
         if (job.tries < 3) await redis([['RPUSH', 'ai:queue', JSON.stringify(job)]]);
         log.push(`실적 ${job.code} 실패(${job.tries}): ${e.message}`);
+      }
+    }
+    // 숨은 종목 소개글: 회원이 처음 관심 종목으로 담은 종목, 실행마다 1개 (시간·하루 개수 제한 없음)
+    const [introRaw] = await redis([['LPOP', 'ai:introq']]);
+    if (introRaw) {
+      const job = introRaw.startsWith('{') ? JSON.parse(introRaw) : { code: introRaw };
+      const [had] = await redis([['HEXISTS', 'ai:posted', job.code]]);
+      if (Number(had)) log.push(`숨은 종목 소개 ${job.code} 이미 글 있음`);
+      else {
+        try {
+          const p = await buildPost(job.code, 'intro');
+          if (p.skip) log.push(`숨은 종목 소개 ${job.code} 건너뜀: ${p.skip}`);
+          else { await savePost(p); log.push(`숨은 종목 소개글 ${job.code} ${p.headline}`); }
+        } catch (e) {
+          job.tries = (job.tries || 0) + 1;
+          // DART 고유번호를 아직 모르면 다음에 누가 새로 담을 때 다시 (ai:introseen에서 뺌), 일시 오류는 3번까지
+          if (/DART 연결 종목이 아닙니다/.test(e.message)) await redis([['SREM', 'ai:introseen', job.code]]);
+          else if (job.tries < 3) await redis([['RPUSH', 'ai:introq', JSON.stringify(job)]]);
+          log.push(`숨은 종목 소개 ${job.code} 실패(${job.tries}): ${e.message}`);
+        }
       }
     }
     // 소개글: 한국시간 9~20시, 하루 10개, 약 1시간 간격

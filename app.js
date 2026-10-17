@@ -148,7 +148,7 @@ function renderTabNote() {
 }
 
 // 가격 표시: 국내 원, 미국 달러
-const fmtPrice = s => s.us
+const fmtPrice = s => !s.price ? '-' : s.us
   ? '$' + s.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   : s.price.toLocaleString() + '원';
 
@@ -181,10 +181,22 @@ const SECTOR_BOARDS = [MARKET_BOARD, ...SECTORS.map(sec => ({ code: boardCode(se
 const sectorBoard = key => SECTOR_BOARDS.find(b => b.sector === key);
 // 관심 종목 모아보기: 내 관심 종목들의 뉴스·리포트·공시를 한 창에서 (토론 게시판 없음)
 const FAV_ALL = { code: 'FAVALL', name: '관심 종목 모아보기', isFav: true };
-const findStock = code => STOCKS.find(s => s.code === code) || SECTOR_BOARDS.find(b => b.code === code)
+const findStock = code => stockOf(code) || SECTOR_BOARDS.find(b => b.code === code)
   || (code === FAV_ALL.code ? FAV_ALL : undefined)
   || (code === 'COLMKT' ? { code, name: '운영자 칼럼', isColumn: true } : undefined);
 const sectorName = key => { const sec = SECTORS.find(x => x.key === key); return sec ? sectorTitle(sec) : ''; };
+
+// ── 숨은 종목: 업종 탭에 없는 상장 종목 (listed.json, scripts/listed.mjs) ──
+// 화면에는 안 보이고 회원 검색에서만 나옴 → 관심 종목에 넣고 종목 창(뉴스·리포트·공시·토론)을 볼 수 있음
+// /stock/ 페이지·사이트맵에는 없음 (검색엔진 노출 안 함). 처음 필요할 때 한 번만 받음
+let HIDDEN = null;  // 코드 → 종목
+let hiddenLoading = null;
+function loadHidden() {
+  return hiddenLoading ||= fetch(`${API_BASE}/listed.json`).then(r => r.ok ? r.json() : Promise.reject(new Error(r.status)))
+    .then(rows => { HIDDEN = new Map(rows.map(([code, name, market, cap]) => [code, { code, name, market, cap, price: 0, change: 0, sectors: {}, hidden: true }])); })
+    .catch(() => { hiddenLoading = null; });  // 실패하면 다음에 다시
+}
+const stockOf = code => STOCKS.find(s => s.code === code) || HIDDEN?.get(code);
 
 
 // ── 업종 뉴스 (업종 대표 종목의 네이버 종목 뉴스 모음, 1분마다 갱신) ──
@@ -377,7 +389,7 @@ function filterTab(type, btn) {
 
 // 업종 탭 종목: 시총·토론글·거래대금 순위 상위 최대 100개 (scripts/build.mjs, 시총순)
 function filteredList() {
-  if (currentFilter === 'fav') return member ? STOCKS.filter(s => favs.has(s.code)) : [];
+  if (currentFilter === 'fav') return member ? [...STOCKS.filter(s => favs.has(s.code)), ...[...favs].map(c => HIDDEN?.get(c)).filter(Boolean)] : [];
   return sectorList(currentFilter);
 }
 
@@ -397,6 +409,8 @@ function clearAutofilledSearch() {
 window.addEventListener('pageshow', clearAutofilledSearch);
 [300, 1000, 2500].forEach(ms => setTimeout(clearAutofilledSearch, ms));
 
+const HIDDEN_SEARCH_MAX = 30;
+let searchPriceTimer;
 function searchStocks(e) {
   const input = document.getElementById('searchInput');
   if (e && document.activeElement !== input) input.value = '';
@@ -410,9 +424,17 @@ function searchStocks(e) {
     return;
   }
 
-  const results = STOCKS.filter(s =>
-    s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || (s.ticker || '').toLowerCase().includes(q)
-  );
+  const match = s => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || (s.ticker || '').toLowerCase().includes(q);
+  const results = STOCKS.filter(match);
+  // 회원은 숨은 종목도 검색 (최대 HIDDEN_SEARCH_MAX개, 시가총액 큰 순)
+  if (member) {
+    if (!HIDDEN) loadHidden().then(() => { if (HIDDEN && input.value.trim()) searchStocks(); });
+    else {
+      const more = [];
+      for (const s of HIDDEN.values()) { if (match(s) && more.push(s) >= HIDDEN_SEARCH_MAX) break; }
+      if (more.length) { results.push(...more); clearTimeout(searchPriceTimer); searchPriceTimer = setTimeout(fetchAllPrices, 400); }
+    }
+  }
   stockEl.classList.add('hidden');
   resultEl.classList.remove('hidden');
   resultEl.innerHTML = `<p class="search-label">검색결과 <strong>${results.length}건</strong></p>` +
@@ -650,8 +672,8 @@ function newsTime(dt) {
 // 뉴스: /api/news?codes= (업종 뉴스와 같은 방식), 리포트·공시: /api/detail?codes=&type= (국내 종목만) — 둘 다 25종목씩 나눠 요청
 const favDetail = {};  // type → { ts, key: 관심 종목 코드 목록, data } | { key, error }
 let favNewsShown = NEWS_PAGE;
-const favCodes = () => [...favs].filter(c => STOCKS.some(s => s.code === c)).sort();
-const stockName = c => STOCKS.find(s => s.code === c)?.name;
+const favCodes = () => [...favs].filter(c => stockOf(c)).sort();
+const stockName = c => stockOf(c)?.name;
 const favItemTime = d => String(d.datetime || d.date || '');
 
 function favAllCardHtml(count) {
@@ -679,7 +701,7 @@ async function loadFavDetail(type, force = false) {
   if (!cached) favNewsShown = NEWS_PAGE;
 
   // 미국 종목은 리포트·공시가 없어 뉴스만
-  const list = type === 'news' ? codes : codes.filter(c => !STOCKS.find(s => s.code === c).us);
+  const list = type === 'news' ? codes : codes.filter(c => !stockOf(c).us);
   const chunks = [];
   for (let i = 0; i < list.length; i += NEWS_CHUNK) chunks.push(list.slice(i, i + NEWS_CHUNK));
   const results = await Promise.allSettled(chunks.map(async c => {
@@ -1773,6 +1795,7 @@ async function loadFavs() {
   if (!member) favs = new Set();
   else {
     try { favs = new Set((await api({}, { action: 'favList' })).codes || []); } catch { favs = new Set(); }
+    if ([...favs].some(c => !STOCKS.some(s => s.code === c))) await loadHidden();  // 숨은 종목이 관심 종목에 있으면 이름·시장 정보 받기
   }
   refreshStars();
   if (currentFilter === 'fav') { renderStocks(filteredList()); fetchAllPrices(); loadHomeNews(); }
@@ -1880,7 +1903,7 @@ async function fetchAllPrices() {
     }));
 
     results.flat().forEach(d => {
-      const s = STOCKS.find(x => x.code === d.code);
+      const s = stockOf(d.code);
       if (!s || !d.price) return;
       s.price = d.price;
       if (d.changeRate != null && !isNaN(d.changeRate)) s.change = d.changeRate;

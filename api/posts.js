@@ -57,6 +57,8 @@
 //   sess:{token}       로그인 세션 → 아이디 (30일)
 //   loginfail:{아이디}  로그인 연속 실패 횟수 (10분)
 //   fav:{아이디}        회원 관심 종목코드 집합
+//   favhidden          숨은 종목(업종 탭에 없는 상장 종목, api/_hidden.js)코드 → 관심 종목으로 담은 회원 수 (hash) — AI 운영자 실적 글 대상
+//   ai:introq          숨은 종목 AI 소개글 대기열 (처음 관심 종목으로 담길 때 넣음, api/_ai.js가 처리), ai:introseen 한 번 넣은 종목 (set)
 //   reports:{id}       게시글을 신고한 cid 집합, reportwhy:{id} 신고 사유별 건수(hash)
 //   reported           신고된 게시글 id → 신고 수 (sorted set)
 //   contacts           연락처 문의 JSON 목록 (최신순, 최대 500건)
@@ -67,6 +69,7 @@
 import crypto from 'crypto';
 import { COLUMN_ORDER_KEY, sortColumns } from './_colorder.js';
 import { redis, dbReady } from './_redis.js';
+import { HIDDEN } from './_hidden.js';
 
 const MAX_CONTENT = 1000;
 const COLUMN_CODE = 'COLMKT';
@@ -157,6 +160,17 @@ function checkBanned(text, label = '내용') {
 }
 
 // 국내 종목코드(6자리) · 미국 종목(네이버 해외주식 코드: TSLA.O, BRKb) · 업종 게시판(SECBIO)
+// 숨은 종목을 관심 종목으로 담은 회원 수 (AI 운영자 실적 글 대상) + 처음 담긴 종목은 AI 소개글 대기열에 (api/_ai.js runOnce)
+const HIDDEN_CODES = new Set(HIDDEN.map(h => h[0]));
+async function countHiddenFav(codes, d) {
+  const hidden = codes.filter(c => HIDDEN_CODES.has(c));
+  if (!hidden.length) return;
+  await redis(hidden.map(c => ['HINCRBY', 'favhidden', c, d]));
+  if (d < 0) return;
+  const seen = await redis(hidden.map(c => ['SADD', 'ai:introseen', c]));
+  const fresh = hidden.filter((_, i) => Number(seen[i]) === 1);
+  if (fresh.length) await redis([['RPUSH', 'ai:introq', ...fresh]]);
+}
 const isCode = c => typeof c === 'string' && (/^[0-9][0-9A-Z]{5}$/.test(c) || /^[A-Z][A-Za-z0-9]{0,6}(\.[A-Z])?$/.test(c));
 const isCid = c => typeof c === 'string' && /^[0-9a-zA-Z-]{8,64}$/.test(c);
 const cleanNick = n => String(n ?? '').trim().slice(0, MAX_NICK);
@@ -496,7 +510,7 @@ async function handlePost(b, env = {}) {
     }
 
     // 회원 탈퇴: 계정·세션·관심 종목·팔로우 관계 삭제 (작성한 글은 남음)
-    const [following, followers] = await redis([['SMEMBERS', `mfollowing:${uid}`], ['SMEMBERS', `mfollowers:${user.nick}`]]);
+    const [following, followers, favCodes] = await redis([['SMEMBERS', `mfollowing:${uid}`], ['SMEMBERS', `mfollowers:${user.nick}`], ['SMEMBERS', `fav:${uid}`]]);
     // 계정을 실제로 지운 요청만 회원 수 감소 (동시에 두 번 눌러도 한 번만)
     const [removed] = await redis([['DEL', `user:${uid}`]]);
     if (Number(removed)) await redis([['DECR', 'members:total']]);
@@ -509,6 +523,7 @@ async function handlePost(b, env = {}) {
       ...(followers || []).map(f => ['SREM', `mfollowing:${f}`, user.nick]),
     ];
     await redis(cmds);
+    if (Number(removed)) await countHiddenFav(favCodes || [], -1);
     return { withdrawn: true };
   }
 
@@ -645,7 +660,8 @@ async function handlePost(b, env = {}) {
         const [count] = await redis([['SCARD', key]]);
         if (Number(count) >= FAV_MAX) throw new BadRequest(`관심 종목은 최대 ${FAV_MAX}개까지 추가할 수 있습니다`);
       }
-      await redis([[b.on ? 'SADD' : 'SREM', key, b.code]]);
+      const [changed] = await redis([[b.on ? 'SADD' : 'SREM', key, b.code]]);
+      if (Number(changed)) await countHiddenFav([b.code], b.on ? 1 : -1);
     }
     const [codes] = await redis([['SMEMBERS', key]]);
     return { codes };
