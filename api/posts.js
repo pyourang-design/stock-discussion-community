@@ -689,7 +689,7 @@ async function handlePost(b, env = {}) {
     }
     if (!isCode(b.code)) throw new BadRequest('종목코드가 올바르지 않습니다');
     const column = b.code === COLUMN_CODE;
-    if (column && !official) throw new BadRequest('운영자 칼럼은 관리자 모드에서만 쓸 수 있습니다');
+    if (column && !official) throw new BadRequest('주식 강의는 관리자 모드에서만 쓸 수 있습니다');
     const title = column ? checkTitle(b.title) : null;
     const content = checkContent(b.content, column ? COLUMN_MAX : MAX_CONTENT);
     const sentiment = SENTIMENTS.includes(b.sentiment) ? b.sentiment : 'neutral';

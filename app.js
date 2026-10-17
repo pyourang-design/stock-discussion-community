@@ -194,7 +194,7 @@ const sectorBoard = key => SECTOR_BOARDS.find(b => b.sector === key);
 const FAV_ALL = { code: 'FAVALL', name: '관심 종목 모아보기', isFav: true };
 const findStock = code => stockOf(code) || SECTOR_BOARDS.find(b => b.code === code)
   || (code === FAV_ALL.code ? FAV_ALL : undefined)
-  || (code === 'COLMKT' ? { code, name: '운영자 칼럼', isColumn: true } : undefined);
+  || (code === 'COLMKT' ? { code, name: '주식 강의', isColumn: true } : undefined);
 const sectorName = key => { const sec = SECTORS.find(x => x.key === key); return sec ? sectorTitle(sec) : ''; };
 
 // ── 숨은 종목: 업종 탭에 없는 상장 종목 (listed.json, scripts/listed.mjs) ──
@@ -973,7 +973,7 @@ function drawPosts() {
   const el = document.getElementById('postList');
   if (isColumnTab()) return drawColumn(el);
   if (!currentPosts.length) {
-    el.innerHTML = isColumnTab() ? '<p class="empty-msg">아직 운영자 칼럼이 없습니다.</p>' : '<p class="empty-msg">첫 번째 의견을 남겨보세요!</p>';
+    el.innerHTML = isColumnTab() ? '<p class="empty-msg">아직 주식 강의가 없습니다.</p>' : '<p class="empty-msg">첫 번째 의견을 남겨보세요!</p>';
     return;
   }
   el.innerHTML = currentPosts.map(p => `
@@ -1011,7 +1011,7 @@ function drawColumn(el) {
       <button class="col-row" data-id="${escHtml(x.id)}" data-act="openColumn">
         <span class="col-title">${escHtml(x.title || stripColumnImgs(x.content).slice(0, 40))}</span>
         <span class="col-meta">${colDate(x.ts)} · 👁 ${(x.views || 0).toLocaleString()}</span>
-      </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : '<p class="empty-msg">아직 운영자 칼럼이 없습니다.</p>';
+      </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : '<p class="empty-msg">아직 주식 강의가 없습니다.</p>';
     return;
   }
   const editing = postAction?.id === p.id && postAction.mode === 'edit';
@@ -1346,7 +1346,7 @@ function feedPostHtml(p, showNick) {
       <div class="post-header">
         ${showNick ? `<button class="post-nick author-link" data-nick="${escHtml(p.nick)}" data-act="openAuthor">${escHtml(p.nick)}</button>` : ''}
         ${p.code === COLUMN_CODE
-          ? `<button class="author-stock" data-id="${escHtml(p.id)}" data-act="columnLink">운영자 칼럼</button>`
+          ? `<button class="author-stock" data-id="${escHtml(p.id)}" data-act="columnLink">주식 강의</button>`
           : `<button class="author-stock" data-code="${escHtml(p.code)}" data-act="openStock">${escHtml(s ? s.name : p.code)}</button>`}
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
@@ -1629,7 +1629,7 @@ async function openStats() {
           <td>${fmtN(d.members)}</td><td>${fmtN(d.posts)}</td></tr>`).join('')}</tbody>
       </table>
       <h3 class="stat-h">게시판별 게시글 TOP ${r.boards.length}</h3>
-      ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" ${b.code === COLUMN_CODE ? 'data-act="openColumnBoard"' : `data-act="openStock" data-code="${escHtml(b.code)}"`}>${b.code === COLUMN_CODE ? '운영자 칼럼' : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
+      ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" ${b.code === COLUMN_CODE ? 'data-act="openColumnBoard"' : `data-act="openStock" data-code="${escHtml(b.code)}"`}>${b.code === COLUMN_CODE ? '주식 강의' : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
       <h3 class="stat-h">칼럼 사진 저장소</h3>
       <div id="imgStats" class="stat-img"><p class="stat-note">불러오는 중...</p></div>
       <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 조회수: 게시판 글 조회수(같은 브라우저·게시판 1시간에 1회, 날짜별은 ${fmtDay(pvSince)}부터 집계) · 게시글: 게시판 글(카드의 '댓글') 수, 삭제된 글 제외 · 날짜는 한국시간</p></div>`;

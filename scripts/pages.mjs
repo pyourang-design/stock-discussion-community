@@ -18,7 +18,7 @@ const PAGES = [
 ];
 
 const footerLinks = () => `<nav class="policy-links">
-      <a class="footer-about-link" href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a><a class="footer-column-link" href="/column" data-go="/?column=list">운영자 칼럼</a>
+      <a class="footer-about-link" href="about.html">사이트 소개</a><a href="terms.html">이용약관</a><a href="privacy.html"><b>개인정보처리방침</b></a><a href="contact.html">연락처</a>
     </nav>`;
 
 const page = (p, body, extraScript = '') => `<!DOCTYPE html>
@@ -52,11 +52,6 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
       <span class="logo-icon"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#logoGrad)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg></span>
       <span class="logo-text">${NAME}</span>
     </a>
-    <nav class="main-nav page-nav">
-      <a href="./">Home</a>
-      <a class="nav-lecture" href="/?column=list">주식 강의</a>
-      <button class="theme-toggle" type="button">Dark</button>
-    </nav>
   </div>
 </header>
 
@@ -76,6 +71,13 @@ ${body}
   </div>
 </footer>
 ${extraScript}
+
+<nav class="bottom-nav" aria-label="하단 메뉴">
+  <a href="/?tab=fav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg><span>관심종목 추가</span></a>
+  <a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Home</span></a>
+  <a class="nav-lecture" href="/?column=list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4h7a3 3 0 013 3v13a2 2 0 00-2-2H2z"/><path d="M22 4h-7a3 3 0 00-3 3v13a2 2 0 012-2h8z"/></svg><span>주식 강의</span></a>
+  <button class="theme-toggle" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg><span class="nav-label">Dark</span></button>
+</nav>
 </body>
 </html>
 `;
@@ -88,7 +90,7 @@ const about = `
     <li><b>실시간 종목·업종 뉴스</b> — 종목·업종·시장 뉴스는 1분마다, 화면에 보이는 종목의 주가는 10초마다 갱신됩니다.</li>
     <li><b>무료 증권사 리포트·공시</b> — 종목·산업·투자전략 리포트와 공시를 종목·업종·시장별로 모아 원문까지 무료로 볼 수 있습니다.</li>
     <li><b>업종별 주요 종목·미국주식 100</b> — 바이오, 반도체, 2차전지·로봇, 전력·원자력, K뷰티컬쳐, 조선·방산, 자동차, 금융 업종의 주요 종목과 국내 투자자가 가장 많이 보유한 미국주식(ETF 포함, 한국예탁결제원 기준)을 모았습니다.</li>
-    <li><b>운영자 주식 강의</b> — 기업 분석과 투자 지표 읽는 법, 차트 보는 법 등을 운영자 칼럼으로 쉽게 정리합니다. 상단 「주식 강의」 메뉴에서 볼 수 있습니다.</li>
+    <li><b>운영자 주식 강의</b> — 기업 분석과 투자 지표 읽는 법, 차트 보는 법 등을 주식 강의로 쉽게 정리합니다. 하단 「주식 강의」 메뉴에서 볼 수 있습니다.</li>
   </ul>
 
   <h2>토론 게시판</h2>

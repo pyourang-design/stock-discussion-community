@@ -39,7 +39,7 @@ export default async function handler(req, res) {
   if (id && !isPostId(id)) {
     res.setHeader('Cache-Control', 's-maxage=600');
     return res.status(404).send(layout({ title: `칼럼을 찾을 수 없습니다 | ${NAME}`, desc: '요청한 칼럼이 없습니다.', canonical: `${SITE}/column`, status: 404,
-      body: '<h1>칼럼을 찾을 수 없습니다</h1><p><a href="/column">운영자 칼럼 목록 보기</a></p>' }));
+      body: '<h1>칼럼을 찾을 수 없습니다</h1><p><a href="/column">주식 강의 목록 보기</a></p>' }));
   }
   let cols = [];
   try { cols = await loadColumns(); } catch (err) {
@@ -62,16 +62,16 @@ export default async function handler(req, res) {
     for (const n of nums) { if (n - last > 1) numHtml += '<span class="pager-gap">…</span>'; numHtml += n === page ? `<span class="pager-btn on" aria-current="page">${n}</span>` : `<a class="pager-btn" href="${pageUrl(n)}">${n}</a>`; last = n; }
     const pager = pages > 1 ? `<nav class="pager" aria-label="칼럼 페이지">${page > 1 ? `<a class="pager-btn" href="${pageUrl(page - 1)}" rel="prev" aria-label="이전 페이지">‹</a>` : '<span class="pager-btn disabled">‹</span>'}${numHtml}${page < pages ? `<a class="pager-btn" href="${pageUrl(page + 1)}" rel="next" aria-label="다음 페이지">›</a>` : '<span class="pager-btn disabled">›</span>'}</nav>` : '';
     const canonical = `${SITE}${pageUrl(page)}`;
-    const title = `운영자 칼럼${page > 1 ? ` ${page}페이지` : ''} - 주식 투자 기초·지표 분석 | ${NAME}`;
+    const title = `주식 강의${page > 1 ? ` ${page}페이지` : ''} - 주식 투자 기초·지표 분석 | ${NAME}`;
     const desc = `${NAME} 운영자가 쓰는 주식 투자 칼럼. ${cols.slice(0, 3).map(c => c.title).filter(Boolean).join(', ')} 등 투자 지표와 분석 방법을 쉽게 정리합니다.`;
     const body = `
-  <nav class="sp-sub"><a href="/">홈</a> › 운영자 칼럼</nav>
-  <h1>운영자 칼럼</h1>
+  <nav class="sp-sub"><a href="/">홈</a> › 주식 강의</nav>
+  <h1>주식 강의</h1>
   <p class="sp-intro">주식 투자에 필요한 지표 읽는 법, 기업 분석 방법, 시장을 보는 관점을 운영자가 쉽게 정리한 글입니다. 칼럼 ${cols.length}편.</p>
   <section class="sp-section">${cols.length ? listHtml(shown) + pager : '<p>아직 칼럼이 없습니다.</p>'}</section>
-  <p class="sp-section"><a class="btn-submit sp-cta" href="/?column=list">운영자 칼럼 게시판 가기 (공감·의견)</a></p>`;
+  <p class="sp-section"><a class="btn-submit sp-cta" href="/?column=list">주식 강의 게시판 가기 (공감·의견)</a></p>`;
     const jsonld = {
-      '@context': 'https://schema.org', '@type': 'CollectionPage', name: '운영자 칼럼', url: canonical,
+      '@context': 'https://schema.org', '@type': 'CollectionPage', name: '주식 강의', url: canonical,
       hasPart: shown.map(c => ({ '@type': 'Article', headline: c.title, url: `${SITE}/column/${c.id}`, datePublished: new Date(c.ts).toISOString() })),
     };
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600');
@@ -83,18 +83,18 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 's-maxage=60');
     return res.status(404).send(layout({
       title: `칼럼을 찾을 수 없습니다 | ${NAME}`, desc: '요청한 칼럼이 없거나 삭제되었습니다.', canonical: `${SITE}/column`, status: 404,
-      body: `<h1>칼럼을 찾을 수 없습니다</h1><p>삭제되었거나 주소가 잘못되었습니다.</p><p><a href="/column">운영자 칼럼 목록 보기</a></p>`,
+      body: `<h1>칼럼을 찾을 수 없습니다</h1><p>삭제되었거나 주소가 잘못되었습니다.</p><p><a href="/column">주식 강의 목록 보기</a></p>`,
     }));
   }
 
   const c = cols[i];
   const prev = cols[i - 1], next = cols[i + 1];  // 목록은 먼저 쓴 글부터: 이전 글 = 앞 칸
   const canonical = `${SITE}/column/${c.id}`;
-  const title = `${c.title || summary(c.content, 40)} | 운영자 칼럼 | ${NAME}`;
+  const title = `${c.title || summary(c.content, 40)} | 주식 강의 | ${NAME}`;
   const desc = summary(c.content, 150);
   const others = cols.filter(x => x.id !== c.id).slice(0, 10);
   const body = `
-  <nav class="sp-sub"><a href="/">홈</a> › <a href="/column">운영자 칼럼</a></nav>
+  <nav class="sp-sub"><a href="/">홈</a> › <a href="/column">주식 강의</a></nav>
   <article class="col-page no-copy">
     <h1>${esc(c.title || '')}</h1>
     <p class="sp-sub">운영자 · ${day(c.ts)}${c.editedTs ? ` · 수정 ${day(c.editedTs)}` : ''}</p>
@@ -109,7 +109,7 @@ ${paragraphs(c.content)}
     <a class="col-page-list-link" href="/column">목록으로</a>
     ${next ? `<a href="/column/${esc(next.id)}"><span>다음 글 →</span>${esc(next.title || '')}</a>` : '<span class="disabled"><span>다음 글 →</span>다음 글이 없습니다</span>'}
   </nav>
-  ${others.length ? `<section class="sp-section"><h2>다른 운영자 칼럼</h2>${listHtml(others)}</section>` : ''}`;
+  ${others.length ? `<section class="sp-section"><h2>다른 주식 강의</h2>${listHtml(others)}</section>` : ''}`;
   const jsonld = [
     {
       '@context': 'https://schema.org', '@type': 'Article', headline: c.title, description: desc,
@@ -121,7 +121,7 @@ ${paragraphs(c.content)}
       '@context': 'https://schema.org', '@type': 'BreadcrumbList',
       itemListElement: [
         { '@type': 'ListItem', position: 1, name: '홈', item: SITE + '/' },
-        { '@type': 'ListItem', position: 2, name: '운영자 칼럼', item: `${SITE}/column` },
+        { '@type': 'ListItem', position: 2, name: '주식 강의', item: `${SITE}/column` },
         { '@type': 'ListItem', position: 3, name: c.title, item: canonical },
       ],
     },

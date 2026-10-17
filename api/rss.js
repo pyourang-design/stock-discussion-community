@@ -41,7 +41,7 @@ export default async function handler(req, res) {
     if (p.code === COLUMN_BOARD) {
       const link = `${SITE}/column/${encodeURIComponent(p.id)}`;
       const text = String(p.content).replace(/\[사진:[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
-      return { title: `[운영자 칼럼] ${p.title || text.slice(0, 40)}`, link, guid: link, desc: text.slice(0, 300), date: new Date(p.editedTs || p.ts), category: '운영자 칼럼' };
+      return { title: `[주식 강의] ${p.title || text.slice(0, 40)}`, link, guid: link, desc: text.slice(0, 300), date: new Date(p.editedTs || p.ts), category: '주식 강의' };
     }
     const s = STOCKS.find(x => x.code === p.code);
     const sec = s ? null : boardSector(p.code);
