@@ -50,6 +50,8 @@ const ACTIONS = {
   openNews: el => openModal(el.dataset.code, 'news'),
   openStock: el => openModal(el.dataset.code),
   openColumnBoard: () => openModal('SECMKT', 'column'),
+  openFavAll: () => openModal(FAV_ALL.code, 'news'),
+  moreFavNews: () => moreFavNews(),
   toggleFav: (el, e) => toggleFav(e, el.dataset.code),
   moreSectorNews: el => moreSectorNews(el.dataset.key),
   moreNews: () => moreNews(),
@@ -154,10 +156,10 @@ const fmtPrice = s => s.us
 function renderStocks(list) {
   const el = document.getElementById('stockList');
   if (currentFilter === 'fav') {
-    // 관심 종목 탭: 회원은 맨 앞에 주식 시장 경제 뉴스·토론 카드, 이어서 등록한 관심 종목만 (비회원은 안내만)
+    // 관심 종목 탭: 회원은 맨 앞에 주식 시장 경제 뉴스·토론 카드와 관심 종목 모아보기 카드, 이어서 등록한 관심 종목만 (비회원은 안내만)
     el.innerHTML = !member
       ? '<p class="empty-msg">관심 종목은 회원 전용입니다.<br><button class="link-btn" data-act="toggleLogin">로그인</button> 또는 <button class="link-btn" data-act="toggleSignup">회원가입</button> 후 종목 카드의 ☆를 눌러 추가하세요.</p>'
-      : newsCardHtml(MARKET_KEY) + (list.length ? list.map(s => stockCard(s)).join('') : '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>');
+      : newsCardHtml(MARKET_KEY) + favAllCardHtml(list.length) + (list.length ? list.map(s => stockCard(s)).join('') : '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>');
     return;
   }
   if (!list.length) {
@@ -177,7 +179,10 @@ const MARKET_KEY = 'market';
 const MARKET_BOARD = { code: 'SECMKT', name: '주식 시장 경제', sector: MARKET_KEY, isSector: true, isMarket: true };
 const SECTOR_BOARDS = [MARKET_BOARD, ...SECTORS.map(sec => ({ code: boardCode(sec.key), name: sectorTitle(sec), sector: sec.key, isSector: true }))];
 const sectorBoard = key => SECTOR_BOARDS.find(b => b.sector === key);
+// 관심 종목 모아보기: 내 관심 종목들의 뉴스·리포트·공시를 한 창에서 (토론 게시판 없음)
+const FAV_ALL = { code: 'FAVALL', name: '관심 종목 모아보기', isFav: true };
 const findStock = code => STOCKS.find(s => s.code === code) || SECTOR_BOARDS.find(b => b.code === code)
+  || (code === FAV_ALL.code ? FAV_ALL : undefined)
   || (code === 'COLMKT' ? { code, name: '운영자 칼럼', isColumn: true } : undefined);
 const sectorName = key => { const sec = SECTORS.find(x => x.key === key); return sec ? sectorTitle(sec) : ''; };
 
@@ -423,14 +428,15 @@ function openModal(code, tab = 'discuss') {
   // 업종 게시판: 가격·종목정보 탭 없이 토론 + 실시간 업종 뉴스
   document.getElementById('modal').classList.toggle('sector-mode', !!s.isSector);
   document.getElementById('modal').classList.toggle('market-mode', !!s.isMarket);  // 운영자 칼럼 탭은 주식 시장 경제 게시판에만
+  document.getElementById('modal').classList.toggle('fav-mode', !!s.isFav);  // 관심 종목 모아보기: 토론 탭·가격 없음
   delete document.getElementById('discussTab').dataset.board;
   document.getElementById('modal').classList.toggle('us-mode', !!s.us);  // 미국 종목: 보고서·공시 탭 없음
   document.querySelector('.modal-tabs .tab[data-tab="news"]').textContent = s.isMarket ? '실시간 시장 뉴스' : s.isSector ? '실시간 업종 뉴스' : '실시간 종목 뉴스';
   document.querySelector('.modal-tabs .tab[data-tab="discuss"]').textContent = s.isMarket ? '시장 토론' : s.isSector ? '업종 토론' : '종목 토론';
   document.getElementById('modalStockName').textContent = s.isMarket ? '주식 시장 경제 토론 게시판' : s.isSector ? `${s.name} 게시판` : s.name;
-  document.getElementById('modalStockCode').textContent = s.isMarket ? '시장·경제 전체 토론' : s.isSector ? '업종 전체 토론' : s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : s.code;
+  document.getElementById('modalStockCode').textContent = s.isMarket ? '시장·경제 전체 토론' : s.isSector ? '업종 전체 토론' : s.isFav ? `관심 종목 ${favs.size}개` : s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : s.code;
   const chgEl = document.getElementById('modalChange');
-  if (s.isSector) {
+  if (s.isSector || s.isFav) {
     document.getElementById('modalPrice').textContent = '';
     chgEl.textContent = '';
   } else {
@@ -442,7 +448,7 @@ function openModal(code, tab = 'discuss') {
 
   DETAIL_TABS.forEach(t => { document.getElementById(`${t}Tab`).innerHTML = ''; });
   switchModalTab(tab);
-  renderPosts();
+  if (!s.isFav) renderPosts();
 
   const wasOpen = isOpen('modalOverlay');
   document.getElementById('modalOverlay').classList.remove('hidden');
@@ -510,6 +516,12 @@ function switchModalTab(tab, btn) {
   DETAIL_TABS.forEach(t => document.getElementById(`${t}Tab`).classList.toggle('hidden', t !== tab));
 
   stopNewsRefresh();
+  if (currentStock?.isFav) {
+    if (!DETAIL_TABS.includes(tab)) return;
+    loadFavDetail(tab);
+    if (tab === 'news') newsTimer = setInterval(whenVisible(() => loadFavDetail('news', true)), NEWS_REFRESH);
+    return;
+  }
   if (currentStock?.isSector) {
     if (tab === 'news') {
       const key = currentStock.sector;
@@ -632,6 +644,116 @@ function newsTime(dt) {
   const m = String(dt || '').match(/^(\d{4})(\d{2})(\d{2})(\d{2})(\d{2})/);
   if (!m) return '';
   return timeAgo(new Date(+m[1], m[2] - 1, +m[3], +m[4], +m[5]).getTime());
+}
+
+// ── 관심 종목 모아보기 (관심 종목 탭의 두 번째 카드) ──
+// 뉴스: /api/news?codes= (업종 뉴스와 같은 방식), 리포트·공시: /api/detail?codes=&type= (국내 종목만) — 둘 다 25종목씩 나눠 요청
+const favDetail = {};  // type → { ts, key: 관심 종목 코드 목록, data } | { key, error }
+let favNewsShown = NEWS_PAGE;
+const favCodes = () => [...favs].filter(c => STOCKS.some(s => s.code === c)).sort();
+const stockName = c => STOCKS.find(s => s.code === c)?.name;
+const favItemTime = d => String(d.datetime || d.date || '');
+
+function favAllCardHtml(count) {
+  return `
+  <div class="stock-card sector-card fav-all" id="favAllCard" data-act="openFavAll">
+    <div class="sector-icon">⭐</div>
+    <div class="sector-label"><span>관심 종목</span><br><span>뉴스·리포트·공시</span></div>
+    <div class="sector-sub">관심 종목 ${count}개 한 번에 보기</div>
+  </div>`;
+}
+
+async function loadFavDetail(type, force = false) {
+  const panel = document.getElementById(`${type}Tab`);
+  const codes = favCodes(), key = codes.join(',');
+  if (!codes.length) {
+    panel.innerHTML = '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>';
+    return;
+  }
+  const cached = favDetail[type]?.key === key ? favDetail[type] : null;
+  if (cached?.data && !force && Date.now() - cached.ts < DETAIL_TTL[type]) {
+    panel.innerHTML = favDetailHtml(type);
+    return;
+  }
+  if (!cached?.data) panel.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
+  if (!cached) favNewsShown = NEWS_PAGE;
+
+  // 미국 종목은 리포트·공시가 없어 뉴스만
+  const list = type === 'news' ? codes : codes.filter(c => !STOCKS.find(s => s.code === c).us);
+  const chunks = [];
+  for (let i = 0; i < list.length; i += NEWS_CHUNK) chunks.push(list.slice(i, i + NEWS_CHUNK));
+  const results = await Promise.allSettled(chunks.map(async c => {
+    const res = await fetch(`${API_BASE}/api/${type === 'news' ? 'news?' : `detail?type=${type}&`}codes=${c.join(',')}`);
+    const json = await res.json();
+    if (!res.ok || json.error) throw new Error(json.error || res.status);
+    return json.data;
+  }));
+  if (results.length && results.every(r => r.status === 'rejected')) {
+    favDetail[type] = cached ? { ...cached, error: true } : { key, error: true };  // 실패 시 이전 목록 유지
+  } else {
+    const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
+    const data = type === 'news'
+      ? mergeSectorNews(items).slice(0, SECTOR_NEWS_MAX)
+      : items.sort((a, b) => favItemTime(b).localeCompare(favItemTime(a))).slice(0, SECTOR_NEWS_MAX);
+    favDetail[type] = { ts: Date.now(), key, data };
+  }
+  // 응답 도착 전에 창을 닫았거나 다른 탭으로 옮겼으면 그리지 않음
+  if (currentStock !== FAV_ALL || currentModalTab !== type) return;
+  panel.innerHTML = favDetailHtml(type);
+}
+
+function moreFavNews() {
+  if (!favDetail.news?.data) return;
+  favNewsShown += NEWS_PAGE;
+  document.getElementById('newsTab').innerHTML = favDetailHtml('news');
+}
+
+// 종목 뉴스·리포트·공시와 같은 모양 + 어느 관심 종목 것인지 종목명 표시
+function favDetailHtml(type) {
+  const d = favDetail[type];
+  if (!d || !d.data) return '<p class="empty-msg">데이터를 불러오지 못했습니다.</p>';
+  const footer = `<div class="panel-footer">출처: ${{
+    news: '<span class="news-src naver">N</span>네이버 증권 (관심 종목 뉴스)',
+    research: '네이버 증권 리서치 (관심 종목 분석 리포트, 국내 종목)',
+    disclosure: '네이버 증권 (관심 종목 공시, 국내 종목)',
+  }[type]}</div>`;
+  if (!d.data.length) return `<p class="empty-msg">최근 ${{ news: '뉴스가', research: '증권사 리포트가', disclosure: '공시가' }[type]} 없습니다.</p>` + footer;
+  const tags = codes => codes.map(stockName).filter(Boolean).slice(0, 3).map(x => `<span class="news-stock">${escHtml(x)}</span>`).join('');
+
+  if (type === 'news') {
+    const updated = new Date(d.ts).toLocaleTimeString('ko-KR', { hour12: false });
+    const more = d.data.length > favNewsShown
+      ? `<button class="news-more" data-act="moreFavNews">더보기 (${favNewsShown} / ${d.data.length})</button>` : '';
+    return `<div class="panel-status">업데이트 ${updated} · 1분마다 자동 갱신 · 최신 ${d.data.length}건</div>` +
+      d.data.slice(0, favNewsShown).map(n => `
+      <a class="feed-item" href="${safeUrl(n.url)}" target="_blank" rel="noopener">
+        <div class="feed-main">
+          <div class="feed-title">${escHtml(n.title)}</div>
+          ${n.summary ? `<div class="feed-summary">${escHtml(n.summary)}</div>` : ''}
+          <div class="feed-meta">${tags(n.codes)}${escHtml(n.press || '')} · ${newsTime(n.datetime)}</div>
+        </div>
+        ${/^https:\/\//.test(n.thumb || '') ? `<img class="feed-thumb" src="${safeUrl(n.thumb)}" alt="" loading="lazy" data-err="remove">` : ''}
+      </a>`).join('') + more + footer;
+  }
+
+  if (type === 'research') {
+    return d.data.map(r => `
+      <a class="feed-item" href="${safeUrl(r.url)}" target="_blank" rel="noopener">
+        <div class="feed-main">
+          <div class="feed-title">${escHtml(r.title)}</div>
+          <div class="feed-summary">${escHtml(r.summary || '')}</div>
+          <div class="feed-meta">${tags([r.code])}<span class="feed-tag">${escHtml(r.broker || '')}</span> ${escHtml(r.date || '')} · 조회 ${escHtml(String(r.views ?? 0))}</div>
+        </div>
+      </a>`).join('') + footer;
+  }
+
+  return d.data.map(x => `
+      <a class="feed-item" href="${safeUrl(x.url)}" target="_blank" rel="noopener">
+        <div class="feed-main">
+          <div class="feed-title">${escHtml(x.title)}</div>
+          <div class="feed-meta">${tags([x.code])}${escHtml((x.datetime || '').replace('T', ' ').slice(0, 16))} · ${escHtml(x.source || '')}</div>
+        </div>
+      </a>`).join('') + footer;
 }
 
 // ── 게시글 · 좋아요 · 팔로우 (서버 DB: /api/posts) ──────
@@ -1748,7 +1870,7 @@ async function fetchAllPrices() {
     // 현재 탭 + 검색결과 + 열린 모달 종목만 조회 (API 1회 최대 50종목)
     const codes = new Set(filteredList().map(s => s.code));
     document.querySelectorAll('#searchResults .stock-card').forEach(c => codes.add(c.dataset.code));
-    if (currentStock && !currentStock.isSector) codes.add(currentStock.code);
+    if (currentStock && !currentStock.isSector && !currentStock.isFav) codes.add(currentStock.code);
     const list = [...codes], chunks = [];
     for (let i = 0; i < list.length; i += 50) chunks.push(list.slice(i, i + 50));
     const results = await Promise.all(chunks.map(async c => {

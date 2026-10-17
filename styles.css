@@ -123,8 +123,12 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .sector-sub span { white-space: nowrap; }
 .sector-card { container-type: inline-size; }
 .sector-label span { white-space: nowrap; font-size: min(1em, 10.5cqi); }  /* 줄마다 한 줄 유지, 좁은 화면에선 글씨를 줄여 맞춤 */
+.sector-card.fav-all { background: linear-gradient(160deg, rgba(255,200,40,.18), var(--surface) 70%); border-color: rgba(255,190,30,.5); }
 .modal.sector-mode .modal-price-block,
 .modal.sector-mode .modal-tabs .tab[data-tab="disclosure"] { display: none; }
+/* 관심 종목 모아보기: 뉴스·리포트·공시만 (토론·가격 없음) */
+.modal.fav-mode .modal-price-block,
+.modal.fav-mode .modal-tabs .tab[data-tab="discuss"] { display: none; }
 /* 미국 종목: 분석 보고서·공시 탭 없음 */
 .modal.us-mode .modal-tabs .tab[data-tab="research"],
 .modal.us-mode .modal-tabs .tab[data-tab="disclosure"] { display: none; }

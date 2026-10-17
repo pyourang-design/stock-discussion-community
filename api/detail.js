@@ -1,5 +1,6 @@
 // GET /api/detail?code=068270&type=news|research|disclosure|info (info = 시세 정보)
 // GET /api/detail?code=SECMKT|SECBIO…&type=research → 주식 시장(투자전략)·업종(산업분석) 증권사 리포트
+// GET /api/detail?codes=005930,000660,…&type=research|disclosure → 관심 종목 모아보기 (국내 종목 최대 25개, 최신순 100건, 항목마다 code)
 // 종목 상세 모달용 데이터 (네이버 금융 / WISEfn 프록시)
 // 미국 종목(code=TSLA.O 등)은 news·info만 (네이버 해외주식)
 // 뉴스 = 네이버 증권 최신 100건 + Google 뉴스 종목명 정확히 일치 검색(최근 7일) 50건 → 중복 제거 후 최신순 100건
@@ -193,9 +194,33 @@ const US_HANDLERS = { news: usNews, info: usInfo, research: async () => [], disc
 const isDomestic = c => /^[0-9][0-9A-Z]{5}$/.test(c);
 const isUs = c => /^[A-Z][A-Za-z0-9]{0,6}(\.[A-Z])?$/.test(c);
 
+// 관심 종목 모아보기: 종목마다 받아 합쳐 최신순 (Cloudflare 무료 요금제: 요청 1번에 외부 호출 50번 제한 → 25종목씩)
+const MULTI_MAX_CODES = 25, MULTI_MAX_ITEMS = 100;
+const MULTI = { research, disclosure };
+const itemTime = d => String(d.datetime || d.date || '');
+async function multi(codes, type) {
+  const results = await Promise.allSettled(codes.map(c => MULTI[type](c).then(list => list.map(d => ({ ...d, code: c })))));
+  if (results.every(r => r.status === 'rejected')) throw results[0].reason;
+  return results.flatMap(r => r.status === 'fulfilled' ? r.value : [])
+    .sort((a, b) => itemTime(b).localeCompare(itemTime(a)))
+    .slice(0, MULTI_MAX_ITEMS);
+}
+
 export default async function handler(req, res) {
   const code = String(req.query.code ?? '').trim();
   const type = String(req.query.type ?? '');
+
+  if (req.query.codes != null) {
+    const codes = [...new Set(String(req.query.codes).split(',').map(c => c.trim()).filter(isDomestic))].slice(0, MULTI_MAX_CODES);
+    if (!Object.hasOwn(MULTI, type)) return res.status(400).json({ error: 'type이 올바르지 않습니다' });
+    if (!codes.length) return res.json({ type, data: [] });  // 미국 종목만 있으면 리포트·공시 없음
+    res.setHeader('Cache-Control', 's-maxage=600, stale-while-revalidate=600');
+    try {
+      return res.json({ type, data: await multi(codes, type) });
+    } catch (err) {
+      return res.status(500).json({ error: err.message });
+    }
+  }
 
   const isBoard = code === MARKET_BOARD || !!boardSector(code);
   const handlers = isBoard ? { research: boardResearch } : isDomestic(code) ? HANDLERS : isUs(code) ? US_HANDLERS : null;
