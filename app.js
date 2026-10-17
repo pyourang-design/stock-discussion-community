@@ -828,12 +828,12 @@ const aiSrcHtml = p => p.src ? `<div class="ai-src">📄 출처: <a href="${escH
 const aiSummary = p => p.summary || String(p.content || '').split(/(?<=다\.)\s/)[0];
 
 // 게시글 본문: 처음엔 4줄까지만 (styles.css .post-body.clamp), 넘치면 '더 보기' 버튼
-// AI 운영자 글은 제목 + 핵심 한 줄만 보이고 표·설명은 '실적 표 보기'로 펼침
+// AI 운영자 글은 제목 + 핵심 한 줄만 보이고 표·설명은 '더 보기'로 펼침 (일반 글과 같은 버튼)
 function postBodyHtml(p) {
   if (p.ai && !p.blind) return `${p.headline ? `<div class="ai-headline">${escHtml(p.headline)}</div>` : ''}<div class="ai-summary">${escHtml(aiSummary(p))}</div>
-      <button class="btn-more" data-act="toggleAi">실적 표 보기 ▼</button>
+      <button class="btn-more" data-act="toggleAi">더 보기</button>
       <div class="ai-detail hidden">${aiTablesHtml(p)}<div class="post-body">${escHtml(p.content)}</div>${aiSrcHtml(p)}
-      <button class="btn-more" data-act="foldAi">접기 ▲</button></div>`;
+      <button class="btn-more" data-act="foldAi">접기</button></div>`;
   return postTextHtml(p);
 }
 function postTextHtml(p) {
@@ -848,7 +848,7 @@ function toggleMore(btn) {
 }
 function toggleAi(btn) {
   const open = btn.nextElementSibling.classList.toggle('hidden') === false;
-  btn.textContent = open ? '접기 ▲' : '실적 표 보기 ▼';
+  btn.textContent = open ? '접기' : '더 보기';
 }
 // 펼친 글 맨 아래 '접기': 접은 뒤 글 제목이 화면 밖이면 제목 위치로 올려 줌 (보던 자리를 잃지 않게)
 function foldAi(btn) {

@@ -83,7 +83,7 @@ function aiPostHtml(p) {
   <table class="ai-table"><thead><tr>${t.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
   <tbody>${t.rows.map(r => `<tr>${r.map((c, i) => i === 0 ? `<th>${aiCellHtml(c)}</th>` : `<td class="${i === r.length - 1 && t.cols.at(-1) === '증감' ? aiChgClass(c) : ''}">${aiCellHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('');
   const summary = p.summary || String(p.content || '').split(/(?<=다\.)\s/)[0];
-  return `<h3 class="ai-headline">${esc(p.headline || '')}</h3><p class="ai-summary">${esc(summary)}</p><details class="ai-more"><summary>실적 표 보기</summary>${tables}<p>${esc(p.content)}</p>${p.src ? `<div class="ai-src">📄 출처: <a href="${esc(p.src.url)}" target="_blank" rel="noopener nofollow">${esc(p.src.label)}</a> · DART 공시 숫자를 프로그램이 정리한 글이며 투자 권유가 아닙니다.</div>` : ''}</details>`;
+  return `<h3 class="ai-headline">${esc(p.headline || '')}</h3><p class="ai-summary">${esc(summary)}</p><details class="ai-more"><summary>더 보기</summary>${tables}<p>${esc(p.content)}</p>${p.src ? `<div class="ai-src">📄 출처: <a href="${esc(p.src.url)}" target="_blank" rel="noopener nofollow">${esc(p.src.label)}</a> · DART 공시 숫자를 프로그램이 정리한 글이며 투자 권유가 아닙니다.</div>` : ''}</details>`;
 }
 
 async function posts(code) {
