@@ -765,3 +765,9 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
   .header-inner { height: 69px; }
   .login-dropdown { top: 77px; }
 }
+/* 검색창 안내 문구 '종목명 검색 관심종목 등록하기': 휴대폰은 칸이 좁아 안내 글자만 화면 폭에 맞춰 작게 (입력 글자 크기는 그대로) */
+@media (max-width: 600px) {
+  .search-box { padding-left: 12px; padding-right: 42px; }
+  .search-box::placeholder { font-size: clamp(10.5px, 3.2vw, 0.92rem); }
+}
+@media (max-width: 359px) { .search-box::placeholder { font-size: max(10px, 2.95vw); } }
