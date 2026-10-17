@@ -30,6 +30,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const ACTIONS = {
   filterTab: el => filterTab(el.dataset.key, el),
   columnLink: (el, e) => { e.preventDefault(); el.blur(); openColumnLink(el.dataset.id || null); },
+  navFav: (el, e) => { e.preventDefault(); el.blur(); openFavTab(); },
   openFeed: () => openFeed(),
   toggleLogin: () => toggleLogin(),
   toggleSignup: () => toggleSignup(),
@@ -123,11 +124,20 @@ function openFromUrl() {
     if (btn) filterTab(key, btn);
   }
   if (s) openModal(s.code);
+  if (q.get('tab') === 'fav') { history.replaceState(null, '', '/'); openFavTab(); }
   const col = q.get('column');
   // 바로가기 주소는 처음 기록에서 지움 (창을 닫으면 홈 주소로 돌아가게, 열린 칼럼 주소는 창 안에서 다시 반영)
   if (col) syncColumnUrl(null);
   if (col === 'list') openColumnLink(null);
   else if (col && /^[0-9a-z]{6,20}$/.test(col)) openColumnLink(col);
+}
+
+// 하단 메뉴 '관심종목 추가': 관심 종목 탭으로 → 회원은 검색창에 커서(검색해서 ☆로 추가), 비회원은 탭의 로그인·회원가입 안내
+function openFavTab() {
+  const btn = document.querySelector('#tabBar .tab[data-key="fav"]');
+  if (btn && currentFilter !== 'fav') filterTab('fav', btn);
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (member) document.getElementById('searchInput').focus();
 }
 
 // 탭 이름: PC는 한 줄, 모바일은 두 단어를 두 줄로 (예: 전력 / 원자력)
@@ -377,6 +387,8 @@ function filterTab(type, btn) {
   currentFilter = type;
   document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
+  document.querySelector('.bottom-nav [data-act="navFav"]')?.classList.toggle('active', type === 'fav');
+  document.querySelector('.bottom-nav a[href="/"]')?.classList.toggle('active', type !== 'fav');
 
   document.getElementById('searchInput').value = '';
   document.getElementById('searchResults').classList.add('hidden');
@@ -438,7 +450,8 @@ function searchStocks(e) {
   stockEl.classList.add('hidden');
   resultEl.classList.remove('hidden');
   resultEl.innerHTML = `<p class="search-label">검색결과 <strong>${results.length}건</strong></p>` +
-    (results.length ? results.map(s => stockCard(s)).join('') : '<p class="empty-msg">종목을 찾을 수 없습니다.</p>');
+    (results.length ? results.map(s => stockCard(s)).join('') : member ? '<p class="empty-msg">종목을 찾을 수 없습니다.</p>' : '') +
+    (member ? '' : '<p class="empty-msg">회원가입 시 전체 종목을 볼 수 있습니다.<br><button class="link-btn" data-act="toggleSignup">회원가입</button> 또는 <button class="link-btn" data-act="toggleLogin">로그인</button></p>');
 }
 
 // ── 모달 열기 ─────────────────────────────────────────

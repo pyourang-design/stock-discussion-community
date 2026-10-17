@@ -676,3 +676,13 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
   .post-header .member-badge { font-size: 0.6rem; padding: 0 3px; }
   .btn-report-head { padding: 0 2px; font-size: 0.7rem; }
 }
+/* 하단 메뉴 (모든 페이지): 관심종목 추가 · Home · 주식 강의 · Light/Dark — 상단 메뉴 대신. 토론·로그인 창(z-index 200·300)보다 아래 */
+:root { --bottom-nav-h: 60px; }
+body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); }
+.bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 120; display: flex; justify-content: center; height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,.08); }
+.bottom-nav > a, .bottom-nav > .theme-toggle { flex: 1; max-width: 160px; width: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; border: 0; border-radius: 0; background: none; color: var(--text-muted); font-size: 0.74rem; font-weight: 600; line-height: 1.2; white-space: nowrap; letter-spacing: -0.02em; }
+.bottom-nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.bottom-nav > a.active { color: var(--accent); }
+.bottom-nav > a.nav-lecture { color: #e02f4b; }  /* 주식 강의는 예전 상단 버튼처럼 빨강으로 강조 */
+@media (hover: hover) { .bottom-nav > a:hover, .bottom-nav > .theme-toggle:hover { color: var(--accent); } .bottom-nav > a.nav-lecture:hover { color: #ff6a5c; } }
+.admin-badge { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }

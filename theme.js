@@ -35,7 +35,7 @@ function isLightTheme() {
 
 function renderThemeButtons() {
   document.querySelectorAll('.theme-toggle').forEach(b => {
-    b.textContent = isLightTheme() ? 'Light' : 'Dark';
+    (b.querySelector('.nav-label') || b).textContent = isLightTheme() ? 'Light' : 'Dark';  // 하단 메뉴는 아이콘 옆 글자만
     b.title = isLightTheme() ? '눌러서 다크모드로' : '눌러서 라이트모드로';
   });
 }
