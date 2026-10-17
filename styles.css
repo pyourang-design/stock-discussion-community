@@ -757,7 +757,7 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 @media (max-width: 600px) {
   .search-wrap { top: 5px; }
   #btnSignup, #btnProfile { align-self: end; position: relative; top: 5px; }
-  #btnLogin { position: relative; top: 16px; }
+  #btnLogin { position: relative; top: 12px; }  /* 회원가입과 간격 8px */
 }
 @media (min-width: 601px) {
   .header-inner { height: 69px; }
