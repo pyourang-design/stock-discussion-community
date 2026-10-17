@@ -812,7 +812,7 @@ const postMax = () => isColumnTab() ? COLUMN_MAX : POST_MAX;
 let columnOpenId = null;   // 운영자 칼럼: 목록(제목만)에서 연 글 id, null이면 목록
 // 칼럼 본문 사진: 본문에 [사진:/img/{id}] 로 저장 → 화면에서 그림으로 (사진 주소 형식이 정확할 때만)
 const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
-const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="칼럼 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
+const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="강의 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
 const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷');
 const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
 let columnPage = 1;
@@ -1177,7 +1177,7 @@ const noPassword = p => p.member || p.official;
 function editFormHtml(p) {
   return `
       <div class="post-form">
-        ${p.code === COLUMN_CODE ? `<input id="editTitle" type="text" maxlength="100" placeholder="칼럼 제목" value="${escHtml(p.title || '')}">` : ''}
+        ${p.code === COLUMN_CODE ? `<input id="editTitle" type="text" maxlength="100" placeholder="강의 제목" value="${escHtml(p.title || '')}">` : ''}
         <textarea id="editContent" maxlength="${postMax()}" rows="4">${escHtml(p.content)}</textarea>
         <div class="post-form-row">
           ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
@@ -1504,7 +1504,7 @@ function renderWriteBox() {
   document.querySelector('.write-box').classList.toggle('hidden', column && (!isAdmin() || Boolean(columnOpenId)));  // 칼럼은 관리자 모드에서만 쓰기
   const ta = document.getElementById('postContent');
   ta.maxLength = postMax();
-  ta.placeholder = column ? '칼럼 본문을 작성하세요 (최대 2,000자)' : '의견을 남겨보세요...';
+  ta.placeholder = column ? '강의 본문을 작성하세요 (최대 2,000자)' : '의견을 남겨보세요...';
   ta.rows = column ? 8 : 3;
   document.getElementById('postTitle').classList.toggle('hidden', !column);
   document.getElementById('btnColImg').classList.toggle('hidden', !(column && isAdmin()));
@@ -1630,7 +1630,7 @@ async function openStats() {
       </table>
       <h3 class="stat-h">게시판별 게시글 TOP ${r.boards.length}</h3>
       ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" ${b.code === COLUMN_CODE ? 'data-act="openColumnBoard"' : `data-act="openStock" data-code="${escHtml(b.code)}"`}>${b.code === COLUMN_CODE ? '주식 강의' : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
-      <h3 class="stat-h">칼럼 사진 저장소</h3>
+      <h3 class="stat-h">강의 사진 저장소</h3>
       <div id="imgStats" class="stat-img"><p class="stat-note">불러오는 중...</p></div>
       <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 조회수: 게시판 글 조회수(같은 브라우저·게시판 1시간에 1회, 날짜별은 ${fmtDay(pvSince)}부터 집계) · 게시글: 게시판 글(카드의 '댓글') 수, 삭제된 글 제외 · 날짜는 한국시간</p></div>`;
     showAuthorOverlay('📊 화면 정보', `${fmtDay(r.today)} 기준 사이트 통계`, '<button class="btn-tool" data-act="openStats">새로고침</button>', body);
@@ -1654,7 +1654,7 @@ async function loadImageStats(cleanup = false) {
     const pct = r.bytes / r.limitBytes * 100;
     el().innerHTML = `
       <div class="stat-grid small">
-        ${tile('사진', fmtN(r.count) + '장', '칼럼에 쓰는 사진 ' + fmtN(r.used) + '장')}
+        ${tile('사진', fmtN(r.count) + '장', '강의에 쓰는 사진 ' + fmtN(r.used) + '장')}
         ${tile('사용 용량', fmtMB(r.bytes), (pct < 0.1 ? '0.1% 미만' : pct.toFixed(1) + '%') + ' / 무료 1GB')}
         ${tile('안 쓰는 사진', fmtN(r.unused) + '장', fmtMB(r.unusedBytes))}
       </div>
@@ -1665,7 +1665,7 @@ async function loadImageStats(cleanup = false) {
   }
 }
 function cleanupImages(n) {
-  if (!confirm(`어느 칼럼에도 쓰이지 않는 사진 ${n}장을 지울까요?\n지운 사진은 되돌릴 수 없습니다.`)) return;
+  if (!confirm(`어느 강의에도 쓰이지 않는 사진 ${n}장을 지울까요?\n지운 사진은 되돌릴 수 없습니다.`)) return;
   document.getElementById('imgStats').innerHTML = '<p class="stat-note">정리하는 중...</p>';
   loadImageStats(true);
 }

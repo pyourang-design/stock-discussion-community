@@ -25,7 +25,7 @@ async function loadColumns() {
 
 // 본문: 빈 줄로 문단을 나누고, 문단 안 줄바꿈은 그대로
 const paragraphs = text => String(text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
-  .map(p => `<p>${esc(p).replace(IMG_RE, '<img class="col-img" src="$1" alt="칼럼 사진" loading="lazy">').replace(/\n/g, '<br>')}</p>`).join('\n');
+  .map(p => `<p>${esc(p).replace(IMG_RE, '<img class="col-img" src="$1" alt="강의 사진" loading="lazy">').replace(/\n/g, '<br>')}</p>`).join('\n');
 const summary = (text, n = 150) => { const t = noImgs(text).replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
 const day = ts => kst(ts).slice(0, 10);
 const listHtml = cols => `<ul class="col-page-list">${cols.map(c => `
@@ -38,8 +38,8 @@ export default async function handler(req, res) {
   // 칼럼 id 형식이 아니면 DB를 읽지 않고 바로 404 (아무 주소나 넣어 DB 호출을 늘리지 못하게)
   if (id && !isPostId(id)) {
     res.setHeader('Cache-Control', 's-maxage=600');
-    return res.status(404).send(layout({ title: `칼럼을 찾을 수 없습니다 | ${NAME}`, desc: '요청한 칼럼이 없습니다.', canonical: `${SITE}/column`, status: 404,
-      body: '<h1>칼럼을 찾을 수 없습니다</h1><p><a href="/column">주식 강의 목록 보기</a></p>' }));
+    return res.status(404).send(layout({ title: `강의를 찾을 수 없습니다 | ${NAME}`, desc: '요청한 강의가 없습니다.', canonical: `${SITE}/column`, status: 404,
+      body: '<h1>강의를 찾을 수 없습니다</h1><p><a href="/column">주식 강의 목록 보기</a></p>' }));
   }
   let cols = [];
   try { cols = await loadColumns(); } catch (err) {
@@ -48,7 +48,7 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     res.setHeader('Retry-After', '60');
     return res.status(503).send(layout({ title: `잠시 후 다시 시도해주세요 | ${NAME}`, desc: '일시적인 오류입니다.', canonical: `${SITE}/column`, status: 503,
-      body: '<h1>잠시 후 다시 시도해주세요</h1><p>일시적으로 칼럼을 불러오지 못했습니다.</p>' }));
+      body: '<h1>잠시 후 다시 시도해주세요</h1><p>일시적으로 강의를 불러오지 못했습니다.</p>' }));
   }
 
   // 목록 페이지
@@ -60,15 +60,15 @@ export default async function handler(req, res) {
     const nums = [...new Set([1, pages, ...Array.from({ length: 5 }, (_, i) => page - 2 + i)])].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
     let numHtml = '', last = 0;
     for (const n of nums) { if (n - last > 1) numHtml += '<span class="pager-gap">…</span>'; numHtml += n === page ? `<span class="pager-btn on" aria-current="page">${n}</span>` : `<a class="pager-btn" href="${pageUrl(n)}">${n}</a>`; last = n; }
-    const pager = pages > 1 ? `<nav class="pager" aria-label="칼럼 페이지">${page > 1 ? `<a class="pager-btn" href="${pageUrl(page - 1)}" rel="prev" aria-label="이전 페이지">‹</a>` : '<span class="pager-btn disabled">‹</span>'}${numHtml}${page < pages ? `<a class="pager-btn" href="${pageUrl(page + 1)}" rel="next" aria-label="다음 페이지">›</a>` : '<span class="pager-btn disabled">›</span>'}</nav>` : '';
+    const pager = pages > 1 ? `<nav class="pager" aria-label="강의 페이지">${page > 1 ? `<a class="pager-btn" href="${pageUrl(page - 1)}" rel="prev" aria-label="이전 페이지">‹</a>` : '<span class="pager-btn disabled">‹</span>'}${numHtml}${page < pages ? `<a class="pager-btn" href="${pageUrl(page + 1)}" rel="next" aria-label="다음 페이지">›</a>` : '<span class="pager-btn disabled">›</span>'}</nav>` : '';
     const canonical = `${SITE}${pageUrl(page)}`;
     const title = `주식 강의${page > 1 ? ` ${page}페이지` : ''} - 주식 투자 기초·지표 분석 | ${NAME}`;
-    const desc = `${NAME} 운영자가 쓰는 주식 투자 칼럼. ${cols.slice(0, 3).map(c => c.title).filter(Boolean).join(', ')} 등 투자 지표와 분석 방법을 쉽게 정리합니다.`;
+    const desc = `${NAME} 운영자가 쓰는 주식 강의. ${cols.slice(0, 3).map(c => c.title).filter(Boolean).join(', ')} 등 투자 지표와 분석 방법을 쉽게 정리합니다.`;
     const body = `
   <nav class="sp-sub"><a href="/">홈</a> › 주식 강의</nav>
   <h1>주식 강의</h1>
-  <p class="sp-intro">주식 투자에 필요한 지표 읽는 법, 기업 분석 방법, 시장을 보는 관점을 운영자가 쉽게 정리한 글입니다. 칼럼 ${cols.length}편.</p>
-  <section class="sp-section">${cols.length ? listHtml(shown) + pager : '<p>아직 칼럼이 없습니다.</p>'}</section>
+  <p class="sp-intro">주식 투자에 필요한 지표 읽는 법, 기업 분석 방법, 시장을 보는 관점을 운영자가 쉽게 정리한 글입니다. 강의 ${cols.length}편.</p>
+  <section class="sp-section">${cols.length ? listHtml(shown) + pager : '<p>아직 주식 강의가 없습니다.</p>'}</section>
   <p class="sp-section"><a class="btn-submit sp-cta" href="/?column=list">주식 강의 게시판 가기 (공감·의견)</a></p>`;
     const jsonld = {
       '@context': 'https://schema.org', '@type': 'CollectionPage', name: '주식 강의', url: canonical,
@@ -82,8 +82,8 @@ export default async function handler(req, res) {
   if (i < 0) {
     res.setHeader('Cache-Control', 's-maxage=60');
     return res.status(404).send(layout({
-      title: `칼럼을 찾을 수 없습니다 | ${NAME}`, desc: '요청한 칼럼이 없거나 삭제되었습니다.', canonical: `${SITE}/column`, status: 404,
-      body: `<h1>칼럼을 찾을 수 없습니다</h1><p>삭제되었거나 주소가 잘못되었습니다.</p><p><a href="/column">주식 강의 목록 보기</a></p>`,
+      title: `강의를 찾을 수 없습니다 | ${NAME}`, desc: '요청한 강의가 없거나 삭제되었습니다.', canonical: `${SITE}/column`, status: 404,
+      body: `<h1>강의를 찾을 수 없습니다</h1><p>삭제되었거나 주소가 잘못되었습니다.</p><p><a href="/column">주식 강의 목록 보기</a></p>`,
     }));
   }
 
@@ -102,8 +102,8 @@ export default async function handler(req, res) {
 ${paragraphs(c.content)}
     </div>
   </article>
-  <p class="sp-disclaimer">본 칼럼은 투자 이해를 돕기 위한 일반 정보이며 특정 종목의 매수·매도 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
-  <p class="sp-section"><a class="btn-submit sp-cta" href="/?column=${esc(c.id)}">이 칼럼에 공감·의견 남기기 (토론 게시판)</a></p>
+  <p class="sp-disclaimer">본 강의는 투자 이해를 돕기 위한 일반 정보이며 특정 종목의 매수·매도 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
+  <p class="sp-section"><a class="btn-submit sp-cta" href="/?column=${esc(c.id)}">이 강의에 공감·의견 남기기 (토론 게시판)</a></p>
   <nav class="col-page-nav">
     ${prev ? `<a href="/column/${esc(prev.id)}"><span>← 이전 글</span>${esc(prev.title || '')}</a>` : '<span class="disabled"><span>← 이전 글</span>이전 글이 없습니다</span>'}
     <a class="col-page-list-link" href="/column">목록으로</a>

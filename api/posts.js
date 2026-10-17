@@ -636,7 +636,7 @@ async function handlePost(b, env = {}) {
     const id = String(b.id ?? '');
     if (!isPostId(id)) throw new BadRequest('게시글 id가 올바르지 않습니다');
     const [post] = await loadPosts([id], b.cid);
-    if (!post || post.code !== COLUMN_CODE) throw new BadRequest('칼럼이 없습니다');
+    if (!post || post.code !== COLUMN_CODE) throw new BadRequest('강의가 없습니다');
     return { post };
   }
 
