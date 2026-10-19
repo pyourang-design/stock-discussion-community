@@ -35,6 +35,8 @@ for (const f of fs.readdirSync(root, { withFileTypes: true })) {
   else fs.copyFileSync(src, out);
   n++;
 }
+// vendor/ (외부 라이브러리 원본 그대로 — PDF.js: 휴대폰 리포트 보기) 폴더째 복사
+fs.cpSync(new URL('vendor/', root), new URL('vendor/', dist), { recursive: true });
 // 종목 페이지(api/page.js 서버 렌더링)도 같은 버전을 쓰도록 함수용 파일 생성
 fs.writeFileSync(new URL('functions/_assets.js', root), `// scripts/cf-build.mjs가 생성 — 정적 파일 버전(내용 해시)\nexport const ASSET_VERSION = ${JSON.stringify(ver)};\n`);
 console.log(`dist/ 에 정적 파일 ${n}개 복사, 버전 ${JSON.stringify(ver)}`);

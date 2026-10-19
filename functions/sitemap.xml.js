@@ -1,7 +1,9 @@
 // /sitemap.xml → 정적 사이트맵(scripts/seo.mjs가 만든 홈·정책·종목 페이지) + 운영자 칼럼 페이지를 덧붙여 응답
 // 칼럼은 관리자 화면에서 수시로 쓰므로 DB에서 읽어 자동 반영 (검색엔진에 사이트맵을 다시 제출할 필요 없음)
+// 정적 사이트맵의 종목은 개편 전부터 탭에 있던 종목만 — 새로 들어온 종목·탭 밖 종목은 회원 토론글이 기준 개수를 넘은 것만 여기서 덧붙임 (api/_public.js)
 // Cloudflare 캐시에 10분 보관 (요청마다 DB를 읽지 않게)
 import { redis, dbReady } from '../api/_redis.js';
+import { indexableAll } from '../api/_public.js';
 
 const SITE = 'https://upjong.com';
 const TTL = 600;
@@ -26,6 +28,12 @@ export async function onRequest(context) {
         const latest = Math.max(...posts.map(p => p.editedTs || p.ts));
         const urls = [`  <url><loc>${SITE}/column</loc><lastmod>${kstDay(latest)}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`,
           ...posts.map(p => `  <url><loc>${SITE}/column/${p.id}</loc><lastmod>${kstDay(p.editedTs || p.ts)}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`)];
+        xml = xml.replace('</urlset>', urls.join('\n') + '\n</urlset>');
+      }
+      // 새로 들어온 종목·탭 밖 종목 중 회원 토론글이 기준 개수를 넘은 종목 페이지 (api/_public.js)
+      const open = await indexableAll();
+      if (open.size) {
+        const urls = [...open].map(([code, ts]) => `  <url><loc>${SITE}/stock/${code}</loc><lastmod>${kstDay(ts)}</lastmod><changefreq>daily</changefreq><priority>0.6</priority></url>`);
         xml = xml.replace('</urlset>', urls.join('\n') + '\n</urlset>');
       }
     }

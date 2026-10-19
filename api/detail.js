@@ -8,6 +8,7 @@
 //   네이버 국내: 20건×5쪽 (50건 단위로 받으면 2쪽이 1쪽과 겹침), 미국: 50건×2쪽 (한 번에 최대 50건)
 import { googleNews, dedupeByTitle } from './_google.js';
 import { STOCKS, SECTORS } from './_stocks.js';
+import { nameOf, stockQuery } from './_names.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const NAVER = 'https://m.stock.naver.com/api';
@@ -29,25 +30,21 @@ const decodeEntities = s => s.replace(/&(#\d{1,7}|#x[0-9a-f]{1,6}|[a-z]+);/gi, (
 });
 const stripTags = s => decodeEntities(String(s ?? '').replace(/<[^>]*>/g, '')).trim();
 
-// 종목명이 정확히 들어간 Google 뉴스 검색 (검색어는 서버의 종목 목록에서만 만듦)
-// 영어 4글자 이하 종목명(HLB, LS, SKC 등)은 다른 뜻으로 쓰이기 쉬워 주식 관련 단어가 함께 있는 기사만
-const SHORT_EN_NAME = /^[A-Za-z0-9&]{1,4}$/;
-const STOCK_WORDS = '(주가 OR 주식 OR 공시 OR 실적 OR 계약 OR 증권사 OR 보고서 OR 분석 OR 리포트 OR 목표가 OR 투자의견)';
+// 종목명이 정확히 들어간 Google 뉴스 검색 (검색어는 서버의 종목 목록에서만 만듦 — 업종 탭·숨은 종목·탭에서 빠진 종목)
 function stockGoogleNews(code) {
-  const s = STOCKS.find(x => x.code === code);
-  if (!s) return Promise.resolve([]);
-  const q = SHORT_EN_NAME.test(s.name) ? `"${s.name}" ${STOCK_WORDS}` : `"${s.name}"`;
-  return googleNews(q, { when: '7d', max: GOOGLE_MAX });
+  const name = nameOf(code);
+  return name ? googleNews(stockQuery(name), { when: '7d', max: GOOGLE_MAX }) : Promise.resolve([]);
 }
 
-// 네이버 뉴스(+구글)를 합쳐 최신순 NEWS_MAX건. 한쪽이 실패해도 나머지로 응답
+// 네이버 최신 NEWS_MAX건 + 구글 최대 GOOGLE_KEEP건 (구글은 네이버보다 오래된 기사가 많아 함께 최신순으로 자르면 다 밀려남
+// → 따로 넘기고 화면에서 20건마다 5건 정도 섞음, app.js mixGoogle). 한쪽이 실패해도 나머지로 응답
+const GOOGLE_KEEP = 25;
 async function mergeNews(naverPages, google) {
   const results = await Promise.allSettled([...naverPages, google]);
   if (results.every(r => r.status === 'rejected')) throw results[0].reason;
-  const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
-  return dedupeByTitle(items)
-    .sort((a, b) => String(b.datetime).localeCompare(String(a.datetime)))
-    .slice(0, NEWS_MAX);
+  const items = dedupeByTitle(results.flatMap(r => r.status === 'fulfilled' ? r.value : []));  // 네이버 먼저 → 같은 기사는 네이버만
+  const byTime = (a, b) => String(b.datetime).localeCompare(String(a.datetime));
+  return [...items.filter(n => n.source !== 'google').sort(byTime).slice(0, NEWS_MAX), ...items.filter(n => n.source === 'google').sort(byTime).slice(0, GOOGLE_KEEP)];
 }
 
 // 실시간 종목 뉴스
@@ -93,6 +90,11 @@ const INDUSTRY_RULES = {
   ship: { cats: ['조선'], words: ['조선', '선박', 'LNG선', '방산', '방위', '국방', '무기', '우주', '항공우주', 'MASGA'] },
   auto: { cats: ['자동차', '타이어'], words: ['자동차', '완성차', '車', '타이어', '부품', '현대차', '기아'] },
   finance: { cats: ['은행', '증권', '보험', '지주회사'], words: ['은행', '증권', '보험', '금융', '카드', '밸류업', '배당', '저PBR', '지주'] },
+  elec: { cats: ['전기전자', 'IT'], words: ['전자부품', 'MLCC', '기판', 'PCB', 'FC-BGA', '카메라모듈', '디스플레이', 'OLED', '가전', '스마트폰', '전장'] },
+  chem: { cats: ['석유화학', '철강금속', '에너지'], words: ['화학', '정유', '석유', '철강', '비철', '아연', '구리', '리튬', '태양광', '수소'] },
+  logistics: { cats: ['건설', '해운', '항공운송'], words: ['건설', '해운', '물류', '항공', '운송', '기계', '건설기계', '플랜트', '시멘트'] },
+  consumer: { cats: ['음식료', '유통', '섬유의류'], words: ['음식료', '식품', '라면', '주류', '담배', '유통', '백화점', '편의점', '의류', '패션', '소비', '내수'] },
+  telecom: { cats: ['통신', '인터넷포탈', '게임'], words: ['통신', '5G', '인터넷', '플랫폼', '포털', '게임', '소프트웨어', 'IT서비스', '클라우드', '광고'] },
 };
 const USA_WORDS = ['미국', '美', '글로벌', 'Global', 'GLOBAL', '해외', 'ETF', 'S&P', '나스닥', '빅테크', '뉴욕', '연준', 'FOMC', 'US ', 'Fed'];
 // 영어 3자 이하 종목명(LS, HLB 등)은 다른 단어와 겹치기 쉬워 제외
@@ -228,7 +230,8 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'code 또는 type이 올바르지 않습니다' });
   }
   // 뉴스·시세 정보는 1분, 나머지는 10분 캐시
-  res.setHeader('Cache-Control', type === 'news' || type === 'info' ? 's-maxage=60, stale-while-revalidate=60' : 's-maxage=600, stale-while-revalidate=600');
+  // 뉴스: 1분마다 새로, 10분까지는 지난 것을 바로 보여 주고 뒤에서 새로 받음(functions/_adapter.js) / 시세 정보는 1분 / 리포트·공시: 10분, 1시간까지 바로
+  res.setHeader('Cache-Control', type === 'news' ? 's-maxage=60, stale-while-revalidate=600' : type === 'info' ? 's-maxage=60, stale-while-revalidate=60' : 's-maxage=600, stale-while-revalidate=3600');
 
   try {
     res.json({ code, type, data: await handlers[type](code) });

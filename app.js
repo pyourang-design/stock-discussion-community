@@ -10,7 +10,6 @@ document.addEventListener('DOMContentLoaded', () => {
   // 맨 앞 '관심 종목' 탭 (회원 전용), 처음 화면은 첫 업종 탭
   document.getElementById('tabBar').innerHTML = [FAV_TAB, ...SECTORS].map(sec =>
     `<button class="tab${sec.key === currentFilter ? ' active' : ''}" data-act="filterTab" data-key="${sec.key}">${tabLabel(sec)}</button>`).join('');
-  renderTabNote();
   renderStocks(filteredList());
   startRealtime();
   loadHomeNews();
@@ -28,6 +27,8 @@ document.addEventListener('DOMContentLoaded', () => {
 // ── 클릭·키 처리: 인라인 onclick 대신 data-act / data-enter / data-err (보안 헤더 CSP script-src 'self') ──
 // 버튼에 data-act="이름"을 달면 아래 ACTIONS[이름](요소, 이벤트)가 실행됨 (안쪽 요소 우선 — 카드 안 ☆는 ☆만)
 const ACTIONS = {
+  openPdf: (el, e) => { e.preventDefault(); openPdf(el.getAttribute('href'), el.dataset.title); },
+  closePdf: () => closePdf(),
   filterTab: el => filterTab(el.dataset.key, el),
   columnLink: (el, e) => { e.preventDefault(); el.blur(); openColumnLink(el.dataset.id || null); },
   navFav: (el, e) => { e.preventDefault(); el.blur(); openFavTab(); },
@@ -107,12 +108,9 @@ document.addEventListener('error', e => {
   img.remove();
 }, true);
 
-// 사이트 조회수 (같은 브라우저 30분에 1회 집계) → 상단 "오늘 N · 누적 N"
+// 사이트 조회수 (같은 브라우저 30분에 1회 집계) — 화면 표시는 2026-10-19 삭제, 관리자 통계용 집계만
 async function countVisit() {
-  try {
-    const r = await api({}, { action: 'visit' });
-    document.getElementById('siteStats').innerHTML = `오늘 <b>${r.today.toLocaleString()}</b> · 누적 <b>${r.total.toLocaleString()}</b>`;
-  } catch {}
+  try { await api({}, { action: 'visit' }); } catch {}
 }
 
 // 주소로 바로 열기: /?stock=005930 → 그 종목이 속한 업종 탭 + 토론 창, /?sector=bio → 업종 탭 (종목 페이지에서 넘어올 때)
@@ -125,6 +123,11 @@ function openFromUrl() {
     if (btn) filterTab(key, btn);
   }
   if (s) openModal(s.code);
+  // 숨은 종목 바로가기 (/stock/코드 페이지가 공개된 숨은 종목에서 넘어올 때, api/_public.js) — 비회원도 listed.json을 받아 종목 창을 엶
+  else if (/^([0-9][0-9A-Z]{5}|[A-Z][A-Za-z0-9]{0,6}(\.[A-Z])?)$/.test(q.get('stock') || '')) {
+    const code = q.get('stock');
+    loadHidden().then(() => { if (HIDDEN?.has(code)) openModal(code); });
+  }
   if (q.get('tab') === 'fav') { history.replaceState(null, '', '/'); openFavTab(); }
   if (q.get('app') === '1') { history.replaceState(null, '', '/'); setTimeout(addToHome, 600); }  // 다른 페이지 하단 메뉴 '앱 다운' (설치 창 이벤트를 잠깐 기다림)
   const col = q.get('column');
@@ -144,20 +147,13 @@ function openFavTab() {
 
 // 탭 이름: PC는 한 줄, 모바일은 두 단어를 두 줄로 (예: 전력 / 원자력)
 const FAV_TAB = { key: 'fav', name: '관심 종목' };
-const TAB_LINES = { fav: ['관심', '종목'], battery: ['2차전지', '로봇'], power: ['전력', '원자력'], kbeauty: ['K뷰티', '컬쳐'], ship: ['조선', '방산'], usa: ['미국', '주식'] };
+const TAB_LINES = { fav: ['관심', '종목'], elec: ['전자', '부품'], battery: ['2차전지', '로봇'], power: ['전력', '원자력'], ship: ['조선', '방산'], chem: ['화학', '철강'],
+  logistics: ['물류·건설', '기계'], kbeauty: ['K뷰티', '컬쳐'], telecom: ['통신', '인터넷'], usa: ['미국', '주식'] };
 function tabLabel(sec) {
   const l = TAB_LINES[sec.key];
   return l ? `<span class="tab-pc">${sec.name}</span><span class="tab-mo">${l[0]}<br>${l[1]}</span>` : sec.name;
 }
 
-// 탭 아래 선정 기준 안내
-function renderTabNote() {
-  document.getElementById('tabNote').textContent = currentFilter === 'fav'
-    ? '종목 카드의 ☆를 눌러 추가한 관심 종목 (회원 전용)'
-    : currentFilter === 'usa'
-    ? '국내 투자자 보유 TOP50 + 관심 TOP50 (한국예탁결제원) · 시총순'
-    : '업종 내 시총·토론글·거래대금 상위 최대 100종목 · 시총순';
-}
 
 // 가격 표시: 국내 원, 미국 달러
 const fmtPrice = s => !s.price ? '-' : s.us
@@ -165,8 +161,21 @@ const fmtPrice = s => !s.price ? '-' : s.us
   : s.price.toLocaleString() + '원';
 
 // ── 종목 카드 렌더링 ──────────────────────────────────
+// 종목 목록 아래 안내: 업종 탭·미국 주식 탭 (관심 종목 탭·검색 결과를 보는 동안은 숨김)
+const LIST_NOTE = {
+  sector: '네이버 종목토론방 인기글·시가총액·거래대금 상위 64개 종목(시가총액순), 화면에 표시되지 않는 종목의 경우 회원 가입 후 관심 종목 등록을 통해 볼 수 있습니다.',
+  usa: '국내 투자자가 가장 많이 보유한 미국 주식·ETF 상위 50개 + 최근 1년 보관·결제 상위 14개(한국예탁결제원 기준, 시가총액순)입니다.',
+};
+function updateListNote() {
+  const el = document.getElementById('listNote');
+  const searching = !document.getElementById('searchResults').classList.contains('hidden');
+  el.classList.toggle('hidden', searching || currentFilter === 'fav');
+  el.textContent = currentFilter === 'usa' ? LIST_NOTE.usa : LIST_NOTE.sector;
+}
+
 function renderStocks(list) {
   const el = document.getElementById('stockList');
+  updateListNote();
   if (currentFilter === 'fav') {
     // 관심 종목 탭: 회원은 맨 앞에 주식 시장 경제 뉴스·토론 카드와 관심 종목 모아보기 카드, 이어서 등록한 관심 종목만 (비회원은 안내만)
     el.innerHTML = !member
@@ -200,12 +209,12 @@ const sectorName = key => { const sec = SECTORS.find(x => x.key === key); return
 
 // ── 숨은 종목: 업종 탭에 없는 상장 종목 (listed.json, scripts/listed.mjs) ──
 // 화면에는 안 보이고 회원 검색에서만 나옴 → 관심 종목에 넣고 종목 창(뉴스·리포트·공시·토론)을 볼 수 있음
-// /stock/ 페이지·사이트맵에는 없음 (검색엔진 노출 안 함). 처음 필요할 때 한 번만 받음
+// 회원이 관심 종목으로 담은 적 있는 종목은 /stock/ 페이지 공개, 회원 토론글이 쌓이면 사이트맵·RSS에도 (api/_public.js). 처음 필요할 때 한 번만 받음
 let HIDDEN = null;  // 코드 → 종목
 let hiddenLoading = null;
 function loadHidden() {
   return hiddenLoading ||= fetch(`${API_BASE}/listed.json`).then(r => r.ok ? r.json() : Promise.reject(new Error(r.status)))
-    .then(rows => { HIDDEN = new Map(rows.map(([code, name, market, cap]) => [code, { code, name, market, cap, price: 0, change: 0, sectors: {}, hidden: true }])); })
+    .then(rows => { HIDDEN = new Map(rows.map(([code, name, market, cap, ticker, etf]) => [code, { code, name, market, cap, price: 0, change: 0, sectors: {}, hidden: true, ...(ticker ? { us: true, ticker, ...(etf ? { etf: true } : {}) } : {}) }])); })  // 6칸이면 탭에서 빠진 미국 종목
     .catch(() => { hiddenLoading = null; });  // 실패하면 다음에 다시
 }
 const stockOf = code => STOCKS.find(s => s.code === code) || HIDDEN?.get(code);
@@ -235,6 +244,11 @@ const SECTOR_KEYWORDS = {
     '원전', '원자력', 'SMR', '원자로', '체코', '한수원'],
   kbeauty: ['화장품', 'K뷰티', 'K-뷰티', '뷰티', '코스메틱', '미용', '피부', '보톡스', '톡신', '필러', '스킨부스터', '의료관광', '올리브영', 'ODM',
     '엔터', 'K팝', 'K-팝', '아이돌', '콘서트', '음원', '드라마', '콘텐츠', '영화', '관광', '여행', '면세', '카지노', '호텔', '방한', '유커', '한류'],
+  elec: ['전자', '부품', 'MLCC', '기판', 'PCB', 'FC-BGA', '카메라모듈', '디스플레이', 'OLED', '가전', 'TV', '스마트폰', '갤럭시', '아이폰', '전장'],
+  chem: ['화학', '석유화학', '정유', '유가', '나프타', '에틸렌', '철강', '철강재', '후판', '열연', '비철', '구리', '아연', '알루미늄', '리튬', '수소', '태양광', '가스'],
+  logistics: ['해운', '운임', '컨테이너', 'SCFI', '벌크', '물류', '택배', '항공', '여객', '화물', '건설', '수주', '분양', '주택', '재건축', '플랜트', '기계', '건설기계', '굴착기', '시멘트'],
+  consumer: ['식품', '음식료', '라면', '불닭', '과자', '음료', '주류', '담배', '의류', '패션', '유통', '백화점', '편의점', '마트', '이커머스', '소비', '내수', '가전렌탈', '교육'],
+  telecom: ['통신', '5G', '6G', '요금', '플랫폼', '포털', '인터넷', '검색', 'AI', '클라우드', '데이터센터', 'IT서비스', 'SI', '게임', '신작', '소프트웨어', '보안', '광고', '웹툰'],
 };
 
 function isSectorNews(item, key) {
@@ -328,6 +342,43 @@ function mergeSectorNews(items) {
   return [...byTitle.values()].sort((a, b) => String(b.datetime).localeCompare(String(a.datetime)));
 }
 
+// 구글 뉴스 섞기: 20건마다 네이버 15건 + 구글 5건 — 네이버 3건 다음마다 구글 1건 (구글이 모자라면 네이버로, 네이버가 모자라면 구글로 채움)
+// 구글 기사는 네이버보다 오래된 것이 많아 그냥 최신순으로 합치면 뒤로 밀려 거의 안 보임 (서버는 구글을 따로 붙여 보냄)
+const MIX_STEP = 4;  // 4건마다 1건 = 20건에 5건
+// arrange: 네이버·구글 목록을 각각 최신순으로 정리한 뒤 다시 줄 세우는 함수 (관심 종목 모아보기는 종목별 상한, capPerStock)
+function mixGoogle(list, arrange = x => x) {
+  const byTime = (a, b) => String(b.datetime).localeCompare(String(a.datetime));
+  const naver = arrange(list.filter(n => n.source !== 'google').sort(byTime)), google = arrange(list.filter(n => n.source === 'google').sort(byTime));
+  const out = [];
+  while (naver.length || google.length) {
+    const wantGoogle = out.length % MIX_STEP === MIX_STEP - 1;
+    out.push((wantGoogle && google.length) || !naver.length ? google.shift() : naver.shift());
+  }
+  return out;
+}
+
+// 관심 종목 모아보기 뉴스: 화면 20건마다 한 종목은 최대 4건 (기사가 많은 종목이 화면을 다 채우지 않게)
+// 네이버 15건·구글 5건 묶음 단위로 따로 적용(mixGoogle arrange) → 네이버는 15건 중 3건, 구글은 5건 중 1건까지
+// 넘친 기사는 다음 묶음으로 넘기고, 다른 종목 기사가 모자라면 그대로 채움. 묶음 안은 최신순 유지
+const capPerStock = (per, max) => list => {
+  const out = [];
+  let queue = list;
+  while (queue.length) {
+    const page = [], rest = [], cnt = {};
+    for (const n of queue) {
+      const c = n.codes?.[0];
+      if (page.length < per && (!c || (cnt[c] || 0) < max)) { page.push(n); if (c) cnt[c] = (cnt[c] || 0) + 1; }
+      else rest.push(n);
+    }
+    while (page.length < per && rest.length) page.push(rest.shift());  // 다른 종목 기사가 없으면 상한 넘어도 채움
+    out.push(...page);
+    queue = rest;
+  }
+  return out;
+};
+const capNaver = capPerStock(15, 3), capGoogle = capPerStock(5, 1);
+const favNewsArrange = l => l[0]?.source === 'google' ? capGoogle(l) : capNaver(l);
+
 async function loadSectorNews(force = false, key = currentFilter) {
   if (key === 'fav') return;
   const cached = sectorNews[key];
@@ -346,7 +397,7 @@ async function loadSectorNews(force = false, key = currentFilter) {
     }));
     const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     if (!items.length) throw new Error('no news');
-    sectorNews[key] = { ts: Date.now(), data: mergeSectorNews(items).filter(n => isSectorNews(n, key)).slice(0, SECTOR_NEWS_MAX) };
+    sectorNews[key] = { ts: Date.now(), data: mixGoogle(mergeSectorNews(items).filter(n => isSectorNews(n, key))).slice(0, SECTOR_NEWS_MAX) };
   } catch (e) {
     // 실패 시 이전 뉴스 유지
     sectorNews[key] = cached ? { ...cached, error: true } : { error: true };
@@ -395,13 +446,12 @@ function filterTab(type, btn) {
   document.getElementById('searchInput').value = '';
   document.getElementById('searchResults').classList.add('hidden');
   document.getElementById('stockList').classList.remove('hidden');
-  renderTabNote();
   renderStocks(filteredList());
   fetchAllPrices();
   loadHomeNews();
 }
 
-// 업종 탭 종목: 시총·토론글·거래대금 순위 상위 최대 100개 (scripts/build.mjs, 시총순)
+// 업종 탭 종목: 시총·토론글·거래대금 순위 상위 64개 (scripts/build.mjs, 시총순)
 function filteredList() {
   if (currentFilter === 'fav') return member ? [...STOCKS.filter(s => favs.has(s.code)), ...[...favs].map(c => HIDDEN?.get(c)).filter(Boolean)] : [];
   return sectorList(currentFilter);
@@ -435,6 +485,22 @@ document.getElementById('searchInput').addEventListener('keydown', e => { if (e.
 
 const HIDDEN_SEARCH_MAX = 30;
 let searchPriceTimer;
+// 별칭 검색: 영문 종목명(NAVER, SK, LG …)을 한글로, 한글 그룹명을 영문으로도 찾음 — [한글, 영문(소문자)]
+// 긴 것부터 바꿈 (에스케이씨 → skc 가 에스케이 → sk 보다 먼저)
+const SEARCH_ALIASES = [
+  ['케이티앤지', 'kt&g'], ['에스케이씨', 'skc'], ['에이치엘비', 'hlb'], ['에이치엠엠', 'hmm'], ['엔에이치엔', 'nhn'], ['비지에프', 'bgf'],
+  ['케이씨씨', 'kcc'], ['오씨아이', 'oci'], ['제이와이피', 'jyp'], ['에스오일', 's-oil'], ['포스코', 'posco'], ['네이버', 'naver'],
+  ['에스케이', 'sk'], ['엘지', 'lg'], ['케이티', 'kt'], ['씨제이', 'cj'], ['지에스', 'gs'], ['에이치디', 'hd'], ['디비', 'db'], ['케이비', 'kb'],
+  ['엘에스', 'ls'], ['에스디아이', 'sdi'], ['엔씨', 'nc'], ['와이지', 'yg'], ['아이에스씨', 'isc'], ['에스엔티', 'snt'],
+  ['삼성', 'samsung'], ['현대', 'hyundai'], ['카카오', 'kakao'], ['롯데', 'lotte'], ['한화', 'hanwha'], ['두산', 'doosan'], ['셀트리온', 'celltrion'],
+].sort((a, b) => b[0].length - a[0].length);
+function searchVariants(q) {
+  let ko2en = q, en2ko = q;
+  for (const [ko, en] of SEARCH_ALIASES) { ko2en = ko2en.split(ko).join(en); }
+  for (const [ko, en] of [...SEARCH_ALIASES].sort((a, b) => b[1].length - a[1].length)) { if (en.length >= 4 || en2ko === en) en2ko = en2ko.split(en).join(ko); }
+  return [...new Set([q, ko2en, en2ko])];
+}
+
 function searchStocks(e) {
   const input = document.getElementById('searchInput');
   if (e && document.activeElement !== input) input.value = '';
@@ -445,10 +511,12 @@ function searchStocks(e) {
   if (!q) {
     resultEl.classList.add('hidden');
     stockEl.classList.remove('hidden');
+    updateListNote();
     return;
   }
 
-  const match = s => s.name.toLowerCase().includes(q) || s.code.toLowerCase().includes(q) || (s.ticker || '').toLowerCase().includes(q);
+  const qs = searchVariants(q);
+  const match = s => { const nm = s.name.toLowerCase(); return qs.some(v => nm.includes(v)) || s.code.toLowerCase().includes(q) || (s.ticker || '').toLowerCase().includes(q); };
   const results = STOCKS.filter(match);
   // 회원은 숨은 종목도 검색 (최대 HIDDEN_SEARCH_MAX개, 시가총액 큰 순)
   if (member) {
@@ -461,6 +529,7 @@ function searchStocks(e) {
   }
   stockEl.classList.add('hidden');
   resultEl.classList.remove('hidden');
+  updateListNote();
   resultEl.innerHTML = `<p class="search-label">검색결과 <strong>${results.length}건</strong></p>` +
     (results.length ? results.map(s => stockCard(s)).join('') : member ? '<p class="empty-msg">종목을 찾을 수 없습니다.</p>' : '') +
     (member ? '' : '<p class="empty-msg">회원가입 시 전체 종목을 볼 수 있습니다.<br><button class="link-btn" data-act="toggleSignup">회원가입</button> 또는 <button class="link-btn" data-act="toggleLogin">로그인</button></p>');
@@ -495,6 +564,7 @@ function openModal(code, tab = 'discuss') {
 
   DETAIL_TABS.forEach(t => { document.getElementById(`${t}Tab`).innerHTML = ''; });
   switchModalTab(tab);
+  prefetchDetails(currentStock);
   if (!s.isFav) renderPosts();
 
   const wasOpen = isOpen('modalOverlay');
@@ -540,6 +610,7 @@ function leaveLayer() {
 window.addEventListener('popstate', () => {
   if (ignorePop) { ignorePop = false; return; }
   const layer = history.state?.layer;
+  if (layer !== 'pdf' && isOpen('pdfOverlay')) closePdf(true);  // 리포트 보기 → 뒤로 가기: 보기 창만 닫힘
   if (layer !== 'author' && isOpen('authorOverlay')) document.getElementById('authorOverlay').classList.add('hidden');
   if (!layer && isOpen('modalOverlay')) hideModal();
 });
@@ -602,6 +673,27 @@ function stopNewsRefresh() {
   newsTimer = null;
 }
 
+// 종목 뉴스·리포트·공시 받기 — 같은 것을 받는 중이면 그 요청을 같이 기다림 (미리 받기와 탭 누르기가 겹쳐도 한 번만)
+const detailInflight = {};
+function fetchDetail(s, type) {
+  const key = `${type}_${s.code}`;
+  return detailInflight[key] ||= fetch(`${API_BASE}/api/detail?code=${s.code}&type=${type}`)
+    .then(async res => {
+      const json = await res.json();
+      if (!res.ok || json.error) throw new Error(json.error || res.status);
+      return detailCache[key] = { ts: Date.now(), data: type === 'news' && Array.isArray(json.data) ? mixGoogle(json.data) : json.data };
+    })
+    .finally(() => { delete detailInflight[key]; });
+}
+// 종목 창을 열면 뉴스·리포트·공시를 미리 받아 둠 → 탭을 누르면 바로 보임 (미국 종목은 뉴스만)
+function prefetchDetails(s) {
+  if (!s || s.isSector || s.isFav) return;
+  for (const type of s.us ? ['news'] : DETAIL_TABS) {
+    const c = detailCache[`${type}_${s.code}`];
+    if (!c || Date.now() - c.ts >= DETAIL_TTL[type]) fetchDetail(s, type).catch(() => {});
+  }
+}
+
 async function loadDetail(type, force = false) {
   const s = currentStock;
   if (!s) return;
@@ -615,10 +707,7 @@ async function loadDetail(type, force = false) {
   if (!cached) panel.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
 
   try {
-    const res = await fetch(`${API_BASE}/api/detail?code=${s.code}&type=${type}`);
-    const json = await res.json();
-    if (!res.ok || json.error) throw new Error(json.error || res.status);
-    detailCache[key] = { ts: Date.now(), data: json.data };
+    await fetchDetail(s, type);
   } catch (e) {
     if (!cached && currentStock === s && currentModalTab === type) {
       panel.innerHTML = `<p class="empty-msg">데이터를 불러오지 못했습니다.<br><a class="panel-link" href="${naverUrl(s)}" target="_blank" rel="noopener">네이버 증권에서 보기 ↗</a></p>`;
@@ -635,6 +724,61 @@ const naverUrl = s => s.isSector
   : s.us
   ? `https://m.stock.naver.com/worldstock/${s.etf ? 'etf' : 'stock'}/${s.code}/total`
   : `https://m.stock.naver.com/domestic/stock/${s.code}/total`;
+// 증권사 리포트 링크: PC는 원문 PDF(/api/report)를 새 탭으로, 휴대폰은 같은 원문을 사이트 안 보기 창(openPdf)으로
+// (휴대폰·홈 화면 앱은 PDF를 새 창에서 못 띄워 빈 창이 열리거나 뒤로 가기 때 앱이 닫힘)
+const MOBILE = matchMedia('(pointer: coarse)').matches;
+const REPORT_RE = /^\/api\/report\?kind=(company|industry|invest)&id=(\d+)$/;
+const reportAttrs = r => MOBILE && REPORT_RE.test(r.url || '') ? ` data-act="openPdf" data-title="${escHtml(r.title)}"` : '';
+
+// ── 휴대폰 리포트 보기: PDF.js로 원문을 그려 사이트 안 전체 화면 창에 (뒤로 가기·← 뒤로로 닫으면 보던 종목 창) ──
+let pdfjsLoading = null, pdfToken = 0;
+const loadPdfjs = () => pdfjsLoading ||= new Promise((resolve, reject) => {
+  const sc = document.createElement('script');
+  sc.src = '/vendor/pdfjs/pdf.min.js';
+  sc.onload = () => { window.pdfjsLib.GlobalWorkerOptions.workerSrc = '/vendor/pdfjs/pdf.worker.min.js'; resolve(window.pdfjsLib); };
+  sc.onerror = () => { pdfjsLoading = null; reject(new Error('pdf.js')); };
+  document.head.appendChild(sc);
+});
+async function openPdf(url, title) {
+  const token = ++pdfToken;
+  const box = document.getElementById('pdfPages');
+  const m = String(url).match(REPORT_RE);
+  const naver = m ? `https://m.stock.naver.com/investment/research/${m[1]}/${m[2]}` : url;
+  document.getElementById('pdfTitle').textContent = title || '증권사 리포트';
+  box.innerHTML = '<p class="empty-msg">리포트를 불러오는 중...</p>';
+  box.scrollTop = 0;
+  const wasOpen = isOpen('pdfOverlay');
+  document.getElementById('pdfOverlay').classList.remove('hidden');
+  enterLayer('pdf', wasOpen);
+  try {
+    // 원문 PDF가 없으면 서버가 네이버 리포트 화면으로 보내므로(302) 따라가지 않고 그때는 링크로 안내
+    const [lib, res] = await Promise.all([loadPdfjs(), fetch(url, { redirect: 'manual' })]);
+    if (!res.ok || !(res.headers.get('Content-Type') || '').includes('pdf')) throw new Error('no pdf');
+    const pdf = await lib.getDocument({ data: await res.arrayBuffer(), isEvalSupported: false }).promise;
+    if (token !== pdfToken) return;
+    box.innerHTML = '';
+    const width = box.clientWidth - 16, dpr = Math.min(window.devicePixelRatio || 1, 2);
+    for (let i = 1; i <= pdf.numPages; i++) {  // 한 쪽씩 차례로 (앞쪽부터 바로 보이게)
+      const page = await pdf.getPage(i);
+      if (token !== pdfToken) return;
+      const viewport = page.getViewport({ scale: (width * dpr * 1.5) / page.getViewport({ scale: 1 }).width });  // 1.5배: 손가락으로 확대해도 선명하게
+      const canvas = document.createElement('canvas');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      box.appendChild(canvas);
+      await page.render({ canvasContext: canvas.getContext('2d'), viewport }).promise;
+    }
+  } catch {
+    if (token !== pdfToken) return;
+    box.innerHTML = `<p class="empty-msg">리포트 원문을 불러오지 못했습니다.<br><a href="${escHtml(naver)}" target="_blank" rel="noopener">네이버 증권에서 보기 ↗</a></p>`;
+  }
+}
+function closePdf(fromPop) {
+  if (!isOpen('pdfOverlay')) return;
+  pdfToken++;
+  document.getElementById('pdfOverlay').classList.add('hidden');
+  document.getElementById('pdfPages').innerHTML = '';
+  if (!fromPop) leaveLayer();
+}
 // 외부 https 링크 또는 우리 서버 경로(/api/report = 리포트 원문 PDF)
 const safeUrl = u => /^(https:\/\/|\/api\/)/.test(u || '') ? escHtml(u) : '#';
 
@@ -667,7 +811,7 @@ function renderDetail(type, data, ts) {
 
   if (type === 'research') {
     return data.map(r => `
-      <a class="feed-item" href="${safeUrl(r.url)}" target="_blank" rel="noopener">
+      <a class="feed-item" href="${safeUrl(r.url)}" target="_blank" rel="noopener"${reportAttrs(r)}>
         <div class="feed-main">
           <div class="feed-title">${escHtml(r.title)}</div>
           <div class="feed-summary">${escHtml(r.summary || '')}</div>
@@ -729,8 +873,9 @@ async function loadFavDetail(type, force = false) {
   const list = type === 'news' ? codes : codes.filter(c => !stockOf(c).us);
   const chunks = [];
   for (let i = 0; i < list.length; i += NEWS_CHUNK) chunks.push(list.slice(i, i + NEWS_CHUNK));
-  const results = await Promise.allSettled(chunks.map(async c => {
-    const res = await fetch(`${API_BASE}/api/${type === 'news' ? 'news?' : `detail?type=${type}&`}codes=${c.join(',')}`);
+  const results = await Promise.allSettled(chunks.map(async (c, i) => {
+    // 뉴스 첫 요청은 구글 뉴스도 (관심 종목 이름으로 검색, api/news.js favGoogleNews)
+    const res = await fetch(`${API_BASE}/api/${type === 'news' ? `news?${i === 0 ? 'google=1&' : ''}` : `detail?type=${type}&`}codes=${c.join(',')}`);
     const json = await res.json();
     if (!res.ok || json.error) throw new Error(json.error || res.status);
     return json.data;
@@ -740,7 +885,7 @@ async function loadFavDetail(type, force = false) {
   } else {
     const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
     const data = type === 'news'
-      ? mergeSectorNews(items).slice(0, SECTOR_NEWS_MAX)
+      ? mixGoogle(mergeSectorNews(items), favNewsArrange).slice(0, SECTOR_NEWS_MAX)
       : items.sort((a, b) => favItemTime(b).localeCompare(favItemTime(a))).slice(0, SECTOR_NEWS_MAX);
     favDetail[type] = { ts: Date.now(), key, data };
   }
@@ -785,7 +930,7 @@ function favDetailHtml(type) {
 
   if (type === 'research') {
     return d.data.map(r => `
-      <a class="feed-item" href="${safeUrl(r.url)}" target="_blank" rel="noopener">
+      <a class="feed-item" href="${safeUrl(r.url)}" target="_blank" rel="noopener"${reportAttrs(r)}>
         <div class="feed-main">
           <div class="feed-title">${escHtml(r.title)}</div>
           <div class="feed-summary">${escHtml(r.summary || '')}</div>
@@ -2014,6 +2159,7 @@ function renderIndexCard(d) {
 // ── 키보드 ESC 닫기 ───────────────────────────────────
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
+    if (isOpen('pdfOverlay')) return closePdf();
     if (!document.getElementById('authorOverlay').classList.contains('hidden')) return closeAuthor();
     closeModal(null);
     closeDropdowns();

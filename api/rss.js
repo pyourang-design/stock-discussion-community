@@ -3,6 +3,7 @@
 //   2) 남는 자리는 업종별 대표 종목 토론방 페이지 (총 100건까지)
 import { STOCKS, SECTORS, STOCKS_AS_OF } from './_stocks.js';
 import { redis, dbReady } from './_redis.js';
+import { HIDDEN_NAME, DROPPED, needsPosts, isStockBoard, indexableAll } from './_public.js';
 
 const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
@@ -16,13 +17,15 @@ const sectorName = key => key === 'usa' ? '미국 주식' : `${SECTORS.find(s =>
 // 주식 시장 경제 게시판 (업종과 무관한 전체 시장 토론)
 const MARKET_BOARD = 'SECMKT';
 const COLUMN_BOARD = 'COLMKT';  // 운영자 칼럼 (주식 시장 경제 게시판의 칼럼 탭)
+// 종목 토론방 글은 검색 노출되는 종목만: 개편 전부터 탭에 있던 종목 + 회원 토론글 기준을 넘은 종목 (api/_public.js)
 const boardSector = code => SECTORS.find(s => 'SEC' + s.key.slice(0, 3).toUpperCase() === code)?.key;
 
 async function recentPosts() {
   if (!dbReady()) return [];
   const [flat] = await redis([['HGETALL', 'postcount']]);
+  const open = await indexableAll();
   const codes = [];
-  for (let i = 0; i < (flat || []).length; i += 2) if (Number(flat[i + 1]) > 0) codes.push(flat[i]);
+  for (let i = 0; i < (flat || []).length; i += 2) if (Number(flat[i + 1]) > 0 && (!isStockBoard(flat[i]) || !needsPosts(flat[i]) || open.has(flat[i]))) codes.push(flat[i]);
   if (!codes.length) return [];
   const lists = await redis(codes.map(c => ['LRANGE', `posts:${c}`, 0, PER_BOARD - 1]));
   const ids = lists.flat().filter(Boolean);
@@ -43,7 +46,8 @@ export default async function handler(req, res) {
       const text = String(p.content).replace(/\[사진:[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
       return { title: `[주식 강의] ${p.title || text.slice(0, 40)}`, link, guid: link, desc: text.slice(0, 300), date: new Date(p.editedTs || p.ts), category: '주식 강의' };
     }
-    const s = STOCKS.find(x => x.code === p.code);
+    const extra = DROPPED.get(p.code) || (HIDDEN_NAME.has(p.code) ? { code: p.code, name: HIDDEN_NAME.get(p.code) } : null);
+    const s = STOCKS.find(x => x.code === p.code) || (extra ? { ...extra, sectors: {}, hidden: true } : null);
     const sec = s ? null : boardSector(p.code);
     const where = s ? `${s.name} 종목 토론방` : sec ? `${sectorName(sec)} 게시판` : p.code === MARKET_BOARD ? '주식 시장 경제 토론' : '토론방';
     const link = s ? stockUrl(s.code) : sec ? `${SITE}/?sector=${sec}` : `${SITE}/`;
@@ -52,7 +56,7 @@ export default async function handler(req, res) {
       title: `[${where}] ${text.slice(0, 40)}${text.length > 40 ? '…' : ''}`,
       link, guid: `${link}#post-${p.id}`,
       desc: `${p.nick}님의 의견: ${text.slice(0, 300)}`,
-      date: new Date(p.editedTs || p.ts), category: s ? sectorName(Object.keys(s.sectors)[0]) : sec ? sectorName(sec) : p.code === MARKET_BOARD ? '주식 시장 경제' : '토론',
+      date: new Date(p.editedTs || p.ts), category: s?.hidden ? '종목 토론' : s ? sectorName(Object.keys(s.sectors)[0]) : sec ? sectorName(sec) : p.code === MARKET_BOARD ? '주식 시장 경제' : '토론',
     };
   });
 

@@ -39,14 +39,28 @@ const NON_PRESS_HOST = [
 const isNonPress = (press, host) => NON_PRESS_NAME.test(press) || /^blog\./.test(host) || /\.go\.kr$/.test(host)
   || NON_PRESS_HOST.some(d => host === d || host.endsWith('.' + d));
 
-// query: 서버에 고정된 검색어만 넘길 것 (임의 검색어 프록시 방지)
-export async function googleNews(query, { when = '1d', max = 20 } = {}) {
+// 구글(중계)이 막히거나 느려도 뉴스 전체가 기다리지 않게 짧게 끊음 (2026-10-19 중계가 503을 10초 뒤에 돌려줘 뉴스가 느려졌던 문제)
+const GOOGLE_TIMEOUT = 3500;
+// 같은 검색어는 10분 동안 Cloudflare 캐시에서 (구글 요청 수를 줄여 다시 막히지 않게, 7일치 검색이라 10분이면 충분)
+const GOOGLE_TTL = 600;
+async function fetchRss(query, when) {
   const proxy = process.env.GNEWS_PROXY_URL;
-  const r = proxy
-    ? await fetch(`${proxy}?q=${encodeURIComponent(query)}&when=${when}`, { headers: { 'x-proxy-key': process.env.GNEWS_PROXY_KEY || '' } })
-    : await fetch(`https://news.google.com/rss/search?q=${encodeURIComponent(`${query} when:${when}`)}&hl=ko&gl=KR&ceid=KR:ko`, { headers: { 'User-Agent': UA } });
+  const url = proxy ? `${proxy}?q=${encodeURIComponent(query)}&when=${when}`
+    : `https://news.google.com/rss/search?q=${encodeURIComponent(`${query} when:${when}`)}&hl=ko&gl=KR&ceid=KR:ko`;
+  const cache = typeof caches !== 'undefined' ? caches.default : null;
+  const key = cache ? new Request(`https://gnews.cache/${encodeURIComponent(query)}/${when}`) : null;
+  const hit = cache && await cache.match(key).catch(() => null);
+  if (hit) return hit.text();
+  const r = await fetch(url, { headers: proxy ? { 'x-proxy-key': process.env.GNEWS_PROXY_KEY || '' } : { 'User-Agent': UA }, signal: AbortSignal.timeout(GOOGLE_TIMEOUT) });
   if (!r.ok) throw new Error(`Google HTTP ${r.status}`);
   const xml = await r.text();
+  if (cache) await cache.put(key, new Response(xml, { headers: { 'Cache-Control': `public, max-age=${GOOGLE_TTL}` } })).catch(() => {});
+  return xml;
+}
+
+// query: 서버에 고정된 검색어만 넘길 것 (임의 검색어 프록시 방지)
+export async function googleNews(query, { when = '1d', max = 20 } = {}) {
+  const xml = await fetchRss(query, when);
   const tag = (s, t) => (s.match(new RegExp(`<${t}[^>]*>([\\s\\S]*?)</${t}>`)) || [])[1] || '';
   return [...xml.matchAll(/<item>([\s\S]*?)<\/item>/g)].map(m => {
     const it = m[1];
@@ -66,7 +80,7 @@ export async function googleNews(query, { when = '1d', max = 20 } = {}) {
       source: 'google',
       nonPress: isNonPress(press, host),
     };
-  }).filter(n => n.title && /^https:\/\//.test(n.url) && !n.nonPress)
+  }).filter(n => n.title && /[가-힣]/.test(n.title) && /^https:\/\//.test(n.url) && !n.nonPress)  // 한글 제목만 (NAVER 등 영문 종목명은 해외 영문 기사가 섞임)
     .map(({ nonPress, ...n }) => n)
     .sort((a, b) => b.datetime.localeCompare(a.datetime))
     .slice(0, max);

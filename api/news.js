@@ -7,6 +7,7 @@
 // { data: [{ title, summary, press, datetime, url, thumb, codes: [관련 종목코드], source: 'naver'|'google' }] }
 import { googleNews, stripTags } from './_google.js';
 import { LISTED_NAMES } from './_listed.js';
+import { nameOf, stockQuery } from './_names.js';
 
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const MAX_CODES = 25;
@@ -27,6 +28,11 @@ const GOOGLE_QUERY = {
   ship: [`(조선주 OR 조선업 OR 조선사 OR K-조선 OR "선박 수주") ${MKT}`, `(방산주 OR 방산 OR 방위산업 OR K-방산) ${MKT}`],
   auto: [`(자동차주 OR 완성차 OR 현대차 OR 기아 OR "자동차 부품" OR 타이어) ${MKT}`],
   finance: [`(금융주 OR 은행주 OR 증권주 OR 보험주 OR 금융지주 OR 밸류업) ${MKT} -美 -유럽`],
+  elec: [`(전자부품 OR MLCC OR 반도체기판 OR FC-BGA OR 카메라모듈 OR 전장부품) ${MKT}`, `(디스플레이 OR OLED OR 가전 OR TV OR 스마트폰 부품) ${MKT}`],
+  chem: [`(석유화학 OR 화학주 OR 정유주 OR 정유사 OR 나프타 OR 에틸렌) ${MKT}`, `(철강주 OR 철강업 OR 후판 OR 열연 OR 비철금속 OR 아연 OR 구리) ${MKT}`],
+  logistics: [`(해운주 OR 해운업 OR 컨테이너 운임 OR SCFI OR 물류 OR 항공주) ${MKT}`, `(건설주 OR 건설사 OR 건설기계 OR 기계주 OR 플랜트 수주) ${MKT}`],
+  consumer: [`(음식료 OR 식품주 OR 라면 OR 주류 OR 담배 OR 음료) ${MKT}`, `(유통주 OR 백화점 OR 편의점 OR 의류 OR 패션주 OR 내수주) ${MKT}`],
+  telecom: [`(통신주 OR 통신사 OR SK텔레콤 OR KT OR LG유플러스 OR 5G) ${MKT}`, `(인터넷 플랫폼 OR 네이버 OR 카카오 OR 게임주 OR IT서비스 OR 소프트웨어) ${MKT}`],
   // 주식 시장: 국내 증시 · 환율·금리·유가(증시 언급 기사만) · 금·은 시세 · 미국 증시 ('금'·'은' 한 글자는 다른 말과 겹쳐 금값·은값 등으로 검색)
   market: [
     '(코스피 OR 코스닥 OR 주식시장 OR 한국증시 OR 국내증시 OR KOSPI OR KOSDAQ OR "외국인 순매도" OR "외국인 순매수")',
@@ -121,6 +127,22 @@ async function sectorGoogleNews(sector) {
   return results.flatMap(r => r.status === 'fulfilled' ? r.value : []);
 }
 
+// 관심 종목 모아보기: 종목명 여러 개를 OR로 묶어 구글 검색 (google=1인 첫 요청에서만, 검색어는 서버의 종목 이름으로만 만듦)
+// 검색어가 너무 길지 않게 FAV_GOOGLE_NAMES개씩, 최대 2번
+const FAV_GOOGLE_NAMES = 8;
+async function favGoogleNews(codes) {
+  const names = [...new Set(codes.map(nameOf).filter(Boolean))].slice(0, FAV_GOOGLE_NAMES * 2);
+  if (!names.length) return [];
+  const groups = [];
+  for (let i = 0; i < names.length; i += FAV_GOOGLE_NAMES) groups.push(names.slice(i, i + FAV_GOOGLE_NAMES));
+  const results = await Promise.allSettled(groups.map(g => googleNews(g.map(stockQuery).map(q => `(${q})`).join(' OR '), { when: '7d', max: Math.ceil(GOOGLE_MAX / groups.length) })));
+  // 기사 제목에 들어간 종목을 관련 종목으로 (화면의 종목명 태그)
+  return results.flatMap(r => r.status === 'fulfilled' ? r.value : []).map(n => {
+    const code = codes.find(c => { const nm = nameOf(c); return nm && n.title.includes(nm); });
+    return code ? { ...n, code } : n;
+  });
+}
+
 export default async function handler(req, res) {
   const codes = String(req.query.codes || '')
     .split(',')
@@ -130,10 +152,10 @@ export default async function handler(req, res) {
 
   const sector = String(req.query.sector || '');
   if (!codes.length && !Object.hasOwn(GOOGLE_QUERY, sector)) return res.status(400).json({ error: '종목코드 또는 업종이 올바르지 않습니다' });
-  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=60');
+  res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=600');  // 10분까지는 지난 것을 바로 보여 주고 뒤에서 새로 받음 (functions/_adapter.js)
 
   const market = sector === 'market' ? MARKET_PAGES.map(marketNews) : [];
-  const results = await Promise.allSettled([...market, ...codes.map(stockNews), sectorGoogleNews(sector)]);
+  const results = await Promise.allSettled([...market, ...codes.map(stockNews), sectorGoogleNews(sector), favGoogleNews(req.query.google === '1' ? codes : [])]);
   const items = results.flatMap(r => r.status === 'fulfilled' ? r.value : []).filter(n => !AUTO_PRICE_RE.test(n.title));
   if (!items.length) return res.status(502).json({ error: '뉴스를 불러오지 못했습니다' });
 
@@ -151,9 +173,10 @@ export default async function handler(req, res) {
     byKey.set(key, item);
     byKey.set(id, item);
   }
-  const data = [...new Set(byKey.values())]
-    .sort((a, b) => String(b.datetime).localeCompare(String(a.datetime)))
-    .slice(0, MAX_ITEMS);
+  // 구글은 네이버보다 오래된 기사가 많아 함께 최신순으로 자르면 다 밀려남 → 따로 붙이고 화면에서 섞음 (app.js mixGoogle)
+  const byTime = (a, b) => String(b.datetime).localeCompare(String(a.datetime));
+  const all = [...new Set(byKey.values())];
+  const data = [...all.filter(n => n.source !== 'google').sort(byTime).slice(0, MAX_ITEMS), ...all.filter(n => n.source === 'google').sort(byTime).slice(0, GOOGLE_MAX)];
 
   res.json({ data });
 }

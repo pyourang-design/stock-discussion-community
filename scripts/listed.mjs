@@ -7,6 +7,7 @@
 //   3) api/_hidden.js : 같은 숨은 종목 [코드, 이름] (서버용: AI 운영자 소개글·실적 글, api/_ai.js · api/posts.js)
 import fs from 'fs';
 import { STOCKS } from '../api/_stocks.js';
+import { LEGACY } from '../api/_legacy.js';  // 2026-10-19 개편으로 탭에서 빠진 미국 종목도 화면용 숨은 종목에 (관심 종목·종목 창 유지)
 const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36';
 const capText = v => v >= 1e13 ? (v / 1e12).toFixed(1) + '조' : v >= 1e12 ? (v / 1e12).toFixed(2) + '조' : Math.round(v / 1e8).toLocaleString() + '억';
 const shown = new Set(STOCKS.map(s => s.code));
@@ -28,7 +29,9 @@ const list = [...names].sort((a, b) => b.length - a.length);
 const day = new Date().toISOString().slice(0, 10);
 fs.writeFileSync(new URL('../api/_listed.js', import.meta.url),
   `// 자동 생성 (scripts/listed.mjs, ${day}) — 코스피·코스닥 상장 보통주 이름 ${list.length}개\nexport const LISTED_NAMES = ${JSON.stringify(list)};\n`);
-fs.writeFileSync(new URL('../listed.json', import.meta.url), JSON.stringify(hidden.map(h => [h.code, h.name, h.market, capText(h.cap)])));
+// 미국 종목: [코드, 이름, 시장, '', 티커, ETF 여부] (국내 숨은 종목 뒤에)
+const usDropped = LEGACY.filter(r => r[3] && !shown.has(r[0])).map(([code, name, market, ticker, etf]) => [code, name, market, '', ticker, etf]);
+fs.writeFileSync(new URL('../listed.json', import.meta.url), JSON.stringify([...hidden.map(h => [h.code, h.name, h.market, capText(h.cap)]), ...usDropped]));
 fs.writeFileSync(new URL('../api/_hidden.js', import.meta.url),
   `// 자동 생성 (scripts/listed.mjs, ${day}) — 업종 탭에 없는 숨은 종목 ${hidden.length}개 [코드, 이름] (회원 검색 전용, 시가총액 큰 순)\nexport const HIDDEN = ${JSON.stringify(hidden.map(h => [h.code, h.name]))};\n`);
-console.log('종목명', list.length, '숨은 종목', hidden.length);
+console.log('종목명', list.length, '숨은 종목', hidden.length, '탭에서 빠진 미국 종목', usDropped.length);

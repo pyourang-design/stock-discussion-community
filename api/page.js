@@ -4,6 +4,7 @@
 import { STOCKS, SECTORS, STOCKS_AS_OF, US_AS_OF } from './_stocks.js';
 import { redis, dbReady } from './_redis.js';
 import { pickPrice } from './_price.js';
+import { needsPosts, publicExtra, indexable } from './_public.js';
 
 const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
@@ -86,17 +87,19 @@ function aiPostHtml(p) {
   return `<h3 class="ai-headline">${esc(p.headline || '')}</h3><p class="ai-summary">${esc(summary)}</p><details class="ai-more"><summary>더 보기</summary>${tables}<p>${esc(p.content)}</p>${p.src ? `<div class="ai-src">📄 출처: <a href="${esc(p.src.url)}" target="_blank" rel="noopener nofollow">${esc(p.src.label)}</a> · DART 공시 숫자를 프로그램이 정리한 글이며 투자 권유가 아닙니다.</div>` : ''}</details>`;
 }
 
-async function posts(code) {
+// page: 1부터, POSTS_SHOWN개씩 (2쪽부터 /stock/{코드}?page=N — 지난 토론글도 검색 로봇이 읽도록)
+async function posts(code, page = 1) {
   if (!dbReady()) return { list: [], total: 0 };
-  const [ids, counts] = await redis([['LRANGE', `posts:${code}`, 0, POSTS_SHOWN - 1], ['HGET', 'postcount', code]]);
-  if (!ids?.length) return { list: [], total: 0 };
+  const from = (page - 1) * POSTS_SHOWN;
+  const [ids, total] = await redis([['LRANGE', `posts:${code}`, from, from + POSTS_SHOWN - 1], ['LLEN', `posts:${code}`]]);
+  if (!ids?.length) return { list: [], total: Number(total) || 0 };
   const raws = await redis(ids.map(id => ['GET', `post:${id}`]));
   const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content, ...(p.ai && !p.blind ? { ai: true, headline: p.headline, summary: p.summary, tables: p.tables, src: p.src } : {}) }));
-  return { list, total: Number(counts) || list.length };
+  return { list, total: Number(total) || list.length };
 }
 
 // image 없으면(종목 페이지·사진 없는 칼럼) 사이트 공유 이미지 /og-image.png (카카오톡·SNS 미리보기, 원본 scripts/og/og.html)
-function layout({ title, desc, canonical, body, jsonld, status = 200, image = null, ogType = 'website' }) {
+function layout({ title, desc, canonical, body, jsonld, status = 200, image = null, ogType = 'website', noindex = false }) {
   return `<!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -104,7 +107,7 @@ function layout({ title, desc, canonical, body, jsonld, status = 200, image = nu
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>${esc(title)}</title>
   <meta name="description" content="${esc(desc)}" />
-  ${status === 200 ? `<link rel="canonical" href="${esc(canonical)}" />` : '<meta name="robots" content="noindex" />'}
+  ${status === 200 && !noindex ? `<link rel="canonical" href="${esc(canonical)}" />` : '<meta name="robots" content="noindex" />'}
   <meta property="og:type" content="${esc(ogType)}" />
   <meta property="og:site_name" content="${NAME}" />
   <meta property="og:title" content="${esc(title)}" />
@@ -124,7 +127,7 @@ function layout({ title, desc, canonical, body, jsonld, status = 200, image = nu
 <body>
 <header class="site-header">
   <div class="container header-inner">
-    <a class="logo" href="/"><span class="logo-icon"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#logoGrad)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg></span><span class="logo-text">${NAME}</span></a>
+    <a class="logo" href="/"><span class="logo-icon"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#logoGrad)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg></span><span class="logo-text">${NAME} 커뮤니티</span></a>
   </div>
 </header>
 <main class="container stock-page">
@@ -151,8 +154,16 @@ ${body}
 
 export default async function handler(req, res) {
   const code = String(req.query.code ?? '').trim();
-  const s = STOCKS.find(x => x.code === code) || STOCKS.find(x => x.code.toLowerCase() === code.toLowerCase());
+  let s = STOCKS.find(x => x.code === code) || STOCKS.find(x => x.code.toLowerCase() === code.toLowerCase());
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
+  // 업종 탭 밖 종목: 개편으로 탭에서 빠진 옛 종목·관심 종목으로 담긴 적 있는 숨은 종목만 페이지 공개 (api/_public.js)
+  // 탭에 새로 들어온 종목과 탭 밖 종목은 회원 토론글이 기준 개수가 되기 전엔 noindex
+  let noindex = false;
+  if (!s && dbReady()) {
+    const x = await publicExtra(code).catch(() => null);
+    if (x) s = { market: '', ...x, price: 0, change: 0, sectors: {}, hidden: true };
+  }
+  if (s && needsPosts(s.code)) noindex = !dbReady() || !(await indexable([s.code]).catch(() => new Map())).has(s.code);
 
   if (!s) {
     res.setHeader('Cache-Control', 's-maxage=600');
@@ -167,39 +178,88 @@ export default async function handler(req, res) {
     return res.status(301).end();
   }
 
-  const [q, nw, ps] = await Promise.allSettled([quote(s), news(s), posts(s.code)]);
+  // 토론글 쪽 번호 (어댑터가 2~1000만 넘김). 2쪽부터는 지난 토론글만 — 시세·뉴스·종목 정보는 1쪽에만 (중복 내용·외부 호출 줄임)
+  const page = Math.min(Math.max(1, parseInt(req.query.page, 10) || 1), 1000);
+  const base = `/stock/${encodeURIComponent(s.code)}`;
+  const pageUrl = n => n === 1 ? base : `${base}?page=${n}`;
+  const [q, nw, ps] = await Promise.allSettled(page === 1 ? [quote(s), news(s), posts(s.code)] : [null, null, posts(s.code, page)]);
   const qt = q.status === 'fulfilled' ? q.value : null;
-  const newsList = nw.status === 'fulfilled' ? nw.value : [];
+  const newsList = nw.status === 'fulfilled' && nw.value ? nw.value : [];
   const { list: postList, total } = ps.status === 'fulfilled' ? ps.value : { list: [], total: 0 };
+  const pages = Math.max(1, Math.ceil(total / POSTS_SHOWN));
+  if (page > pages && ps.status === 'fulfilled') {  // 없는 쪽 → 마지막 쪽으로
+    res.setHeader('Location', pageUrl(pages));
+    return res.status(301).end();
+  }
+  const nums = [...new Set([1, pages, ...Array.from({ length: 5 }, (_, i) => page - 2 + i)])].filter(n => n >= 1 && n <= pages).sort((a, b) => a - b);
+  let numHtml = '', last = 0;
+  for (const n of nums) { if (n - last > 1) numHtml += '<span class="pager-gap">…</span>'; numHtml += n === page ? `<span class="pager-btn on" aria-current="page">${n}</span>` : `<a class="pager-btn" href="${pageUrl(n)}">${n}</a>`; last = n; }
+  const pager = pages > 1 ? `<nav class="pager" aria-label="토론글 페이지">${page > 1 ? `<a class="pager-btn" href="${pageUrl(page - 1)}" rel="prev" aria-label="이전 페이지">‹</a>` : '<span class="pager-btn disabled">‹</span>'}${numHtml}${page < pages ? `<a class="pager-btn" href="${pageUrl(page + 1)}" rel="next" aria-label="다음 페이지">›</a>` : '<span class="pager-btn disabled">›</span>'}</nav>` : '';
+  const postsHtml = postList.length ? `<ul class="sp-posts">${postList.map(p => `
+      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.ai ? ' <span class="member-badge ai">🤖 자동</span>' : p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
+      ${p.ai ? aiPostHtml(p) : `<p class="sp-clamp">${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p>`}</li>`).join('')}
+    </ul>` : `<p class="sp-empty">아직 ${esc(s.name)} 토론글이 없습니다. 첫 번째 의견을 남겨보세요.</p>`;
 
   const keys = Object.keys(s.sectors);
   const main = keys[0];
-  const r = s.sectors[main];
+  const r = s.sectors[main] || {};
   const rankParts = [];
   if (r.hold) rankParts.push(`국내 투자자 보유 ${r.hold}위 (${r.amt})`);
   if (r.hits) rankParts.push(`국내 투자자 관심 ${r.sel}위`);
   if (r.cap) rankParts.push(`시가총액 ${r.cap}위`);
   if (r.talk) rankParts.push(`네이버 토론글 ${r.talk}위`);  // 네이버 종목토론방 최근 1년 글 수 순위 (이 사이트 글 수 아님)
   if (r.tv) rankParts.push(`거래대금 ${r.tv}위`);
-  const idLabel = s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : `${s.code} · ${s.market.toUpperCase()}`;
+  const idLabel = s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : s.hidden ? s.code : `${s.code} · ${s.market.toUpperCase()}`;
   const unit = s.us ? '$' : '';
   const won = s.us ? '' : '원';
-  const price = qt?.price ?? (s.us ? s.price.toFixed(2) : s.price.toLocaleString());
+  const price = qt?.price ?? (s.hidden ? '-' : s.us ? s.price.toFixed(2) : s.price.toLocaleString());
   const change = Number.isFinite(qt?.change) ? qt.change : s.change;
   const up = change >= 0;
   const sectorNames = keys.map(sectorTitle);
-  const sectorName = sectorNames[0];
-  const peers = STOCKS.filter(x => x.code !== s.code && x.sectors[main]).sort((a, b) => a.sectors[main].order - b.sectors[main].order).slice(0, 40);
+  const sectorName = sectorNames[0] || '';
+  const peers = s.hidden ? [] : STOCKS.filter(x => x.code !== s.code && x.sectors[main]).sort((a, b) => a.sectors[main].order - b.sectors[main].order).slice(0, 40);
   const discussUrl = `/?stock=${encodeURIComponent(s.code)}`;
 
   const title = `${s.name} 종목 토론방(종토방) - 주가·뉴스·투자자 의견 | 주식 종목 토론 게시판`;
-  const desc = `${s.name}(${s.us ? s.ticker : s.code}) 종목 토론방·종목 토론 게시판. ${sectorName} ${rankParts[0] || ''} 종목의 실시간 주가, 시가총액·PER·PBR, 최근 뉴스와 투자자 토론 의견을 한곳에서 확인하고 함께 이야기하는 주식 종목 토론방입니다.`;
-  const canonical = `${SITE}/stock/${encodeURIComponent(s.code)}`;
+  const desc = `${s.name}(${s.us ? s.ticker : s.code}) 종목 토론방·종목 토론 게시판.${s.hidden ? '' : ` ${sectorName} ${rankParts[0] || ''} 종목의`} 실시간 주가, 시가총액·PER·PBR, 최근 뉴스와 투자자 토론 의견을 한곳에서 확인하고 함께 이야기하는 주식 종목 토론방입니다.`;
+  const canonical = `${SITE}${pageUrl(page)}`;
+
+  if (page > 1) {
+    const from = (page - 1) * POSTS_SHOWN + 1, to = Math.min(page * POSTS_SHOWN, total);
+    const body2 = `
+  <nav class="breadcrumb"><a href="/">홈</a> › ${s.hidden ? '' : `<a href="/?sector=${esc(main)}">${esc(sectorName)}</a> › `}<a href="${esc(base)}">${esc(s.name)} 종목 토론방</a> › <span>${page}페이지</span></nav>
+  <h1>${esc(s.name)} 종목 토론방 지난 토론글 (${page}페이지)</h1>
+  <p class="sp-sub">${esc(idLabel)} · 전체 ${total}건 중 ${from}~${to}번째 글 (최신순)</p>
+  <a class="btn-submit sp-cta" href="${esc(discussUrl)}">💬 ${esc(s.name)} 토론 참여하기 · 실시간 시세 보기</a>
+  <p class="sp-disclaimer">⚠️ 토론글은 투자자 개인 의견이며 투자 권유가 아닙니다. 투자 판단과 그 결과의 책임은 투자자 본인에게 있습니다.</p>
+
+  <section class="sp-section">
+    <h2>${esc(s.name)} 지난 토론글 <span>(${page}/${pages}페이지)</span></h2>
+    ${postsHtml}
+    ${pager}
+    <a class="sp-more" href="${esc(base)}">${esc(s.name)} 종목 토론방 첫 페이지 (주가·뉴스·종목 정보) →</a>
+  </section>
+`;
+    const jsonld2 = {
+      '@context': 'https://schema.org', '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: '홈', item: SITE + '/' },
+        { '@type': 'ListItem', position: 2, name: `${s.name} 종목 토론방`, item: SITE + base },
+        { '@type': 'ListItem', position: 3, name: `${page}페이지`, item: canonical },
+      ],
+    };
+    res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600');
+    return res.status(200).send(layout({
+      title: `${s.name} 종목 토론방 지난 토론글 ${page}페이지 | 주식 종목 토론 게시판`,
+      desc: `${s.name}(${s.us ? s.ticker : s.code}) 종목 토론방의 지난 투자자 토론글 ${page}페이지 — 전체 ${total}건 중 ${from}~${to}번째 글.`,
+      canonical, body: body2, jsonld: jsonld2, noindex,
+    }));
+  }
 
   const body = `
-  <nav class="breadcrumb"><a href="/">홈</a> › <a href="/?sector=${esc(main)}">${esc(sectorName)}</a> › <span>${esc(s.name)}</span></nav>
+  <nav class="breadcrumb"><a href="/">홈</a> › ${s.hidden ? '' : `<a href="/?sector=${esc(main)}">${esc(sectorName)}</a> › `}<span>${esc(s.name)}</span></nav>
   <h1>${esc(s.name)} 종목 토론방</h1>
-  <p class="sp-sub">${esc(idLabel)} · ${sectorNames.map(esc).join(', ')}${rankParts.length ? ' · ' + esc(rankParts.join(' · ')) : ''}</p>
+  <p class="sp-sub">${esc(idLabel)}${sectorNames.length ? ' · ' + sectorNames.map(esc).join(', ') : ''}${rankParts.length ? ' · ' + esc(rankParts.join(' · ')) : ''}</p>
 
   <div class="sp-quote">
     <span class="sp-price">${esc(unit + price + won)}</span>
@@ -210,22 +270,20 @@ export default async function handler(req, res) {
   <p class="sp-disclaimer">⚠️ 이 페이지의 시세·뉴스·토론글은 정보 제공용이며 투자 권유가 아닙니다. 투자 판단과 그 결과의 책임은 투자자 본인에게 있습니다.</p>
 
   <p class="sp-intro">${esc(s.name)} 종목 토론방은 ${esc(s.name)}(${esc(s.us ? s.ticker : s.code)}) 주가와 뉴스, 종목 정보, 투자자들의 매수·매도 의견을 한곳에서 보는 주식 종목 토론방입니다.
-  ${esc(s.name)}${josa(s.name, '은', '는')} ${esc(sectorNames.join(', '))}에 속하며${rankParts.length ? `, ${esc(rankParts.join(', '))}` : ''} 종목입니다.
+  ${s.hidden ? '' : `${esc(s.name)}${josa(s.name, '은', '는')} ${esc(sectorNames.join(', '))}에 속하며${rankParts.length ? `, ${esc(rankParts.join(', '))}` : ''} 종목입니다.`}
   회원은 닉네임·비밀번호 입력 없이 바로 의견을 남길 수 있고, 비회원도 닉네임과 비밀번호로 글을 쓸 수 있습니다.</p>
 
   <section class="sp-section">
     <h2>${esc(s.name)} 최근 토론글 <span>(${total}건)</span></h2>
-    ${postList.length ? `<ul class="sp-posts">${postList.map(p => `
-      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.ai ? ' <span class="member-badge ai">🤖 자동</span>' : p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
-      ${p.ai ? aiPostHtml(p) : `<p class="sp-clamp">${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p>`}</li>`).join('')}
-    </ul>` : `<p class="sp-empty">아직 ${esc(s.name)} 토론글이 없습니다. 첫 번째 의견을 남겨보세요.</p>`}
+    ${postsHtml}
+    ${pager}
     <a class="sp-more" href="${esc(discussUrl)}">${esc(s.name)} 토론 전체 보기 · 글쓰기 →</a>
   </section>
 
   ${qt?.infos?.length ? `<section class="sp-section">
     <h2>${esc(s.name)} 종목 정보</h2>
     <table class="policy-table sp-info">${qt.infos.map(([k, v]) => `<tr><th>${esc(k)}</th><td>${esc(v)}</td></tr>`).join('')}</table>
-    <p class="sp-note">출처: 네이버 증권${s.us ? ` · 국내 보유 순위: 한국예탁결제원 (${esc(US_AS_OF)} 기준)` : ` · 업종 순위: ${esc(STOCKS_AS_OF)} 기준`}</p>
+    <p class="sp-note">출처: 네이버 증권${s.us ? ` · 국내 보유 순위: 한국예탁결제원 (${esc(US_AS_OF)} 기준)` : s.hidden ? '' : ` · 업종 순위: ${esc(STOCKS_AS_OF)} 기준`}</p>
   </section>` : ''}
 
   ${newsList.length ? `<section class="sp-section">
@@ -234,8 +292,8 @@ export default async function handler(req, res) {
   </section>` : ''}
 
   <section class="sp-section">
-    <h2>${esc(sectorName)} 다른 종목 토론방</h2>
-    <ul class="sp-peers">${peers.map(x => `<li><a href="/stock/${encodeURIComponent(x.code)}">${esc(x.name)} 토론방</a></li>`).join('')}</ul>
+    ${s.hidden ? '' : `<h2>${esc(sectorName)} 다른 종목 토론방</h2>
+    <ul class="sp-peers">${peers.map(x => `<li><a href="/stock/${encodeURIComponent(x.code)}">${esc(x.name)} 토론방</a></li>`).join('')}</ul>`}
     <p><a href="/">업종별 주식 종목 토론방 전체 보기 →</a></p>
   </section>
 `;
@@ -245,13 +303,13 @@ export default async function handler(req, res) {
     '@type': 'BreadcrumbList',
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: '홈', item: SITE + '/' },
-      { '@type': 'ListItem', position: 2, name: sectorName, item: `${SITE}/?sector=${main}` },
-      { '@type': 'ListItem', position: 3, name: `${s.name} 종목 토론방`, item: canonical },
+      ...(s.hidden ? [] : [{ '@type': 'ListItem', position: 2, name: sectorName, item: `${SITE}/?sector=${main}` }]),
+      { '@type': 'ListItem', position: s.hidden ? 2 : 3, name: `${s.name} 종목 토론방`, item: canonical },
     ],
   };
 
   res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate=3600');
-  res.status(200).send(layout({ title, desc, canonical, body, jsonld }));
+  res.status(200).send(layout({ title, desc, canonical, body, jsonld, noindex }));
 }
 
 // 운영자 칼럼 페이지(api/column.js)에서 같은 틀을 씀

@@ -58,6 +58,7 @@
 //   loginfail:{아이디}  로그인 연속 실패 횟수 (10분)
 //   fav:{아이디}        회원 관심 종목코드 집합
 //   favhidden          숨은 종목(업종 탭에 없는 상장 종목, api/_hidden.js)코드 → 관심 종목으로 담은 회원 수 (hash) — AI 운영자 실적 글 대상
+//   hiddenpublic       한 번이라도 관심 종목으로 담긴 숨은 종목 (set) — 종목 페이지 공개 (api/_public.js)
 //   ai:introq          숨은 종목 AI 소개글 대기열 (처음 관심 종목으로 담길 때 넣음, api/_ai.js가 처리), ai:introseen 한 번 넣은 종목 (set)
 //   reports:{id}       게시글을 신고한 cid 집합, reportwhy:{id} 신고 사유별 건수(hash)
 //   reported           신고된 게시글 id → 신고 수 (sorted set)
@@ -167,6 +168,7 @@ async function countHiddenFav(codes, d) {
   if (!hidden.length) return;
   await redis(hidden.map(c => ['HINCRBY', 'favhidden', c, d]));
   if (d < 0) return;
+  await redis([['SADD', 'hiddenpublic', ...hidden]]);  // 종목 페이지 공개 (한 번 공개되면 계속, api/_public.js)
   const seen = await redis(hidden.map(c => ['SADD', 'ai:introseen', c]));
   const fresh = hidden.filter((_, i) => Number(seen[i]) === 1);
   if (fresh.length) await redis([['RPUSH', 'ai:introq', ...fresh]]);

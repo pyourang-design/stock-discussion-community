@@ -47,6 +47,7 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .site-header { background: var(--surface); border-bottom: 1px solid var(--border); position: sticky; top: 0; z-index: 100; backdrop-filter: blur(8px); }
 .header-inner { display: flex; align-items: center; gap: 16px; padding: 12px 16px; }
 .logo { display: flex; align-items: center; gap: 8px; font-size: 1.32rem; font-weight: 700; white-space: nowrap; }
+.logo h1.logo-text { font-size: inherit; font-weight: inherit; margin: 0; line-height: inherit; }  /* 홈은 제목이 H1 */
 .logo-icon { font-size: 1.85rem; display: inline-flex; }
 .main-nav { display: flex; gap: 4px; flex: 1; }
 /* Home · 다크모드 버튼은 로그인 버튼과 같은 모양·크기 */
@@ -88,11 +89,10 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 
 /* ── 탭 ──────────────────────────────────────────── */
 /* 업종 탭: PC는 10개를 한 줄에 같은 크기로 (양끝은 아래 종목 카드 줄과 맞춤), 1060px 이하는 5개씩 두 줄 */
-.tab-bar { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 8px; margin-bottom: 8px; }
+.tab-bar { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); gap: 8px; margin-bottom: 18px; }  /* 탭 15개(관심·13개 업종·미국) → PC 두 줄 */
 .tab-bar .tab { padding: 8px 2px; text-align: center; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 @media (max-width: 1180px) { .tab-bar .tab { font-size: 0.86rem; letter-spacing: -0.02em; } }
 @media (max-width: 1060px) { .tab-bar { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 6px; } .tab-bar .tab { font-size: 0.95rem; letter-spacing: 0; } }
-.tab-note { font-size: 0.75rem; color: var(--text-muted); margin-bottom: 16px; }
 .tab { padding: 7px 18px; border-radius: 6px; font-size: 0.88rem; background: var(--surface); border: 1px solid var(--border); color: var(--text-muted); transition: all 0.2s; }
 .tab:hover { border-color: var(--accent); color: var(--accent); }
 .tab.active { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
@@ -229,6 +229,15 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 .btn-follow { font-size: 0.76rem; font-weight: 600; color: var(--hot); border: 1px solid var(--hot); border-radius: 10px; padding: 0 6px; transition: all .2s; white-space: nowrap; }  /* 공감·비공감과 같은 크기, 주황 */
 .btn-follow:hover { background: rgba(255,140,66,.15); }
 .author-overlay { z-index: 300; }
+/* 휴대폰 리포트 보기 (PDF.js) */
+.pdf-overlay { position: fixed; inset: 0; z-index: 400; background: #3b3d45; display: flex; flex-direction: column; }
+.pdf-bar { display: flex; align-items: center; gap: 10px; padding: 8px 12px; padding-top: calc(8px + env(safe-area-inset-top)); background: var(--surface); border-bottom: 1px solid var(--border); }
+.pdf-back { flex: none; padding: 7px 12px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface2); color: var(--text); font-weight: 700; font-size: 0.9rem; }
+.pdf-title { flex: 1; min-width: 0; font-size: 0.85rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pdf-pages { flex: 1; overflow: auto; -webkit-overflow-scrolling: touch; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); }
+.pdf-pages canvas { display: block; width: 100%; height: auto; margin: 0 auto 8px; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.pdf-pages .empty-msg { color: #eee; }
+.pdf-pages .empty-msg a { color: #9cc3ff; }
 .author-modal { max-width: 640px; height: 80vh; }
 .author-modal .post-list { overflow-y: auto; }
 .author-stock { font-weight: 700; font-size: 0.85rem; color: var(--accent); }
@@ -414,6 +423,8 @@ a.logo { color: inherit; text-decoration: none; }
 .hero { margin: 14px 0 0; }
 .hero h1 { font-size: 1.05rem; font-weight: 800; }
 .hero p { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+.list-note { margin-top: 10px; font-size: 0.85rem; font-weight: 700; color: var(--up); line-height: 1.5; }  /* 종목 목록 아래 안내 (이용 안내 줄 위) — 위아래 여백 최소 */
+#listNote:not(.hidden) ~ .seo-guide { margin-top: 10px; }
 .seo-guide { margin-top: 36px; padding-top: 16px; border-top: 1px solid var(--border); }
 .seo-guide h2 { font-size: 0.9rem; font-weight: 700; color: var(--text-muted); margin-bottom: 6px; }
 .seo-guide p { font-size: 0.75rem; color: var(--text-muted); line-height: 1.6; margin-top: 4px; }
@@ -494,7 +505,6 @@ a.logo { color: inherit; text-decoration: none; }
   .idx-value { font-size: 0.9rem; }
   .tab-bar { gap: 5px; margin-bottom: 12px; }
   .tab-bar .tab { padding: 5px 2px; font-size: 0.84rem; line-height: 1.2; }
-  .tab-note { display: none; }  /* 업종 선정 기준 안내는 휴대폰에서 생략 (PC에서 표시) */
 }
 @media (max-width: 480px) and (max-height: 699px) {
   .header-inner { padding: 8px 16px; gap: 6px 10px; }

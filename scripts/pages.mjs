@@ -6,7 +6,7 @@ const SITE = 'https://upjong.com/';
 const NAME = '주식 업종 종목 토론방';
 const EFFECTIVE = '2026년 10월 12일';
 const PRIVACY_EFFECTIVE = '2026년 10월 14일';  // 개인정보처리방침만 개정 (호스팅 이전·접속 IP 이용 반영)
-const OWNER = '김유랑';
+const OWNER = '김업종';
 const EMAIL = 'tpsdurang@naver.com';
 const mail = `<a href="mailto:${EMAIL}">${EMAIL}</a>`;
 
@@ -50,7 +50,7 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
   <div class="container header-inner">
     <a class="logo" href="./">
       <span class="logo-icon"><svg viewBox="0 0 32 32" width="1em" height="1em" aria-hidden="true"><defs><linearGradient id="logoGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#ff6a5c"/><stop offset="1" stop-color="#e02f4b"/></linearGradient></defs><rect width="32" height="32" rx="8" fill="url(#logoGrad)"/><path d="M9 14v12M16 10v12M23 6v12" stroke="#fff" stroke-width="1.6" stroke-linecap="round"/><g fill="#fff"><rect x="7" y="17" width="4" height="6" rx="1"/><rect x="14" y="13" width="4" height="6" rx="1"/><rect x="21" y="9" width="4" height="6" rx="1"/></g></svg></span>
-      <span class="logo-text">${NAME}</span>
+      <span class="logo-text">${NAME} 커뮤니티</span>
     </a>
   </div>
 </header>
@@ -90,7 +90,7 @@ const about = `
   <ul>
     <li><b>실시간 종목·업종 뉴스</b> — 종목·업종·시장 뉴스는 1분마다, 화면에 보이는 종목의 주가는 10초마다 갱신됩니다.</li>
     <li><b>무료 증권사 리포트·공시</b> — 종목·산업·투자전략 리포트와 공시를 종목·업종·시장별로 모아 원문까지 무료로 볼 수 있습니다.</li>
-    <li><b>업종별 주요 종목·미국주식 100</b> — 바이오, 반도체, 2차전지·로봇, 전력·원자력, K뷰티컬쳐, 조선·방산, 자동차, 금융 업종의 주요 종목과 국내 투자자가 가장 많이 보유한 미국주식(ETF 포함, 한국예탁결제원 기준)을 모았습니다.</li>
+    <li><b>업종별 주요 종목·미국주식 64</b> — 반도체, 전자·부품, 바이오, 2차전지·로봇, 전력·원자력, 조선·방산, 화학·철강, 자동차, 물류·건설·기계, 소비재, K뷰티·컬쳐, 금융, 통신·인터넷 13개 업종의 주요 종목과 국내 투자자가 가장 많이 보유한 미국주식(ETF 포함, 한국예탁결제원 기준)을 모았습니다.</li>
     <li><b>운영자 주식 강의</b> — 기업 분석과 투자 지표 읽는 법, 차트 보는 법 등을 주식 강의로 쉽게 정리합니다. 하단 「주식 강의」 메뉴에서 볼 수 있습니다.</li>
   </ul>
 
@@ -272,7 +272,7 @@ const privacy = `
   <p>사이트는 만 14세 미만 아동을 대상으로 하지 않으며, 만 14세 미만 아동의 회원가입을 받지 않습니다.</p>
 
   <h2>10. 개인정보 보호책임자와 고충 처리</h2>
-  <p>개인정보 보호책임자: ${OWNER} (운영자)<br>이메일: ${mail}<br>문의 양식: <a href="contact.html">연락처</a></p>
+  <p>개인정보 보호책임자: 운영자 (이메일로 문의)<br>이메일: ${mail}<br>문의 양식: <a href="contact.html">연락처</a></p>
   <p>개인정보 침해에 대한 신고·상담은 아래 기관에도 할 수 있습니다.</p>
   <ul>
     <li>개인정보침해신고센터 (privacy.kisa.or.kr / 국번 없이 118)</li>

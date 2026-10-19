@@ -6,7 +6,17 @@
 - **옛 Vercel 프로젝트** `homepage` (팀 jimmy-eadd): `vercel.json`이 전체를 upjong.com으로 리다이렉트 + **Google 뉴스 중계 `/api/gnews`** (Google이 Cloudflare IP를 503으로 막아서). 인증 키 GNEWS_PROXY_KEY는 Vercel 환경변수·Cloudflare 시크릿에 같은 값. Vercel 배포는 `vercel --prod --yes` (.vercelignore로 gnews.js만 올라감). 중계가 죽어도 네이버 기사만으로 동작
 - **DB**: Upstash Redis `upjong-db` (2026-10-13 Vercel 마켓플레이스 DB `bio-forum-db`에서 이관, Upstash에 구글 계정으로 직접 가입한 계정, 도쿄 리전). Cloudflare Pages 시크릿 `KV_REST_API_URL` / `KV_REST_API_TOKEN`. 옛 DB는 백업용으로 한 달 정도 보관 후 삭제
 - **관리자 비밀번호**: Cloudflare Pages 시크릿 `ADMIN_PASSWORD` (코드·문서에 값 없음)
-- **운영자**: 김유랑 · tpsdurang@naver.com
+- **운영자**: 김업종 · tpsdurang@naver.com
+
+
+> **2026-10-19 기준 최신 상태** (아래 1~ 항목 중 탭·종목 수 등은 10-12 기준이라 예전 내용 — 자세한 건 WORK_LOG_2026-10-19.md)
+> - 업종 탭 13개 + 미국 주식: 반도체 · 전자·부품 · 바이오 · 2차전지·로봇 · 전력·원자력 · 조선·방산 · 화학·철강 · 자동차 · 물류·건설·기계 · 소비재 · K뷰티·컬쳐 · 금융 · 통신·인터넷, 탭마다 64개(미국 64), 국내 817 + 미국 64 = 881개
+> - 종목 선정 순서: members.mjs → members_add.mjs → members_new.mjs → stats.mjs → build.mjs → listed.mjs → corpcodes.mjs
+> - 검색 노출: api/_legacy.js(개편 전 819개)에 있던 종목이 탭에 남으면 노출, 새로 들어온·탭에서 빠진·관심 등록된 숨은 종목은 회원 토론글 3개부터 노출(api/_public.js)
+> - 구글 뉴스 중계 Vercel 리전 icn1(서울) — 미국 리전은 구글이 503으로 막음. 뉴스는 20건마다 구글 5건(app.js mixGoogle)
+> - 휴대폰 증권사 리포트는 사이트 안 PDF 보기(vendor/pdfjs), 뒤로 가기로 닫힘
+> - 서버 캐시는 stale-while-revalidate(functions/_adapter.js), 종목 창을 열면 뉴스·리포트·공시 미리 받기
+> - 개인정보 보호책임자: "운영자 (이메일로 문의)"
 
 ---
 
