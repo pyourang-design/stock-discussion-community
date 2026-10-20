@@ -1187,11 +1187,13 @@ async function countPostViews(s, posts, code = s.code) {
     currentPosts.forEach(p => { if (views[p.id] != null) p.views = views[p.id]; });
     document.querySelectorAll('#postList .post-views').forEach(el => {
       const v = views[el.dataset.id];
-      if (v != null) el.innerHTML = `👁 <span class="pv-num">${v.toLocaleString()}</span>`;
+      if (v != null) el.innerHTML = `${EYE_ICON}${v.toLocaleString()}`;
     });
   } catch {}
 }
-const viewsHtml = p => `<span class="post-views" data-id="${escHtml(p.id)}" title="조회수">👁 <span class="pv-num">${(p.views || 0).toLocaleString()}</span></span>`;
+// 눈 아이콘: 👁 이모지를 쓰면 갤럭시에서 뒤 숫자까지 이모지 글꼴(굵고 넓은 숫자)로 그려져 그림으로 대신함
+const EYE_ICON = '<svg class="eye-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+const viewsHtml = p => `<span class="post-views" data-id="${escHtml(p.id)}" title="조회수">${EYE_ICON}${(p.views || 0).toLocaleString()}</span>`;
 
 function drawPosts() {
   const el = document.getElementById('postList');
@@ -1234,7 +1236,7 @@ function drawColumn(el) {
     el.innerHTML = currentPosts.length ? `<div class="col-list">${shown.map(x => `
       <button class="col-row" data-id="${escHtml(x.id)}" data-act="openColumn">
         <span class="col-title">${escHtml(x.title || stripColumnImgs(x.content).slice(0, 40))}</span>
-        <span class="col-meta">${colDate(x.ts)} · 👁 ${(x.views || 0).toLocaleString()}</span>
+        <span class="col-meta">${colDate(x.ts)} · ${EYE_ICON}${(x.views || 0).toLocaleString()}</span>
       </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : '<p class="empty-msg">아직 주식 강의가 없습니다.</p>';
     return;
   }
