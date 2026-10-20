@@ -33,10 +33,21 @@ function isLightTheme() {
   return document.documentElement.getAttribute('data-theme') === 'light';
 }
 
+// 버튼엔 누르면 바뀔 모드를 보여줌: 화이트 화면이면 🌙 Dark, 다크 화면이면 ☀️ Light (가로 보기 버튼과 같은 방식)
+const THEME_ICON = {
+  dark: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg>',
+  light: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.5"/><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></svg>',
+};
 function renderThemeButtons() {
+  const next = isLightTheme() ? 'dark' : 'light';
   document.querySelectorAll('.theme-toggle').forEach(b => {
-    (b.querySelector('.nav-label') || b).textContent = isLightTheme() ? 'Light' : 'Dark';  // 하단 메뉴는 아이콘 옆 글자만
-    b.title = isLightTheme() ? '눌러서 다크모드로' : '눌러서 라이트모드로';
+    const label = b.querySelector('.nav-label');
+    if (label) {
+      b.querySelector('svg')?.remove();
+      label.insertAdjacentHTML('beforebegin', THEME_ICON[next]);
+      label.textContent = next === 'dark' ? 'Dark' : 'Light';
+    } else b.textContent = next === 'dark' ? 'Dark' : 'Light';
+    b.title = next === 'dark' ? '눌러서 다크모드로' : '눌러서 라이트모드로';
   });
 }
 
@@ -49,6 +60,36 @@ function toggleTheme() {
 }
 
 document.addEventListener('DOMContentLoaded', renderThemeButtons);
+
+// 종목 목록 보기 방식: 카드 보기(기본) ↔ 가로 보기(네이버 관심종목처럼 한 종목 한 줄), 이 브라우저에 기억 (localStorage 'view')
+// <html data-view="list">로 styles.css가 모양을 바꿈 — 홈이 아닌 페이지에서 누르면 바꾼 뒤 홈으로
+function isListView() {
+  return document.documentElement.getAttribute('data-view') === 'list';
+}
+try { if (localStorage.getItem('view') === 'list') document.documentElement.setAttribute('data-view', 'list'); } catch (e) {}
+
+const VIEW_ICON = {
+  list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>',
+  card: '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg>',
+};
+function renderViewButtons() {
+  const list = isListView();
+  document.querySelectorAll('.view-toggle').forEach(b => {
+    b.innerHTML = `${VIEW_ICON[list ? 'card' : 'list']}<span>${list ? '카드 보기' : '가로 보기'}</span>`;  // 누르면 바뀔 모양을 보여줌
+    b.title = list ? '눌러서 카드로 보기' : '눌러서 한 줄로 보기';
+  });
+}
+
+function toggleView() {
+  const list = !isListView();
+  if (list) document.documentElement.setAttribute('data-view', 'list');
+  else document.documentElement.removeAttribute('data-view');
+  try { localStorage.setItem('view', list ? 'list' : 'card'); } catch (e) {}
+  renderViewButtons();
+  if (!document.getElementById('stockList')) location.href = '/';
+  else document.dispatchEvent(new Event('viewchange'));  // app.js가 가로 보기 일봉을 불러옴
+}
+document.addEventListener('DOMContentLoaded', renderViewButtons);
 // 이미 홈 화면 앱으로 연 경우 하단 메뉴 '앱 다운' 숨김 (모든 페이지)
 document.addEventListener('DOMContentLoaded', () => {
   try {
@@ -58,9 +99,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 인라인 onclick 없이 처리 (보안 헤더 CSP script-src 'self'): 테마 버튼, data-go 링크(누르면 그 주소로 — 검색엔진엔 href 주소를 보여줌)
 document.addEventListener('click', e => {
-  const t = e.target.closest && e.target.closest('.theme-toggle, a[data-go]');
+  const t = e.target.closest && e.target.closest('.theme-toggle, .view-toggle, a[data-go]');
   if (!t) return;
   if (t.classList.contains('theme-toggle')) return toggleTheme();
+  if (t.classList.contains('view-toggle')) return toggleView();
   e.preventDefault();
   location.href = t.dataset.go;
 });

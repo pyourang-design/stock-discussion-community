@@ -20,6 +20,8 @@ function parse(d) {
     status:     d.marketStatus ?? null,
     time:       p.time,
     session:    p.session,
+    // 당일 정규장 일봉 [시가, 고가, 저가, 종가, 전일종가] — 카드 오른쪽 캔들 (장 시작 전엔 시가 0)
+    ohlc:       [d.openPrice, d.highPrice, d.lowPrice, d.closePrice].map(toNum).concat(toNum(d.closePrice) - toNum(d.compareToPreviousClosePrice)),
   };
 }
 

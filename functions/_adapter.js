@@ -3,6 +3,7 @@ import { ASSET_VERSION } from './_assets.js';
 // Vercel 방식(req, res) API 핸들러를 Cloudflare Pages Functions(fetch 방식)로 감싸는 어댑터
 // api/*.js 코드는 그대로 두고 Vercel·Cloudflare 양쪽에서 동작하게 함
 const HANDLERS = {
+  chart: () => import('../api/chart.js'),
   column: () => import('../api/column.js'),
   detail: () => import('../api/detail.js'),
   market: () => import('../api/market.js'),

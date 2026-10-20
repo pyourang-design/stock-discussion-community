@@ -66,6 +66,7 @@ KOSPI · KOSDAQ · USD/KRW · 다우존스 · 나스닥 · S&P 500 (WTI 원유·
 - **업종 게시판 보기**: 업종 전체 토론 (가상 코드 `SECBIO`, `SECUSA` 등으로 종목 게시판과 같은 DB 사용)
 
 ### 화면
+- 가로 보기(2026-10-20): 하단 메뉴 맨 왼쪽 버튼, 네이버 관심종목처럼 한 줄(휴대폰 1열, PC 2열 표) + 최근 20거래일 일봉(api/chart.js). 카드 보기는 오른쪽에 실시간 당일 캔들 1개
 - 다크·라이트 전환: 헤더 Home 옆 Dark / Light 버튼, 고른 모드는 브라우저에 기억. 고른 적 없으면 기기 설정(다크/라이트)을 따르고, 알 수 없으면 라이트 (`theme.js`, 2026-10-13 변경)
 - 모바일 헤더: 1줄 로고·홈·다크 버튼, 2줄 검색·팔로잉·로그인·회원가입
 - 토론 창·작성자 창은 휴대폰 뒤로가기(브라우저 뒤로가기)로 닫힘
@@ -110,9 +111,10 @@ KOSPI · KOSDAQ · USD/KRW · 다우존스 · 나스닥 · S&P 500 (WTI 원유·
 
 - 사이트 등록·소유 확인 완료 (`naver-site-verification`, `google-site-verification` 메타)
 - 제목: "주식 업종 종목 토론방 - 업종별 주식 종목 토론방 · 종목토론방", 설명·키워드·H1에 "주식 종목 토론방"
-- 종목 페이지 819개(`/stock/{코드}`)를 서버에서 글자로 렌더링 → "○○ 종목 토론방" 검색 대응
+- 종목 페이지(`/stock/{코드}`)를 서버에서 글자로 렌더링 → "○○ 종목 토론방" 검색 대응
+- 검색 노출(2026-10-20 애드센스 대비): 업종 탭마다 시총 상위 8개(`CORE_N`, api/_public.js·scripts/seo.mjs)만 항상 색인·사이트맵(105개), 나머지는 회원 토론글 3개 이상일 때만. 승인 후 CORE_N을 늘려 되돌림
 - 홈 하단 "전체 주식 종목 토론방 보기"(접힘)에 종목 페이지 링크 전체
-- `sitemap.xml` 445개 주소, `/rss.xml` RSS
+- `sitemap.xml`(종목 105개 + 주식 강의 + 토론글 기준을 넘은 종목), `/rss.xml` RSS
 
 **운영자가 할 일**
 - 구글 Search Console: `sitemap.xml` 재제출, 주요 페이지 URL 검사 → 색인 생성 요청
@@ -166,6 +168,7 @@ node us_extra.mjs                # 51~100위 후보 → data/us_extra.json
 node us_merge.mjs                # 미국 100종목 → data/us100.json
 node build.mjs 2026-10-12        # stocks.js 생성 + seo.mjs 자동 실행 (api/_stocks.js, sitemap.xml, 홈 종목 링크)
 node pages.mjs                   # 사이트 소개·약관·개인정보처리방침·연락처 페이지
+node us_listed.mjs               # 미국 전체 종목(주식·ETF) → us-listed.json (회원 검색용, 가끔 갱신)
 cd .. && vercel --prod --yes     # 배포
 ```
 

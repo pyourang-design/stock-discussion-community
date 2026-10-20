@@ -73,6 +73,7 @@ ${body}
 ${extraScript}
 
 <nav class="bottom-nav" aria-label="하단 메뉴">
+  <button class="view-toggle" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg><span>가로 보기</span></button>
   <a href="/?tab=fav"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.7 5.6 6.1.9-4.4 4.3 1 6.1L12 17l-5.4 2.9 1-6.1-4.4-4.3 6.1-.9z"/></svg><span>관심종목 추가</span></a>
   <a href="/"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Home</span></a>
   <a class="nav-lecture" href="/?column=list"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4h7a3 3 0 013 3v13a2 2 0 00-2-2H2z"/><path d="M22 4h-7a3 3 0 00-3 3v13a2 2 0 012-2h8z"/></svg><span>주식 강의</span></a>
@@ -114,7 +115,7 @@ const about = `
   <p>이 사이트의 정보와 게시글은 투자 권유가 아니며, 특정 종목의 매수·매도를 추천하지 않습니다. 게시글은 작성자 개인의 의견이며 사실과 다를 수 있습니다. 투자 결정과 그 결과에 대한 책임은 투자자 본인에게 있습니다.</p>
 
   <h2>문의</h2>
-  <p>운영자: ${OWNER} · 이메일: ${mail}</p>
+  <p>운영 주체: 개인 · 운영자: ${OWNER} · 이메일: ${mail}</p>
   <p>오류 제보, 게시물 신고, 제휴 문의는 이메일 또는 <a href="contact.html">연락처</a> 페이지의 문의 양식으로 남겨주세요.</p>
 `;
 
@@ -272,7 +273,7 @@ const privacy = `
   <p>사이트는 만 14세 미만 아동을 대상으로 하지 않으며, 만 14세 미만 아동의 회원가입을 받지 않습니다.</p>
 
   <h2>10. 개인정보 보호책임자와 고충 처리</h2>
-  <p>개인정보 보호책임자: 운영자 (이메일로 문의)<br>이메일: ${mail}<br>문의 양식: <a href="contact.html">연락처</a></p>
+  <p>개인정보 보호책임자: 운영자 ${OWNER} (개인 운영)<br>이메일: ${mail}<br>문의 양식: <a href="contact.html">연락처</a></p>
   <p>개인정보 침해에 대한 신고·상담은 아래 기관에도 할 수 있습니다.</p>
   <ul>
     <li>개인정보침해신고센터 (privacy.kisa.or.kr / 국번 없이 118)</li>
@@ -289,6 +290,7 @@ const contact = `
   <p class="policy-lead">사이트 이용 문의, 오류 제보, 게시물 신고, 개인정보 열람·삭제 요청, 제휴 문의를 남겨주세요. 운영자가 확인 후 답변이 필요한 경우 남겨주신 이메일로 회신합니다.</p>
 
   <table class="policy-table contact-info">
+    <tr><th>운영 주체</th><td>개인</td></tr>
     <tr><th>운영자</th><td>${OWNER}</td></tr>
     <tr><th>이메일</th><td>${mail}</td></tr>
   </table>

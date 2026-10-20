@@ -159,6 +159,8 @@ function tabLabel(sec) {
 const fmtPrice = s => !s.price ? '-' : s.us
   ? '$' + s.price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
   : s.price.toLocaleString() + '원';
+// 전일대비 금액 (가로 보기에서만 보임, 네이버처럼 ▲1,200 / ▼0.35) — 실시간 시세를 받기 전엔 빈칸
+const fmtDiff = s => s.diff == null ? '' : (s.diff > 0 ? '▲' : s.diff < 0 ? '▼' : '') + Math.abs(s.diff).toLocaleString('en-US', s.us ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {});
 
 // ── 종목 카드 렌더링 ──────────────────────────────────
 // 종목 목록 아래 안내: 업종 탭·미국 주식 탭 (관심 종목 탭·검색 결과를 보는 동안은 숨김)
@@ -181,6 +183,7 @@ function renderStocks(list) {
     el.innerHTML = !member
       ? '<p class="empty-msg">관심 종목은 회원 전용입니다.<br><button class="link-btn" data-act="toggleLogin">로그인</button> 또는 <button class="link-btn" data-act="toggleSignup">회원가입</button> 후 상단의 종목 검색 또는 종목 카드의 ☆를 눌러 관심 종목을 추가하세요.<br>관심종목을 지정하면 지정한 관심종목들의 실시간 뉴스, 증권사 리포트, 공시 정보를 한꺼번에 볼 수 있습니다.</p>'
       : newsCardHtml(MARKET_KEY) + favAllCardHtml(list.length) + (list.length ? list.map(s => stockCard(s)).join('') : '<p class="empty-msg">아직 관심 종목이 없습니다.<br>종목 카드 오른쪽 위의 ☆를 눌러 추가하세요.</p>');
+    loadCharts();
     return;
   }
   if (!list.length) {
@@ -189,6 +192,7 @@ function renderStocks(list) {
   }
   // 맨 앞 두 칸은 주식 시장 경제 뉴스·토론 → 업종 뉴스·토론, 이어서 종목 카드(시총순)
   el.innerHTML = newsCardHtml(MARKET_KEY) + newsCardHtml(currentFilter) + list.map(s => stockCard(s)).join('');
+  loadCharts();
 }
 
 // ── 업종 게시판: 업종별 가상 코드(SECBIO 등)로 종목 게시판과 같은 DB를 사용 ──
@@ -212,8 +216,10 @@ const sectorName = key => { const sec = SECTORS.find(x => x.key === key); return
 // 회원이 관심 종목으로 담은 적 있는 종목은 /stock/ 페이지 공개, 회원 토론글이 쌓이면 사이트맵·RSS에도 (api/_public.js). 처음 필요할 때 한 번만 받음
 let HIDDEN = null;  // 코드 → 종목
 let hiddenLoading = null;
+// 미국 종목 전체(us-listed.json, scripts/us_listed.mjs — 주식·ETF 약 1만 2천 개)도 같은 형식으로 함께 받아 뒤에 붙임 (국내 숨은 종목이 먼저 검색됨)
+const getJson = f => fetch(`${API_BASE}/${f}`).then(r => r.ok ? r.json() : Promise.reject(new Error(r.status)));
 function loadHidden() {
-  return hiddenLoading ||= fetch(`${API_BASE}/listed.json`).then(r => r.ok ? r.json() : Promise.reject(new Error(r.status)))
+  return hiddenLoading ||= Promise.all([getJson('listed.json'), getJson('us-listed.json')]).then(([kr, us]) => kr.concat(us))
     .then(rows => { HIDDEN = new Map(rows.map(([code, name, market, cap, ticker, etf]) => [code, { code, name, market, cap, price: 0, change: 0, sectors: {}, hidden: true, ...(ticker ? { us: true, ticker, ...(etf ? { etf: true } : {}) } : {}) }])); })  // 6칸이면 탭에서 빠진 미국 종목
     .catch(() => { hiddenLoading = null; });  // 실패하면 다음에 다시
 }
@@ -411,6 +417,7 @@ function stockCard(s) {
   const postCount = postCounts[s.code] || 0;
   return `
   <div class="stock-card" data-code="${escHtml(s.code)}" data-act="openNews">
+    <div class="day-candle">${dayCandleSvg(s)}</div>
     <div class="card-top">
       <div class="stock-avatar ${up ? 'up' : 'down'}">
         <img class="stock-logo" src="${escHtml(s.logo || LOGO_URL(s.code))}" alt="${escHtml(s.name)} CI" loading="lazy"
@@ -419,8 +426,10 @@ function stockCard(s) {
       </div>
       <div class="card-quote">
         <div class="stock-price">${fmtPrice(s)}</div>
+        <div class="price-diff ${up ? 'up' : 'down'}">${fmtDiff(s)}</div>
         <div class="price-change ${up ? 'up' : 'down'}">${sign}${s.change}%</div>
       </div>
+      <div class="mini-chart" data-chart="${escHtml(s.code)}">${miniChartSvg(s.code)}</div>
       <div class="card-marks">
         <button class="fav-star${favs.has(s.code) ? ' on' : ''}" title="관심 종목" data-code="${escHtml(s.code)}" data-act="toggleFav">${favs.has(s.code) ? '★' : '☆'}</button>
       </div>
@@ -430,10 +439,71 @@ function stockCard(s) {
       <div class="stock-sub">${escHtml(s.us ? s.ticker : s.code)} · <span class="badge ${escHtml(s.market)}">${escHtml(String(s.market).toUpperCase())}</span>${s.etf ? ' <span class="badge etf">ETF</span>' : ''}</div>
     </div>
     <div class="card-bottom">
-      <div class="stock-extra">${s.etf ? '규모' : '시총'} ${escHtml(s.cap)} · 댓글 ${postCount}</div>
+      <div class="stock-extra"><span>${s.etf ? '규모' : '시총'} ${escHtml(s.cap)}</span><i> · </i><span>댓글 ${postCount}</span></div>
     </div>
   </div>`;
 }
+
+// 카드 보기 오른쪽 당일 캔들 1개 (실시간 시세마다 갱신): 높이 = 전일종가 포함 당일 범위, 단 전일종가의 4% 미만이면 4%로 잡아
+// 작은 등락은 작게 보이게. 양봉(종가 ≥ 시가) 빨강·음봉 파랑
+function dayCandleSvg(s) {
+  const [o, h, l, c, prev] = s.ohlc || [];
+  if (!(o > 0 && h > 0 && l > 0 && c > 0)) return '';
+  const base = prev > 0 ? prev : o;
+  let top = Math.max(h, base), bot = Math.min(l, base);
+  const min = base * 0.04;
+  if (top - bot < min) { const pad = (min - (top - bot)) / 2; top += pad; bot -= pad; }
+  const y = v => ((top - v) / (top - bot) * 96 + 2).toFixed(1);
+  const bodyTop = y(Math.max(o, c)), bodyH = Math.max(1.5, y(Math.min(o, c)) - bodyTop).toFixed(1);
+  const cls = c >= o ? 'c-up' : 'c-down';
+  return `<svg viewBox="0 0 12 100" preserveAspectRatio="none" aria-label="당일 일봉"><g class="${cls}"><line x1="6" x2="6" y1="${y(h)}" y2="${y(l)}"/><rect x="2" y="${bodyTop}" width="8" height="${bodyH}"/></g></svg>`;
+}
+
+// ── 가로 보기 일봉 (최근 20거래일, /api/chart 25종목씩, 5분 캐시) — 카드 보기에선 받지 않음 ──
+const CHART_TTL = 5 * 60 * 1000;
+const chartData = {};  // 코드 → { ts, candles: [[시가, 고가, 저가, 종가], ...] }
+const chartLoading = new Set();
+function miniChartSvg(code) {
+  const c = chartData[code]?.candles;
+  if (!c?.length) return '';
+  const hi = Math.max(...c.map(d => d[1])), lo = Math.min(...c.map(d => d[2]));
+  const H = 30, step = 3, range = hi - lo || 1;
+  const y = v => ((hi - v) / range * (H - 2) + 1).toFixed(1);
+  const bars = c.map(([o, h, l, cl], i) => {
+    const x = i * step + 1.5, up = cl >= o;
+    const top = y(Math.max(o, cl)), bh = Math.max(0.8, y(Math.min(o, cl)) - top).toFixed(1);
+    return `<g class="${up ? 'c-up' : 'c-down'}"><line x1="${x}" x2="${x}" y1="${y(h)}" y2="${y(l)}"/><rect x="${x - 1}" y="${top}" width="2" height="${bh}"/></g>`;
+  }).join('');
+  return `<svg viewBox="0 0 ${c.length * step} ${H}" preserveAspectRatio="none" aria-label="최근 ${c.length}거래일 일봉">${bars}</svg>`;
+}
+async function loadCharts() {
+  if (!isListView()) return;
+  const els = [...document.querySelectorAll('.mini-chart[data-chart]')];
+  const need = [...new Set(els.map(e => e.dataset.chart))]
+    .filter(c => !chartLoading.has(c) && !(chartData[c] && Date.now() - chartData[c].ts < CHART_TTL));
+  // 이미 받은 일봉은 바로 그림 (탭을 오가며 다시 그린 카드)
+  els.forEach(e => { if (!e.firstChild && chartData[e.dataset.chart]) e.innerHTML = miniChartSvg(e.dataset.chart); });
+  if (!need.length) return;
+  need.forEach(c => chartLoading.add(c));
+  const chunks = [];
+  for (let i = 0; i < need.length; i += 25) chunks.push(need.slice(i, i + 25));
+  await Promise.all(chunks.map(async codes => {
+    try {
+      const res = await fetch(`${API_BASE}/api/chart?codes=${codes.join(',')}`);
+      const { charts } = res.ok ? await res.json() : {};
+      Object.entries(charts || {}).forEach(([code, candles]) => {
+        chartData[code] = { ts: Date.now(), candles };
+        document.querySelectorAll(`.mini-chart[data-chart='${code}']`).forEach(e => { e.innerHTML = miniChartSvg(code); });
+      });
+    } catch (e) {
+      // 실패하면 빈칸으로 두고 다음 갱신 때 다시
+    } finally {
+      codes.forEach(c => chartLoading.delete(c));
+    }
+  }));
+}
+document.addEventListener('viewchange', loadCharts);  // theme.js 가로 보기 버튼
+setInterval(whenVisible(loadCharts), CHART_TTL);
 
 // ── 탭 필터 ───────────────────────────────────────────
 function filterTab(type, btn) {
@@ -522,8 +592,15 @@ function searchStocks(e) {
   if (member) {
     if (!HIDDEN) loadHidden().then(() => { if (HIDDEN && input.value.trim()) searchStocks(); });
     else {
-      const more = [];
-      for (const s of HIDDEN.values()) { if (match(s) && more.push(s) >= HIDDEN_SEARCH_MAX) break; }
+      // 티커·종목명이 검색어와 똑같은 종목을 맨 앞에 (예: 'ON', 'T'처럼 짧은 미국 티커가 다른 종목에 묻히지 않게)
+      const exact = [], more = [];
+      for (const s of HIDDEN.values()) {
+        if (!match(s)) continue;
+        if ((s.ticker || '').toLowerCase() === q || s.name.toLowerCase() === q) exact.push(s);
+        else if (more.length < HIDDEN_SEARCH_MAX) more.push(s);
+      }
+      more.unshift(...exact);
+      more.length = Math.min(more.length, HIDDEN_SEARCH_MAX);
       if (more.length) { results.push(...more); clearTimeout(searchPriceTimer); searchPriceTimer = setTimeout(fetchAllPrices, 400); }
     }
   }
@@ -533,6 +610,7 @@ function searchStocks(e) {
   resultEl.innerHTML = `<p class="search-label">검색결과 <strong>${results.length}건</strong></p>` +
     (results.length ? results.map(s => stockCard(s)).join('') : member ? '<p class="empty-msg">종목을 찾을 수 없습니다.</p>' : '') +
     (member ? '' : '<p class="empty-msg">회원가입 시 전체 종목을 볼 수 있습니다.<br><button class="link-btn" data-act="toggleSignup">회원가입</button> 또는 <button class="link-btn" data-act="toggleLogin">로그인</button></p>');
+  loadCharts();
 }
 
 // ── 모달 열기 ─────────────────────────────────────────
@@ -2077,6 +2155,8 @@ async function fetchAllPrices() {
       if (!s || !d.price) return;
       s.price = d.price;
       if (d.changeRate != null && !isNaN(d.changeRate)) s.change = d.changeRate;
+      if (d.diff != null && !isNaN(d.diff)) s.diff = d.diff;
+      if (Array.isArray(d.ohlc)) s.ohlc = d.ohlc;
       s.session = d.session || null;  // 장 마감 후·시작 전 시간외 가격이면 PRE_MARKET/AFTER_MARKET
       if (d.volume) s.volume = d.volume;
       liveCodes.add(s.code);
@@ -2104,11 +2184,18 @@ function updateCard(s) {
   document.querySelectorAll(`.stock-card[data-code='${s.code}']`).forEach(card => {
     const priceEl = card.querySelector('.stock-price');
     const chgEl = card.querySelector('.price-change');
+    const diffEl = card.querySelector('.price-diff');
+    const candleEl = card.querySelector('.day-candle');
+    if (candleEl) candleEl.innerHTML = dayCandleSvg(s);
     const avatarEl = card.querySelector('.stock-avatar');
     if (priceEl) priceEl.textContent = fmtPrice(s);
     if (chgEl) {
       chgEl.textContent = `${up ? '+' : ''}${s.change}%`;
       chgEl.className = 'price-change ' + (up ? 'up' : 'down');
+    }
+    if (diffEl) {
+      diffEl.textContent = fmtDiff(s);
+      diffEl.className = 'price-diff ' + (up ? 'up' : 'down');
     }
     if (avatarEl) { avatarEl.classList.toggle('up', up); avatarEl.classList.toggle('down', !up); }
   });

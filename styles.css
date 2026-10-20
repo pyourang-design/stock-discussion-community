@@ -556,7 +556,7 @@ a.logo { color: inherit; text-decoration: none; }
 .col-body { white-space: pre-wrap; line-height: 1.75; margin-top: 12px; }
 #postTitle { font-weight: 700; }
 .post-form #editTitle { width: 100%; margin-bottom: 8px; font-weight: 700; }
-@media (max-width: 480px) { .col-row { padding: 12px 14px; flex-direction: column; align-items: flex-start; gap: 3px; } .col-title { white-space: normal; } .col-article { padding: 12px 14px 16px; } }
+@media (max-width: 480px) { .col-row { padding: 9px 14px; flex-direction: column; align-items: flex-start; gap: 2px; } .col-title { white-space: normal; } .col-article { padding: 12px 14px 16px; } }
 /* 칼럼 글 아래: 이전 글 · 목록으로 · 다음 글 */
 .col-nav { display: grid; grid-template-columns: 1fr auto 1fr; gap: 8px; align-items: stretch; margin-top: 22px; padding-top: 14px; border-top: 1px solid var(--border); }
 .col-nav-btn { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); text-align: left; }
@@ -566,7 +566,7 @@ button.col-nav-btn:hover { border-color: var(--accent); }
 .col-nav-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
 .col-nav-title { font-size: 0.9rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .col-nav-list { padding: 0 16px; border-radius: 10px; background: var(--accent); color: #fff; font-weight: 700; font-size: 0.88rem; white-space: nowrap; }
-@media (max-width: 480px) { .col-nav { grid-template-columns: 1fr 1fr; } .col-nav-list { grid-column: 1 / -1; grid-row: 2; padding: 10px; } .col-nav-title { font-size: 0.84rem; } }
+@media (max-width: 480px) { .col-nav { grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 16px; padding-top: 10px; } .col-nav-btn { padding: 7px 12px; gap: 2px; } .col-nav-list { grid-column: 1 / -1; grid-row: 2; padding: 7px; } .col-nav-title { font-size: 0.84rem; } }  /* 휴대폰: 강의 목록·이전/다음 글 위아래 여백을 조금 줄임 */
 .feed-col-title { font-weight: 800; font-size: 1rem; margin: 4px 0 6px; }
 /* 정책 표: 칸이 많은 표(국외 이전)는 휴대폰에서 표 안에서만 옆으로 스크롤 */
 @media (max-width: 600px) { .policy-table { display: block; max-width: 100%; overflow-x: auto; } .policy-table th, .policy-table td { min-width: 6.5em; overflow-wrap: anywhere; } }
@@ -690,11 +690,11 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
 :root { --bottom-nav-h: 60px; }
 body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); }
 .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 120; display: flex; justify-content: center; height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,.08); }
-.bottom-nav > a, .bottom-nav > .theme-toggle { flex: 1; max-width: 160px; width: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; border: 0; border-radius: 0; background: none; color: var(--text-muted); font-size: 0.74rem; font-weight: 600; line-height: 1.2; white-space: nowrap; letter-spacing: -0.02em; }
+.bottom-nav > a, .bottom-nav > .theme-toggle, .bottom-nav > .view-toggle { flex: 1; max-width: 160px; width: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; border: 0; border-radius: 0; background: none; color: var(--text-muted); font-size: 0.74rem; font-weight: 600; line-height: 1.2; white-space: nowrap; letter-spacing: -0.02em; }
 .bottom-nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .bottom-nav > a.active { color: var(--accent); }
 .bottom-nav > a.nav-lecture { color: #e02f4b; }  /* 주식 강의는 예전 상단 버튼처럼 빨강으로 강조 */
-@media (hover: hover) { .bottom-nav > a:hover, .bottom-nav > .theme-toggle:hover { color: var(--accent); } .bottom-nav > a.nav-lecture:hover { color: #ff6a5c; } }
+@media (hover: hover) { .bottom-nav > a:hover, .bottom-nav > .theme-toggle:hover, .bottom-nav > .view-toggle:hover { color: var(--accent); } .bottom-nav > a.nav-lecture:hover { color: #ff6a5c; } }
 .admin-badge { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }
 /* 상단: 제목·검색창을 조금 키움, 검색창은 길게 + 끝에 동그란 돋보기 버튼(누르면 검색), 로그인 위·회원가입 아래로 쌓음 */
 .header-inner { padding-top: 14px; padding-bottom: 14px; }
@@ -794,3 +794,89 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
   .login-dropdown { top: 102px; }
 }
 @media (max-width: 480px) and (max-height: 699px) { .header-inner { height: 95px; } .login-dropdown { top: 102px; } }
+
+/* ── 가로 보기 (하단 메뉴 맨 왼쪽 '가로 보기', theme.js가 <html data-view="list">) ──
+   네이버 관심종목처럼 한 종목 한 줄: 로고 · 종목명/코드 · 일봉(최근 20거래일) · 현재가 · 전일대비 · 등락률 · ☆
+   휴대폰(760px 이하) 1열(현재가 아래 전일대비·등락률), 태블릿·좁은 PC 1열 표, 넓은 PC(1101px 이상) 2열 표 */
+.price-diff, .mini-chart { display: none; }
+.mini-chart svg { display: block; width: 100%; height: 30px; }
+.mini-chart .c-up { stroke: var(--up); fill: var(--up); }
+.mini-chart .c-down { stroke: var(--down); fill: var(--down); }
+.mini-chart line { stroke-width: 0.6; vector-effect: non-scaling-stroke; }
+.mini-chart rect { stroke: none; }
+.stock-extra i { font-style: normal; }
+:root[data-view="list"] :is(.stock-list, .search-results) { grid-template-columns: minmax(0, 1fr); gap: 0; border-top: 1px solid var(--border); }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-card { aspect-ratio: auto; display: grid; grid-template-columns: 30px minmax(0, max-content) minmax(44px, 1fr) auto 22px; grid-template-areas: "logo meta chart quote star"; column-gap: 8px; align-items: center; padding: 10px 4px 10px 8px; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; overflow: visible; }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-card:hover { transform: none; box-shadow: none; background: rgba(91,140,255,.07); }
+:root[data-view="list"] :is(.stock-list, .search-results) .card-top { display: contents; }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-avatar { grid-area: logo; width: 30px; height: 30px; }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-meta { grid-area: meta; margin: 0; }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-name { font-size: 0.94rem; }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-sub { margin-top: 1px; }
+:root[data-view="list"] :is(.stock-list, .search-results) .card-quote { grid-area: quote; display: grid; grid-template-areas: "price price" "diff rate"; justify-content: end; justify-items: end; column-gap: 6px; text-align: right; }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-price { grid-area: price; font-size: 0.98rem; }
+:root[data-view="list"] :is(.stock-list, .search-results) .price-diff { grid-area: diff; display: block; font-size: 0.78rem; font-weight: 600; white-space: nowrap; }
+:root[data-view="list"] :is(.stock-list, .search-results) .price-change { grid-area: rate; font-size: 0.78rem; }
+:root[data-view="list"] :is(.stock-list, .search-results) .card-marks { grid-area: star; position: static; }
+:root[data-view="list"] :is(.stock-list, .search-results) .mini-chart { display: block; grid-area: chart; width: 44px; justify-self: center; }  /* 휴대폰: 종목명과 현재가 사이 빈칸의 가운데 */
+:root[data-view="list"] :is(.stock-list, .search-results) .card-bottom { display: none; margin: 0; }
+/* 주식 시장·업종 뉴스 토론 카드도 한 줄 (휴대폰은 이름 아래 뉴스·댓글 수) */
+:root[data-view="list"] :is(.stock-list, .search-results) .sector-card { grid-template-columns: 30px minmax(0, 1fr); grid-template-areas: "logo label" "logo sub"; row-gap: 1px; text-align: left; justify-items: start; }
+:root[data-view="list"] :is(.stock-list, .search-results) .sector-icon { grid-area: logo; justify-self: center; font-size: 1.35rem; }
+:root[data-view="list"] :is(.stock-list, .search-results) .sector-label { grid-area: label; font-size: 0.98rem; }
+:root[data-view="list"] :is(.stock-list, .search-results) .sector-label br { display: none; }
+:root[data-view="list"] :is(.stock-list, .search-results) .sector-label span { font-size: 1em; }
+:root[data-view="list"] :is(.stock-list, .search-results) .sector-label span + br + span { margin-left: .35em; }
+:root[data-view="list"] :is(.stock-list, .search-results) .sector-sub { grid-area: sub; }
+@media (min-width: 761px) {
+  :root[data-view="list"] :is(.stock-list, .search-results) .stock-card:not(.sector-card) { grid-template-columns: 32px minmax(0, 1fr) 96px 104px 84px 70px 24px; grid-template-areas: "logo meta chart price diff rate star"; column-gap: 12px; padding: 9px 6px 9px 10px; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .stock-avatar { width: 32px; height: 32px; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .card-quote { display: contents; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .stock-price { grid-area: price; text-align: right; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .price-diff { grid-area: diff; text-align: right; font-size: 0.86rem; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .price-change { grid-area: rate; text-align: right; font-size: 0.86rem; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .mini-chart { width: auto; justify-self: stretch; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .mini-chart svg { height: 32px; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .sector-card { grid-template-columns: 32px auto minmax(0, 1fr); grid-template-areas: "logo label sub"; column-gap: 12px; padding: 9px 6px 9px 10px; min-height: 52px; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .sector-sub { justify-self: end; padding-right: 6px; }
+}
+@media (min-width: 1101px) {
+  :root[data-view="list"] :is(.stock-list, .search-results) { grid-template-columns: repeat(2, minmax(0, 1fr)); column-gap: 28px; }
+  :root[data-view="list"] :is(.stock-list, .search-results) .stock-card:not(.sector-card) { grid-template-columns: 30px minmax(0, 1fr) 84px 100px 76px 64px 22px; column-gap: 9px; }
+}
+
+/* 휴대폰 카드 보기: 주가·종목명을 카드 폭에 맞춰 최대한 크게 (카드 폭 기준 cqi — 좁은 폰에선 자동으로 줄어 잘리지 않게) */
+@media (max-width: 480px) {
+  :root:not([data-view="list"]) .stock-card:not(.sector-card) { container-type: inline-size; }
+  :root:not([data-view="list"]) .stock-card:not(.sector-card) .stock-price { font-size: min(1.14rem, 10.07cqi); letter-spacing: -0.02em; }
+  :root:not([data-view="list"]) .stock-card:not(.sector-card) .stock-name { font-size: min(1.235rem, 11.4cqi); letter-spacing: -0.03em; }
+}
+
+/* 카드 보기 오른쪽 가운데: 당일 캔들 1개 (app.js dayCandleSvg, 시세 갱신마다 다시 그림), 관심 종목 ☆ 바로 아래 같은 세로줄 (☆ 가운데 = 카드 오른쪽에서 약 19px) — 글자와 겹치지 않게 이름·코드 줄 오른쪽을 비움 */
+.day-candle { position: absolute; right: 14px; top: 50%; transform: translateY(-50%); width: 8.7px; height: 29%; pointer-events: none; }
+.day-candle svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.day-candle .c-up { stroke: var(--up); fill: var(--up); }
+.day-candle .c-down { stroke: var(--down); fill: var(--down); }
+.day-candle line { stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.day-candle rect { stroke: none; }
+.stock-card:not(.sector-card) .stock-meta { padding-right: 16px; }
+:root[data-view="list"] .day-candle { display: none; }
+:root[data-view="list"] :is(.stock-list, .search-results) .stock-meta { padding-right: 0; }
+
+/* 가로 보기 휴대폰: 주식 시장 뉴스(왼쪽)와 업종 뉴스·관심 종목 모아보기(오른쪽)를 나란히 — 높이는 예전 두 줄만큼, 종목 줄은 전체 폭 */
+@media (max-width: 760px) {
+  :root[data-view="list"] .stock-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  :root[data-view="list"] .stock-list > :not(.sector-card) { grid-column: 1 / -1; }
+  :root[data-view="list"] .stock-list .sector-card { grid-template-columns: minmax(0, 1fr); grid-template-areas: "logo" "label" "sub"; align-content: center; justify-items: center; text-align: center; row-gap: 3px; min-height: 112px; padding: 8px 6px; }
+  :root[data-view="list"] .stock-list .sector-card + .sector-card { border-left: 1px solid var(--border); }
+  :root[data-view="list"] .stock-list .sector-icon { justify-self: center; }
+  :root[data-view="list"] .stock-list .sector-label { font-size: 0.9rem; line-height: 1.3; }
+  :root[data-view="list"] .stock-list .sector-label br { display: inline; }
+  :root[data-view="list"] .stock-list .sector-label span + br + span { margin-left: 0; }
+  :root[data-view="list"] .stock-list .sector-label span { font-size: min(1em, 10.5cqi); }
+}
+
+/* 시장·업종·관심 종목 카드: 이모티콘과 이름 사이를 조금 띄움 (카드 보기, 휴대폰 가로 보기 나란히 카드) */
+.sector-card .sector-icon { margin-bottom: 4px; }
+@media (max-width: 760px) { :root[data-view="list"] .stock-list .sector-card .sector-icon { margin-bottom: 5px; } }
+@media (min-width: 761px) { :root[data-view="list"] :is(.stock-list, .search-results) .sector-card .sector-icon { margin-bottom: 0; } }
