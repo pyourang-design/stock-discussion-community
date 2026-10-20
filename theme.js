@@ -1,13 +1,10 @@
 // 다크/라이트 화면 전환 (모든 페이지 공통, <head>에서 먼저 읽어 화면 깜빡임 없이 적용)
-// 기본값: ① 버튼으로 고른 모드(이 브라우저에 기억, localStorage 'theme') → ② 기기 설정(다크/라이트) → ③ 설정을 알 수 없으면 라이트
+// 기본값: 버튼으로 고른 모드(이 브라우저에 기억, localStorage 'theme'), 고른 적 없으면 라이트(화이트) — 기기 다크 설정은 따르지 않음 (2026-10-21)
 function savedTheme() {
   try { const t = localStorage.getItem('theme'); return t === 'light' || t === 'dark' ? t : null; } catch (e) { return null; }
 }
-function systemDark() {
-  try { return window.matchMedia('(prefers-color-scheme: dark)').matches; } catch (e) { return false; }
-}
 function applyTheme() {
-  const light = (savedTheme() || (systemDark() ? 'dark' : 'light')) === 'light';
+  const light = (savedTheme() || 'light') === 'light';
   if (light) document.documentElement.setAttribute('data-theme', 'light');
   else document.documentElement.removeAttribute('data-theme');
 }
@@ -21,13 +18,6 @@ if (!/SamsungBrowser/i.test(navigator.userAgent)) {
   m.href = '/manifest.webmanifest';
   document.head.appendChild(m);
 }
-
-// 직접 고른 적이 없으면 기기 설정이 바뀔 때(예: 밤에 자동 다크) 따라감
-try {
-  window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
-    if (!savedTheme()) { applyTheme(); renderThemeButtons(); }
-  });
-} catch (e) {}
 
 function isLightTheme() {
   return document.documentElement.getAttribute('data-theme') === 'light';
@@ -61,12 +51,14 @@ function toggleTheme() {
 
 document.addEventListener('DOMContentLoaded', renderThemeButtons);
 
-// 종목 목록 보기 방식: 카드 보기(기본) ↔ 가로 보기(네이버 관심종목처럼 한 종목 한 줄), 이 브라우저에 기억 (localStorage 'view')
+// 종목 목록 보기 방식: 가로 보기(기본, 네이버 관심종목처럼 한 종목 한 줄) ↔ 카드 보기, 이 브라우저에 기억 (localStorage 'view')
 // <html data-view="list">로 styles.css가 모양을 바꿈 — 홈이 아닌 페이지에서 누르면 바꾼 뒤 홈으로
 function isListView() {
   return document.documentElement.getAttribute('data-view') === 'list';
 }
-try { if (localStorage.getItem('view') === 'list') document.documentElement.setAttribute('data-view', 'list'); } catch (e) {}
+let savedView = null;
+try { savedView = localStorage.getItem('view'); } catch (e) {}
+if (savedView !== 'card') document.documentElement.setAttribute('data-view', 'list');
 
 const VIEW_ICON = {
   list: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 6h13M8 12h13M8 18h13"/><path d="M3.5 6h.01M3.5 12h.01M3.5 18h.01"/></svg>',
