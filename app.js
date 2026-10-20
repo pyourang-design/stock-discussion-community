@@ -1187,11 +1187,11 @@ async function countPostViews(s, posts, code = s.code) {
     currentPosts.forEach(p => { if (views[p.id] != null) p.views = views[p.id]; });
     document.querySelectorAll('#postList .post-views').forEach(el => {
       const v = views[el.dataset.id];
-      if (v != null) el.textContent = `👁 ${v.toLocaleString()}`;
+      if (v != null) el.innerHTML = `👁 <span class="pv-num">${v.toLocaleString()}</span>`;
     });
   } catch {}
 }
-const viewsHtml = p => `<span class="post-views" data-id="${escHtml(p.id)}" title="조회수">👁 ${(p.views || 0).toLocaleString()}</span>`;
+const viewsHtml = p => `<span class="post-views" data-id="${escHtml(p.id)}" title="조회수">👁 <span class="pv-num">${(p.views || 0).toLocaleString()}</span></span>`;
 
 function drawPosts() {
   const el = document.getElementById('postList');
