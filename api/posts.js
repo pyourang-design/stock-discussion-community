@@ -22,7 +22,7 @@
 // POST /api/posts { action: 'columnList',    cid, board? } 운영자 칼럼 목록 (누구나 읽기, board: COLMKT 기본 | COLNEWS) — 제목·날짜·조회수만, 본문 없음 (명령 3개, colmeta)
 // POST /api/posts { action: 'columnPost',    cid, id } 칼럼 한 편의 본문·공감·비공감 (글을 열 때)
 // POST /api/posts { action: 'sihwangLatest', cid } 주식 시황 최신 글 한 편 (홈 지수 칸 아래 한 줄) → { post: { id, title, ts } | null }
-// POST /api/posts { action: 'sihwangDraft',  cid, adminKey, discard? } 예약 실행 루틴이 쓴 시황 초안 보기 / 버리기 (functions/api/sihwang.js)
+// POST /api/posts { action: 'sihwangDraft',  cid, adminKey, discard?: 'kr'|'us' } 예약 실행 루틴이 쓴 시황 초안(국내·미국) 보기 / 버리기 (functions/api/sihwang.js) → { drafts: { kr, us } }
 //   칼럼 글(columnPost·create·edit 응답)에는 html(본문 표·그래프를 그린 것, api/_rich.js)이 붙음
 // POST /api/posts { action: 'adminImages',   cid, adminKey, cleanup? } 칼럼 사진 저장소 현황 / 안 쓰는 사진 정리
 //   운영자 칼럼(COLUMN_CODE): 주식 시장 경제 게시판의 칼럼 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 제목(최대 100자) + 본문(최대 2000자)
@@ -88,7 +88,7 @@ const columnMax = code => code === SIHWANG_CODE ? SIHWANG_MAX : COLUMN_MAX;
 // 글쓰기·수정·삭제 때 함께 바꾸고, 없는 글(2026-10-21 이전 글)은 목록을 열 때 한 번 채움
 const colMetaKey = code => `colmeta:${code}`;
 const colMeta = p => JSON.stringify({ id: p.id, title: p.title || '', ts: p.ts });
-const SIHWANG_DRAFT_KEY = 'sihwang:draft';  // 루틴이 쓴 초안 (functions/api/sihwang.js)
+const SIHWANG_DRAFT_KEYS = { kr: 'sihwang:draft', us: 'sihwang:draft:us' };  // 루틴이 쓴 초안: 국내 장 마감(16시)·미국 장 마감(아침 8시) (functions/api/sihwang.js)
 const withHtml = p => isColumnCode(p.code) && !p.blind ? { ...p, html: renderRich(p.content) } : p;  // 칼럼 본문 표·그래프
 const COLUMN_TITLE_MAX = 100;
 // 칼럼 본문 사진 [사진:/img/{id}] → 사진 저장소(Workers KV, 키 img:{id}) 정리용
@@ -678,10 +678,10 @@ async function handlePost(b, env = {}) {
 
   if (b.action === 'sihwangDraft') {
     await checkAdmin(b.adminKey, b._ip);
-    if (b.discard === true) { await redis([['DEL', SIHWANG_DRAFT_KEY]]); return { draft: null }; }
-    const [raw] = await redis([['GET', SIHWANG_DRAFT_KEY]]);
-    const d = raw ? JSON.parse(raw) : null;
-    return { draft: d ? { ...d, html: renderRich(d.content) } : null };
+    if (SIHWANG_DRAFT_KEYS[b.discard]) await redis([['DEL', SIHWANG_DRAFT_KEYS[b.discard]]]);
+    const raws = await redis(Object.values(SIHWANG_DRAFT_KEYS).map(k => ['GET', k]));
+    const drafts = Object.fromEntries(Object.keys(SIHWANG_DRAFT_KEYS).map((kind, i) => { const d = raws[i] ? JSON.parse(raws[i]) : null; return [kind, d ? { ...d, html: renderRich(d.content) } : null]; }));
+    return { drafts };
   }
 
   if (b.action === 'adminImages') {
@@ -751,7 +751,7 @@ async function handlePost(b, env = {}) {
       ['LPUSH', `author:${nick}`, id],
       ['HINCRBY', 'postcount', b.code, 1],
       column ? ['HSET', colMetaKey(b.code), id, colMeta(post)] : ['ECHO', ''],
-      official && b.code === SIHWANG_CODE && b.fromDraft === true ? ['DEL', SIHWANG_DRAFT_KEY] : ['ECHO', ''],  // 초안을 불러와 올렸으면 초안은 지움
+      official && b.code === SIHWANG_CODE && SIHWANG_DRAFT_KEYS[b.fromDraft] ? ['DEL', SIHWANG_DRAFT_KEYS[b.fromDraft]] : ['ECHO', ''],  // 초안을 불러와 올렸으면 그 초안은 지움
     ]);
     return { post: withHtml({ ...publicPost(post), likes: 0, dislikes: 0, liked: false, disliked: false }) };
   }

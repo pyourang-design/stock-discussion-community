@@ -72,8 +72,8 @@ const ACTIONS = {
   reportPost: el => reportPost(el.dataset.id),
   openColumn: el => openColumn(el.dataset.id),
   draftPreview: el => { el.closest('.draft-card')?.querySelector('.draft-preview')?.classList.toggle('hidden'); },
-  draftLoad: () => loadDraftIntoWriteBox(),
-  draftDiscard: () => discardSihwangDraft(),
+  draftLoad: el => loadDraftIntoWriteBox(el.dataset.kind),
+  draftDiscard: el => discardSihwangDraft(el.dataset.kind),
   closeColumn: () => closeColumn(),
   goColumnPage: el => goColumnPage(Number(el.dataset.page)),
   toggleAdminForm: () => toggleAdminForm(),
@@ -1321,41 +1321,46 @@ function openColumnLink(id, tab = 'column') {
   pendingColumnId = id || null;
   openModal('SECMKT', OP_BOARDS[tab] ? tab : 'column');
 }
-// ── 주식 시황 초안 (관리자): 예약 실행 루틴이 매일 장 마감 후 써 두는 초안 (functions/api/sihwang.js) → 보고 고쳐서 등록 ──
-let sihwangDraft;        // undefined: 아직 안 받음, null: 없음, { title, content, ts, html }
-let draftLoaded = false;  // 글쓰기 칸에 초안을 불러왔는지 (등록하면 서버가 초안을 지움)
+// ── 주식 시황 초안 (관리자): 예약 실행 루틴이 써 두는 초안 — 국내 장 마감(평일 16시)·미국 장 마감(화~토 아침 8시) (functions/api/sihwang.js) → 보고 고쳐서 등록 ──
+const DRAFT_KINDS = [['kr', '국내 장 마감', '평일 16:00쯤'], ['us', '미국 장 마감', '화~토 08:00쯤']];
+let sihwangDraft;        // undefined: 아직 안 받음, { kr, us }: 각 { title, content, ts, html } 또는 null
+let draftLoaded = false;  // 글쓰기 칸에 불러온 초안 ('kr' | 'us', 등록하면 서버가 그 초안을 지움)
 async function drawSihwangDraft() {
   const box = document.getElementById('draftCard');
   if (!box || !isAdmin()) return;
   if (sihwangDraft === undefined) {
     box.innerHTML = '<div class="draft-card"><span class="draft-meta">시황 초안 확인 중...</span></div>';
-    try { sihwangDraft = (await api({}, { action: 'sihwangDraft', adminKey })).draft; } catch (e) { box.innerHTML = `<div class="draft-card"><span class="draft-meta">초안을 불러오지 못했습니다. (${escHtml(e.message)})</span></div>`; return; }
+    try { sihwangDraft = (await api({}, { action: 'sihwangDraft', adminKey })).drafts; } catch (e) { box.innerHTML = `<div class="draft-card"><span class="draft-meta">초안을 불러오지 못했습니다. (${escHtml(e.message)})</span></div>`; return; }
   }
-  const d = sihwangDraft, el = document.getElementById('draftCard');
+  const el = document.getElementById('draftCard');
   if (!el) return;
-  const at = d && new Date(d.ts);
-  el.innerHTML = d ? `<div class="draft-card">
-      <span class="draft-meta">📝 시황 초안 · ${colDate(d.ts).slice(5)} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')} · ${d.content.length.toLocaleString()}자 · 방문자에게는 안 보임</span>
+  el.innerHTML = DRAFT_KINDS.map(([kind, label, when]) => {
+    const d = sihwangDraft?.[kind];
+    if (!d) return `<div class="draft-card empty"><span class="draft-meta">📝 ${label} 초안 없음 — ${when} 자동으로 만들어집니다</span></div>`;
+    const at = new Date(d.ts);
+    return `<div class="draft-card">
+      <span class="draft-meta">📝 ${label} 초안 · ${colDate(d.ts).slice(5)} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')} · ${d.content.length.toLocaleString()}자 · 방문자에게는 안 보임</span>
       <strong class="draft-title">${escHtml(d.title)}</strong>
-      <div class="draft-btns"><button class="btn-tool" data-act="draftPreview">미리보기</button><button class="btn-submit" data-act="draftLoad">글쓰기 칸에 불러오기</button><button class="btn-tool" data-act="draftDiscard">버리기</button></div>
+      <div class="draft-btns"><button class="btn-tool" data-act="draftPreview">미리보기</button><button class="btn-submit" data-act="draftLoad" data-kind="${kind}">글쓰기 칸에 불러오기</button><button class="btn-tool" data-act="draftDiscard" data-kind="${kind}">버리기</button></div>
       <div class="draft-preview hidden"><div class="post-body col-body rich">${d.html}</div></div>
-    </div>` : '<div class="draft-card empty"><span class="draft-meta">📝 시황 초안 없음 — 거래일 16:30쯤 자동으로 만들어집니다</span></div>';
+    </div>`;
+  }).join('');
 }
-function loadDraftIntoWriteBox() {
-  const d = sihwangDraft;
+function loadDraftIntoWriteBox(kind) {
+  const d = sihwangDraft?.[kind];
   if (!d) return;
   const ta = document.getElementById('postContent');
   if (ta.value.trim() && !confirm('글쓰기 칸에 쓰던 내용을 초안으로 바꿀까요?')) return;
   document.getElementById('postTitle').value = d.title;
   ta.value = d.content;
-  draftLoaded = true;
+  draftLoaded = kind;
   updateCharCount();
   document.querySelector('.write-box').scrollIntoView({ block: 'start', behavior: 'smooth' });
   ta.focus();
 }
-async function discardSihwangDraft() {
-  if (!confirm('오늘 시황 초안을 버릴까요? 되돌릴 수 없습니다.')) return;
-  try { sihwangDraft = (await api({}, { action: 'sihwangDraft', adminKey, discard: true })).draft; draftLoaded = false; drawSihwangDraft(); }
+async function discardSihwangDraft(kind) {
+  if (!confirm('이 시황 초안을 버릴까요? 되돌릴 수 없습니다.')) return;
+  try { sihwangDraft = (await api({}, { action: 'sihwangDraft', adminKey, discard: kind })).drafts; if (draftLoaded === kind) draftLoaded = false; drawSihwangDraft(); }
   catch (e) { alert(`버리지 못했습니다: ${e.message}`); }
 }
 // 홈 지수 칸 아래 한 줄: 주식 시황 최신 글 (없으면 숨김)
@@ -1599,11 +1604,11 @@ async function submitPost() {
   const code = boardCodeNow();
   try {
     const { post } = await api({}, isAdmin()
-      ? { action: 'create', code, ...(isColumnTab() ? { title } : {}), content, asOperator: true, adminKey, ...(code === 'COLNEWS' && draftLoaded ? { fromDraft: true } : {}) }
+      ? { action: 'create', code, ...(isColumnTab() ? { title } : {}), content, asOperator: true, adminKey, ...(code === 'COLNEWS' && draftLoaded ? { fromDraft: draftLoaded } : {}) }
       : member
       ? { action: 'create', code, content }
       : { action: 'create', code, nick, password, content });
-    if (code === 'COLNEWS' && draftLoaded) { draftLoaded = false; sihwangDraft = null; }  // 초안으로 올렸으면 서버가 초안을 지움
+    if (code === 'COLNEWS' && draftLoaded) { if (sihwangDraft) sihwangDraft[draftLoaded] = null; draftLoaded = false; }  // 초안으로 올렸으면 서버가 그 초안을 지움
     if (currentStock && boardCodeNow() === code) {
       if (isColumnTab() && !opBoard().latest) { currentPosts.push(post); columnPage = Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE); }  // 강의는 먼저 쓴 글부터라 새 글은 마지막 페이지
       else { currentPosts.unshift(post); columnPage = 1; }

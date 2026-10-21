@@ -650,7 +650,8 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
 @media (max-width: 480px) { .rich-line { height: 130px; } .rich-line-meta span:nth-child(2) { display: none; } .rich-table { font-size: 0.82rem; } .rich-table th, .rich-table td { padding: 6px 8px; } }
 /* 주식 시황 초안 카드 (관리자 모드, 주식 시황 탭 맨 위) */
 .draft-card { display: flex; flex-direction: column; gap: 6px; margin: 12px 16px 6px; padding: 12px 14px; border: 1px dashed var(--hot); border-radius: 10px; background: rgba(255,140,66,.08); }
-.draft-card.empty { border-color: var(--border); background: none; }
+.draft-card.empty { padding: 8px 14px; border-color: var(--border); background: none; }
+.draft-card + .draft-card { margin-top: 6px; }
 .draft-meta { font-size: 0.78rem; color: var(--text-muted); }
 .draft-title { font-size: 0.98rem; line-height: 1.4; }
 .draft-btns { display: flex; flex-wrap: wrap; gap: 6px; }
