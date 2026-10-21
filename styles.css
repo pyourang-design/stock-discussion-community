@@ -338,6 +338,11 @@ input:focus, textarea:focus, select:focus { border-color: var(--accent); }
 /* 지수 카드: 값·등락 두 줄, 1000px 이하 글자 축소 → 880px 이하 3열 */
 @media (max-width: 1000px) { .index-card { padding: 7px 10px; column-gap: 6px; } .idx-value { font-size: 0.95rem; } .idx-change { font-size: 0.72rem; } }
 @media (max-width: 880px) { .market-banner { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+/* 휴대폰: 시간대에 맞는 3개만 (app.js setBannerSession — 08~20시 국내, 그 외 미국) */
+@media (max-width: 760px) {
+  .market-banner.show-kr .index-card:is([data-key="DJI"], [data-key="IXIC"], [data-key="INX"]) { display: none; }
+  .market-banner.show-us .index-card:is([data-key="KOSPI"], [data-key="KOSDAQ"], [data-key="USDKRW"]) { display: none; }
+}
 
 .main-nav a, .btn-login, .btn-signup { white-space: nowrap; }
 @media (max-width: 1000px) { .main-nav { flex: 0 0 auto; } }

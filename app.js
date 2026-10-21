@@ -2283,8 +2283,18 @@ function updateCard(s) {
 const MARKET_STATUS = { CLOSE: '장마감', PREOPEN: '장전', OPEN: '' };
 
 function startMarketBanner() {
+  setBannerSession();
+  setInterval(setBannerSession, 60000);
   fetchMarket();
   setInterval(whenVisible(fetchMarket), PRICE_REFRESH);
+}
+// 휴대폰 지수 칸: 한국 시간 08:00~20:00는 코스피·코스닥·환율, 20:00~다음날 08:00는 다우·나스닥·S&P 500만 (styles.css .market-banner.show-kr/.show-us, PC는 6개 모두)
+function setBannerSession() {
+  const h = new Date(Date.now() + 9 * 3600e3).getUTCHours();
+  const kr = h >= 8 && h < 20;
+  const banner = document.getElementById('marketBanner');
+  banner.classList.toggle('show-kr', kr);
+  banner.classList.toggle('show-us', !kr);
 }
 
 async function fetchMarket() {
