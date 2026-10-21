@@ -23,6 +23,12 @@ async function macro() {
   }).filter(Boolean);
 }
 
+// 코스피·코스닥 종가·증감 포인트·등락률 (네이버 실시간 지수 — 하락이면 증감에 - 붙임)
+async function indices() {
+  const j = await getJson('https://polling.finance.naver.com/api/realtime/domestic/index/KOSPI,KOSDAQ');
+  return (j.datas || []).map(d => { const rate = num(d.fluctuationsRatio); const diff = Math.abs(num(d.compareToPreviousClosePrice) ?? 0); return { name: d.itemCode === 'KOSPI' ? '코스피' : '코스닥', close: num(d.closePrice), diff: rate < 0 ? -diff : diff, rate, status: d.marketStatus }; });
+}
+
 // 지수 최근 20거래일 종가 (꺾은선 그래프용)
 async function indexDays(code) {
   const j = await getJson(`https://api.stock.naver.com/chart/domestic/index/${code}?periodType=dayCandle`);
@@ -54,17 +60,18 @@ export async function sihwangData(now, origin) {
   const day = ymd(now);
   const [discRaw] = await redis([['HVALS', `ai:disc:${day}`]]);
   const settle = p => p.then(v => v, e => ({ error: String(e.message || e) }));
-  const [close, us, mac, kospi20, kosdaq20, capK, capQ, upK, downK, upQ, downQ, news, secK, secQ] = await Promise.all([
+  const [close, us, mac, kospi20, kosdaq20, capK, capQ, upK, downK, upQ, downQ, news, secK, secQ, idx] = await Promise.all([
     settle(buildMarketClose(now, {})), settle(buildMorning(now)), settle(macro()),
     settle(indexDays('KOSPI')), settle(indexDays('KOSDAQ')),
     settle(stocks('marketValue', 'KOSPI', 10)), settle(stocks('marketValue', 'KOSDAQ', 5)),
     settle(stocks('up', 'KOSPI', 8)), settle(stocks('down', 'KOSPI', 8)), settle(stocks('up', 'KOSDAQ', 8)), settle(stocks('down', 'KOSDAQ', 8)),
     settle(fetch(new URL('/api/news?sector=market', origin)).then(r => r.json()).then(j => (j.data || []).slice(0, 40).map(n => ({ title: n.title, press: n.press || n.source, time: n.datetime, url: n.url })))),
-    settle(krxSectors('KOSPI')), settle(krxSectors('KOSDAQ')),
+    settle(krxSectors('KOSPI')), settle(krxSectors('KOSDAQ')), settle(indices()),
   ]);
   if (close?.skip) return { tradingDay: false, date: today, reason: `오늘 거래 없음 (${close.skip})` };
   return {
     tradingDay: true, date: today, generatedAt: new Date(now).toISOString(),
+    indices: idx,  // 코스피·코스닥: close 종가, diff 증감 포인트, rate 등락률 %
     market: close?.error ? close : { summary: close.summary, tables: close.tables },  // 지수·투자자별 순매수(억 원)
     krxSectors: { KOSPI: secK, KOSDAQ: secQ },  // 거래소 업종지수: name, close(지수), diff, rate(%), aggregate(묶음 지수) — 등락률 큰 순
     macro: mac,  // 환율·WTI·브렌트·금·한국 3년/10년·미국 10년 (price, diff, rate %)
