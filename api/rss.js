@@ -17,6 +17,7 @@ const sectorName = key => key === 'usa' ? '미국 주식' : `${SECTORS.find(s =>
 // 주식 시장 경제 게시판 (업종과 무관한 전체 시장 토론)
 const MARKET_BOARD = 'SECMKT';
 const COLUMN_BOARD = 'COLMKT';  // 운영자 칼럼 (주식 시장 경제 게시판의 칼럼 탭)
+const SIHWANG_BOARD = 'COLNEWS';  // 주식 시황 (같은 게시판의 시황 탭, 검색용 /sihwang)
 // 종목 토론방 글은 검색 노출되는 종목만: 개편 전부터 탭에 있던 종목 + 회원 토론글 기준을 넘은 종목 (api/_public.js)
 const boardSector = code => SECTORS.find(s => 'SEC' + s.key.slice(0, 3).toUpperCase() === code)?.key;
 
@@ -40,11 +41,12 @@ export default async function handler(req, res) {
   try { posts = await recentPosts(); } catch { posts = []; }
 
   const items = posts.filter(p => !isNaN(new Date(p.editedTs || p.ts))).map(p => {
-    // 운영자 칼럼: 제목 그대로, 링크는 해당 칼럼을 바로 여는 주소
-    if (p.code === COLUMN_BOARD) {
-      const link = `${SITE}/column/${encodeURIComponent(p.id)}`;
+    // 운영자 칼럼(주식 강의·주식 시황): 제목 그대로, 링크는 해당 글의 검색용 페이지
+    if (p.code === COLUMN_BOARD || p.code === SIHWANG_BOARD) {
+      const [path, label] = p.code === COLUMN_BOARD ? ['/column', '주식 강의'] : ['/sihwang', '주식 시황'];
+      const link = `${SITE}${path}/${encodeURIComponent(p.id)}`;
       const text = String(p.content).replace(/\[사진:[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
-      return { title: `[주식 강의] ${p.title || text.slice(0, 40)}`, link, guid: link, desc: text.slice(0, 300), date: new Date(p.editedTs || p.ts), category: '주식 강의' };
+      return { title: `[${label}] ${p.title || text.slice(0, 40)}`, link, guid: link, desc: text.slice(0, 300), date: new Date(p.editedTs || p.ts), category: label };
     }
     const extra = DROPPED.get(p.code) || (HIDDEN_NAME.has(p.code) ? { code: p.code, name: HIDDEN_NAME.get(p.code) } : null);
     const s = STOCKS.find(x => x.code === p.code) || (extra ? { ...extra, sectors: {}, hidden: true } : null);

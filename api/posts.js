@@ -19,11 +19,13 @@
 // POST /api/posts { action: 'adminUnblind',  cid, id, adminKey }  신고 기록 초기화·블라인드 해제
 // POST /api/posts { action: 'adminContacts', cid, adminKey }      문의 목록
 // POST /api/posts { action: 'adminStats',    cid, adminKey }      사이트 통계 (방문·회원·게시글, 최근 14일)
-// POST /api/posts { action: 'columnList',    cid } 운영자 칼럼 목록 (누구나 읽기) — 제목·본문·조회수만 (명령 3개)
+// POST /api/posts { action: 'columnList',    cid, board? } 운영자 칼럼 목록 (누구나 읽기, board: COLMKT 기본 | COLNEWS) — 제목·본문·조회수만 (명령 3개)
 // POST /api/posts { action: 'columnPost',    cid, id } 칼럼 한 편의 공감·비공감 (글을 열 때)
+// POST /api/posts { action: 'sihwangLatest', cid } 주식 시황 최신 글 한 편 (홈 지수 칸 아래 한 줄) → { post: { id, title, ts } | null }
 // POST /api/posts { action: 'adminImages',   cid, adminKey, cleanup? } 칼럼 사진 저장소 현황 / 안 쓰는 사진 정리
 //   운영자 칼럼(COLUMN_CODE): 주식 시장 경제 게시판의 칼럼 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 제목(최대 100자) + 본문(최대 2000자)
 //   (2026-10-14부터 공개: RSS·작성자 목록(author:운영자)에도 포함, 바로가기 /?column={id})
+//   주식 시황(COLNEWS, 2026-10-21~): 같은 방식의 두 번째 운영자 게시판 — 목록은 최신 글부터, 바로가기 /?sihwang={id}, 검색용 /sihwang
 // POST /api/posts { action: 'favList',   cid, token }            관심 종목 목록 → { codes }
 // POST /api/posts { action: 'favToggle', cid, token, code, on }  관심 종목 추가(on=true)·해제
 // POST /api/posts { action: 'adminCheck',  cid, adminKey }       관리자 로그인 확인
@@ -73,7 +75,9 @@ import { redis, dbReady } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 
 const MAX_CONTENT = 1000;
-const COLUMN_CODE = 'COLMKT';
+const COLUMN_CODE = 'COLMKT';  // 주식 강의
+const SIHWANG_CODE = 'COLNEWS';  // 주식 시황
+const isColumnCode = c => c === COLUMN_CODE || c === SIHWANG_CODE;  // 운영자만 쓰는 게시판 (제목 + 2000자, 사진)
 const COLUMN_MAX = 2000;
 const COLUMN_TITLE_MAX = 100;
 // 칼럼 본문 사진 [사진:/img/{id}] → 사진 저장소(Workers KV, 키 img:{id}) 정리용
@@ -97,8 +101,9 @@ async function imageStats(env, cleanup) {
     keys.push(...r.keys);
     cursor = r.list_complete ? null : r.cursor;
   } while (cursor && keys.length < 20000);
-  const [ids] = await redis([['LRANGE', `posts:${COLUMN_CODE}`, 0, -1]]);
-  const [raws] = ids?.length ? await redis([['MGET', ...ids.map(id => `post:${id}`)]]) : [[]];
+  const [a, b] = await redis([['LRANGE', `posts:${COLUMN_CODE}`, 0, -1], ['LRANGE', `posts:${SIHWANG_CODE}`, 0, -1]]);
+  const ids = [...(a || []), ...(b || [])];
+  const [raws] = ids.length ? await redis([['MGET', ...ids.map(id => `post:${id}`)]]) : [[]];
   const used = new Set();
   for (const r of raws || []) if (r) for (const id of imagesIn(JSON.parse(r).content)) used.add(id);
   const now = Date.now();
@@ -305,7 +310,7 @@ async function removePost(post, env) {
     ['LREM', `author:${post.nick}`, 0, post.id],
     ['HINCRBY', 'postcount', post.code, -1],
   ]);
-  if (post.code === COLUMN_CODE) await deleteImages(env, [...imagesIn(post.content)]).catch(e => console.error('column image delete', e));
+  if (isColumnCode(post.code)) await deleteImages(env, [...imagesIn(post.content)]).catch(e => console.error('column image delete', e));
   return { deleted: post.id, code: post.code };
 }
 
@@ -546,8 +551,8 @@ async function handlePost(b, env = {}) {
     const ids = (listed || []).filter(id => want.has(id));  // 이 게시판에 실제 있는 글만
     if (!ids.length) return { views: {} };
     // 칼럼은 글을 열 때 글마다 셈 (목록엔 제목만 보이므로), 그 외 게시판은 게시판 단위
-    const viewKey = b.code === COLUMN_CODE ? `pvb:${b.code}:${b.cid}:${ids[0]}` : `pvb:${b.code}:${b.cid}`;
-    if (b.code === COLUMN_CODE) ids.length = 1;
+    const viewKey = isColumnCode(b.code) ? `pvb:${b.code}:${b.cid}:${ids[0]}` : `pvb:${b.code}:${b.cid}`;
+    if (isColumnCode(b.code)) ids.length = 1;
     const [ok] = await redis([['SET', viewKey, '1', 'NX', 'EX', BOARD_VIEW_GAP]]);
     const res = await redis(ids.map(id => ok === 'OK' ? ['HINCRBY', 'postviews', id, 1] : ['HGET', 'postviews', id]));
     // 날짜별 글 조회수 (관리자 화면 정보 '오늘 조회수'·최근 14일, 2026-10-15부터)
@@ -626,19 +631,28 @@ async function handlePost(b, env = {}) {
   }
 
   if (b.action === 'columnList') {
-    const [ids] = await redis([['LRANGE', `posts:${COLUMN_CODE}`, 0, LIST_LIMIT - 1]]);
+    const board = b.board === SIHWANG_CODE ? SIHWANG_CODE : COLUMN_CODE;
+    const [ids] = await redis([['LRANGE', `posts:${board}`, 0, LIST_LIMIT - 1]]);
     if (!ids?.length) return { posts: [] };
-    const [raws, views, order] = await redis([['MGET', ...ids.map(id => `post:${id}`)], ['HMGET', 'postviews', ...ids], ['HGETALL', COLUMN_ORDER_KEY]]);
-    // 연재 순서: 운영자가 정한 순번(colorder) → 없으면 먼저 쓴 글부터 (api/_colorder.js)
-    const posts = sortColumns(ids.map((id, i) => raws[i] ? { ...publicPost(JSON.parse(raws[i])), views: Number(views?.[i]) || 0 } : null).filter(Boolean), order);
-    return { posts };
+    const [raws, views, order] = await redis([['MGET', ...ids.map(id => `post:${id}`)], ['HMGET', 'postviews', ...ids], board === COLUMN_CODE ? ['HGETALL', COLUMN_ORDER_KEY] : ['ECHO', '']]);
+    const posts = ids.map((id, i) => raws[i] ? { ...publicPost(JSON.parse(raws[i])), views: Number(views?.[i]) || 0 } : null).filter(Boolean);
+    // 강의: 연재 순서(colorder) → 없으면 먼저 쓴 글부터 (api/_colorder.js) / 시황: 최신 글부터 (LPUSH 순서 그대로)
+    return { posts: board === COLUMN_CODE ? sortColumns(posts, order) : posts };
+  }
+
+  if (b.action === 'sihwangLatest') {
+    const [ids] = await redis([['LRANGE', `posts:${SIHWANG_CODE}`, 0, 4]]);
+    if (!ids?.length) return { post: null };
+    const [raws] = await redis([['MGET', ...ids.map(id => `post:${id}`)]]);
+    const p = (raws || []).filter(Boolean).map(r => JSON.parse(r)).find(x => !x.blind);
+    return { post: p ? { id: p.id, title: p.title || '', ts: p.ts } : null };
   }
 
   if (b.action === 'columnPost') {
     const id = String(b.id ?? '');
     if (!isPostId(id)) throw new BadRequest('게시글 id가 올바르지 않습니다');
     const [post] = await loadPosts([id], b.cid);
-    if (!post || post.code !== COLUMN_CODE) throw new BadRequest('강의가 없습니다');
+    if (!post || !isColumnCode(post.code)) throw new BadRequest('글이 없습니다');
     return { post };
   }
 
@@ -690,8 +704,8 @@ async function handlePost(b, env = {}) {
       if (Number(owned)) throw new BadRequest('회원 닉네임이라 비회원 글쓰기에 사용할 수 없습니다');
     }
     if (!isCode(b.code)) throw new BadRequest('종목코드가 올바르지 않습니다');
-    const column = b.code === COLUMN_CODE;
-    if (column && !official) throw new BadRequest('주식 강의는 관리자 모드에서만 쓸 수 있습니다');
+    const column = isColumnCode(b.code);
+    if (column && !official) throw new BadRequest(`${b.code === SIHWANG_CODE ? '주식 시황' : '주식 강의'}는 관리자 모드에서만 쓸 수 있습니다`);
     const title = column ? checkTitle(b.title) : null;
     const content = checkContent(b.content, column ? COLUMN_MAX : MAX_CONTENT);
     const sentiment = SENTIMENTS.includes(b.sentiment) ? b.sentiment : 'neutral';
@@ -715,9 +729,9 @@ async function handlePost(b, env = {}) {
   if (b.action === 'edit') {
     const post = await authorize(String(b.id ?? ''), b.password, b.token, b.adminKey, b._ip);
     if (post.blind) throw new BadRequest('블라인드 처리된 글은 수정할 수 없습니다');
-    const oldImages = post.code === COLUMN_CODE ? imagesIn(post.content) : new Set();
-    if (post.code === COLUMN_CODE) post.title = checkTitle(b.title);
-    post.content = checkContent(b.content, post.code === COLUMN_CODE ? COLUMN_MAX : MAX_CONTENT);
+    const oldImages = isColumnCode(post.code) ? imagesIn(post.content) : new Set();
+    if (isColumnCode(post.code)) post.title = checkTitle(b.title);
+    post.content = checkContent(b.content, isColumnCode(post.code) ? COLUMN_MAX : MAX_CONTENT);
     if (SENTIMENTS.includes(b.sentiment)) post.sentiment = b.sentiment;
     post.editedTs = Date.now();
     const [saved] = await redis([['SET', `post:${post.id}`, JSON.stringify(post), 'XX']]);

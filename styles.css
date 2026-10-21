@@ -543,7 +543,7 @@ a.logo { color: inherit; text-decoration: none; }
 @media (max-width: 600px) { .stat-wrap { padding: 0 14px 12px; } }
 
 /* 운영자 칼럼 탭: 주식 시장 경제 게시판에서만 */
-.modal:not(.market-mode) .modal-tabs .tab[data-tab="column"] { display: none; }
+.modal:not(.market-mode) .modal-tabs .tab[data-tab="column"], .modal:not(.market-mode) .modal-tabs .tab[data-tab="sihwang"] { display: none; }
 
 /* 운영자 칼럼: 제목 목록 · 본문 */
 .col-list { display: flex; flex-direction: column; }
@@ -687,7 +687,7 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
   .post-header .member-badge { font-size: 0.6rem; padding: 0 3px; }
   .btn-report-head { padding: 0 2px; font-size: 0.7rem; }
 }
-/* 하단 메뉴 (모든 페이지): 관심종목 추가 · Home · 주식 강의 · Light/Dark — 상단 메뉴 대신. 토론·로그인 창(z-index 200·300)보다 아래 */
+/* 하단 메뉴 (모든 페이지): 보기 전환 · 주식 시황 · Home · 주식 강의 · Light/Dark · 앱 다운 — 상단 메뉴 대신. 토론·로그인 창(z-index 200·300)보다 아래 */
 :root { --bottom-nav-h: 60px; }
 body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); }
 .bottom-nav { position: fixed; left: 0; right: 0; bottom: 0; z-index: 120; display: flex; justify-content: center; height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); padding: 0 8px env(safe-area-inset-bottom); background: var(--surface); border-top: 1px solid var(--border); box-shadow: 0 -2px 10px rgba(0,0,0,.08); }
@@ -697,6 +697,14 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 .bottom-nav > a.nav-lecture { color: #e02f4b; }  /* 주식 강의는 예전 상단 버튼처럼 빨강으로 강조 */
 @media (hover: hover) { .bottom-nav > a:hover, .bottom-nav > .theme-toggle:hover, .bottom-nav > .view-toggle:hover { color: var(--accent); } .bottom-nav > a.nav-lecture:hover { color: #ff6a5c; } }
 .admin-badge { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }
+/* 홈 지수 칸 아래 주식 시황 최신 글 한 줄 (누르면 그 글) */
+.sihwang-latest { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 0.9rem; min-width: 0; }
+.sihwang-latest .sl-tag { flex: 0 0 auto; padding: 1px 8px; border-radius: 10px; background: rgba(240,68,82,.12); color: #e02f4b; font-size: 0.76rem; font-weight: 700; }
+.sihwang-latest .sl-date { flex: 0 0 auto; color: var(--text-muted); font-size: 0.8rem; }
+.sihwang-latest .sl-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.sihwang-latest .sl-go { flex: 0 0 auto; color: var(--text-muted); font-size: 1.1rem; line-height: 1; }
+@media (hover: hover) { .sihwang-latest:hover { border-color: var(--accent); } }
+@media (max-width: 600px) { .sihwang-latest { margin-bottom: 8px; padding: 7px 10px; gap: 6px; font-size: 0.84rem; } }
 /* 상단: 제목·검색창을 조금 키움, 검색창은 길게 + 끝에 동그란 돋보기 버튼(누르면 검색), 로그인 위·회원가입 아래로 쌓음 */
 .header-inner { padding-top: 14px; padding-bottom: 14px; }
 .logo { font-size: 1.42rem; }

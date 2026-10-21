@@ -1,4 +1,4 @@
-// /sitemap.xml → 정적 사이트맵(scripts/seo.mjs가 만든 홈·정책·종목 페이지) + 운영자 칼럼 페이지를 덧붙여 응답
+// /sitemap.xml → 정적 사이트맵(scripts/seo.mjs가 만든 홈·정책·종목 페이지) + 운영자 칼럼(주식 강의 /column · 주식 시황 /sihwang) 페이지를 덧붙여 응답
 // 칼럼은 관리자 화면에서 수시로 쓰므로 DB에서 읽어 자동 반영 (검색엔진에 사이트맵을 다시 제출할 필요 없음)
 // 정적 사이트맵의 종목은 개편 전부터 탭에 있던 종목만 — 새로 들어온 종목·탭 밖 종목은 회원 토론글이 기준 개수를 넘은 것만 여기서 덧붙임 (api/_public.js)
 // Cloudflare 캐시에 10분 보관 (요청마다 DB를 읽지 않게)
@@ -21,13 +21,15 @@ export async function onRequest(context) {
   try {
     for (const [k, v] of Object.entries(env || {})) if (typeof v === 'string') process.env[k] = v;
     if (dbReady()) {
-      const [ids] = await redis([['LRANGE', 'posts:COLMKT', 0, 199]]);
-      const raws = ids?.length ? (await redis([['MGET', ...ids.map(id => `post:${id}`)]]))[0] : [];
-      const posts = (raws || []).filter(Boolean).map(r => JSON.parse(r)).filter(p => !p.blind && Number.isFinite(p.ts));
-      if (posts.length) {
+      // 주식 강의(COLMKT → /column, 주 단위) · 주식 시황(COLNEWS → /sihwang, 매일)
+      for (const [code, path, freq] of [['COLMKT', '/column', 'weekly'], ['COLNEWS', '/sihwang', 'daily']]) {
+        const [ids] = await redis([['LRANGE', `posts:${code}`, 0, 199]]);
+        const raws = ids?.length ? (await redis([['MGET', ...ids.map(id => `post:${id}`)]]))[0] : [];
+        const posts = (raws || []).filter(Boolean).map(r => JSON.parse(r)).filter(p => !p.blind && Number.isFinite(p.ts));
+        if (!posts.length) continue;
         const latest = Math.max(...posts.map(p => p.editedTs || p.ts));
-        const urls = [`  <url><loc>${SITE}/column</loc><lastmod>${kstDay(latest)}</lastmod><changefreq>weekly</changefreq><priority>0.8</priority></url>`,
-          ...posts.map(p => `  <url><loc>${SITE}/column/${p.id}</loc><lastmod>${kstDay(p.editedTs || p.ts)}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`)];
+        const urls = [`  <url><loc>${SITE}${path}</loc><lastmod>${kstDay(latest)}</lastmod><changefreq>${freq}</changefreq><priority>0.8</priority></url>`,
+          ...posts.map(p => `  <url><loc>${SITE}${path}/${p.id}</loc><lastmod>${kstDay(p.editedTs || p.ts)}</lastmod><changefreq>monthly</changefreq><priority>0.7</priority></url>`)];
         xml = xml.replace('</urlset>', urls.join('\n') + '\n</urlset>');
       }
       // 새로 들어온 종목·탭 밖 종목 중 회원 토론글이 기준 개수를 넘은 종목 페이지 (api/_public.js)

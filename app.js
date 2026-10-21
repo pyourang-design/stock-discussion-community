@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkMember();
   openFromUrl();
   countVisit();
+  loadSihwangLatest();
   document.getElementById('postContent').addEventListener('input', updateCharCount);
   document.getElementById('searchInput').addEventListener('input', searchStocks);
 });
@@ -30,8 +31,7 @@ const ACTIONS = {
   openPdf: (el, e) => { e.preventDefault(); openPdf(el.getAttribute('href'), el.dataset.title); },
   closePdf: () => closePdf(),
   filterTab: el => filterTab(el.dataset.key, el),
-  columnLink: (el, e) => { e.preventDefault(); el.blur(); openColumnLink(el.dataset.id || null); },
-  navFav: (el, e) => { e.preventDefault(); el.blur(); openFavTab(); },
+  columnLink: (el, e) => { e.preventDefault(); el.blur(); openColumnLink(el.dataset.id || null, el.dataset.tab); },
   doSearch: () => doSearch(),
   openFeed: () => openFeed(),
   toggleLogin: () => toggleLogin(),
@@ -52,7 +52,6 @@ const ACTIONS = {
   authorClose: () => closeAuthor(),
   openNews: el => openModal(el.dataset.code, 'news'),
   openStock: el => openModal(el.dataset.code),
-  openColumnBoard: () => openModal('SECMKT', 'column'),
   openFavAll: () => openModal(FAV_ALL.code, 'news'),
   moreFavNews: () => moreFavNews(),
   toggleFav: (el, e) => toggleFav(e, el.dataset.code),
@@ -130,14 +129,14 @@ function openFromUrl() {
   }
   if (q.get('tab') === 'fav') { history.replaceState(null, '', '/'); openFavTab(); }
   if (q.get('app') === '1') { history.replaceState(null, '', '/'); setTimeout(addToHome, 600); }  // 다른 페이지 하단 메뉴 '앱 다운' (설치 창 이벤트를 잠깐 기다림)
-  const col = q.get('column');
+  const tab = q.has('sihwang') ? 'sihwang' : 'column', col = q.get(tab);
   // 바로가기 주소는 처음 기록에서 지움 (창을 닫으면 홈 주소로 돌아가게, 열린 칼럼 주소는 창 안에서 다시 반영)
   if (col) syncColumnUrl(null);
-  if (col === 'list') openColumnLink(null);
-  else if (col && /^[0-9a-z]{6,20}$/.test(col)) openColumnLink(col);
+  if (col === 'list') openColumnLink(null, tab);
+  else if (col && /^[0-9a-z]{6,20}$/.test(col)) openColumnLink(col, tab);
 }
 
-// 하단 메뉴 '관심종목 추가': 관심 종목 탭으로 → 회원은 검색창에 커서(검색해서 ☆로 추가), 비회원은 탭의 로그인·회원가입 안내
+// 관심 종목 탭으로 (예전 하단 메뉴 '관심종목 추가'의 /?tab=fav 주소) → 회원은 검색창에 커서(검색해서 ☆로 추가), 비회원은 탭의 로그인·회원가입 안내
 function openFavTab() {
   const btn = document.querySelector('#tabBar .tab[data-key="fav"]');
   if (btn && currentFilter !== 'fav') filterTab('fav', btn);
@@ -208,7 +207,7 @@ const sectorBoard = key => SECTOR_BOARDS.find(b => b.sector === key);
 const FAV_ALL = { code: 'FAVALL', name: '관심 종목 모아보기', isFav: true };
 const findStock = code => stockOf(code) || SECTOR_BOARDS.find(b => b.code === code)
   || (code === FAV_ALL.code ? FAV_ALL : undefined)
-  || (code === 'COLMKT' ? { code, name: '주식 강의', isColumn: true } : undefined);
+  || (OP_CODES[code] ? { code, name: OP_BOARDS[OP_CODES[code]].name, isColumn: true } : undefined);
 const sectorName = key => { const sec = SECTORS.find(x => x.key === key); return sec ? sectorTitle(sec) : ''; };
 
 // ── 숨은 종목: 업종 탭에 없는 상장 종목 (listed.json, scripts/listed.mjs) ──
@@ -510,8 +509,6 @@ function filterTab(type, btn) {
   currentFilter = type;
   document.querySelectorAll('.tab-bar .tab').forEach(t => t.classList.remove('active'));
   btn.classList.add('active');
-  document.querySelector('.bottom-nav [data-act="navFav"]')?.classList.toggle('active', type === 'fav');
-  document.querySelector('.bottom-nav a[href="/"]')?.classList.toggle('active', type !== 'fav');
 
   document.getElementById('searchInput').value = '';
   document.getElementById('searchResults').classList.add('hidden');
@@ -669,8 +666,10 @@ function closeModal(e) {
 
 function hideModal() {
   document.getElementById('modalOverlay').classList.add('hidden');
-  if (new URLSearchParams(location.search).has('column')) syncColumnUrl(null);
+  const q = new URLSearchParams(location.search);
+  if (q.has('column') || q.has('sihwang')) syncColumnUrl(null);
   currentStock = null;
+  loadSihwangLatest();  // 시황을 쓰거나 지웠으면 홈 한 줄도 바뀜
   document.body.classList.remove('no-scroll');
   stopNewsRefresh();
 }
@@ -702,9 +701,9 @@ function switchModalTab(tab, btn) {
   currentModalTab = tab;
   document.querySelectorAll('.modal-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab));
   if (btn) btn.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-  document.getElementById('discussTab').classList.toggle('hidden', tab !== 'discuss' && tab !== 'column');
-  // 토론 ↔ 운영자 칼럼: 같은 글 목록 화면을 쓰므로, 불러온 게시판(renderPosts가 기록)과 다르면 다시 불러옴
-  if ((tab === 'discuss' || tab === 'column') && currentStock) {
+  document.getElementById('discussTab').classList.toggle('hidden', tab !== 'discuss' && !OP_BOARDS[tab]);
+  // 토론 ↔ 운영자 칼럼(강의·시황): 같은 글 목록 화면을 쓰므로, 불러온 게시판(renderPosts가 기록)과 다르면 다시 불러옴
+  if ((tab === 'discuss' || OP_BOARDS[tab]) && currentStock) {
     renderWriteBox();
     const loaded = document.getElementById('discussTab').dataset.board;
     if (loaded && loaded !== boardCodeNow()) renderPosts();
@@ -1028,15 +1027,22 @@ function favDetailHtml(type) {
 
 // ── 게시글 · 좋아요 · 팔로우 (서버 DB: /api/posts) ──────
 const POST_MAX = 1000;     // 게시글 최대 글자 수
-// 운영자 칼럼: 주식 시장 경제 게시판의 '운영자 칼럼' 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 최대 2000자 (api/posts.js COLUMN_CODE)
-const COLUMN_CODE = 'COLMKT', COLUMN_MAX = 2000;
-const isColumnTab = () => currentModalTab === 'column' && Boolean(currentStock?.isMarket);
-const boardCodeNow = () => isColumnTab() ? COLUMN_CODE : currentStock.code;  // 지금 보고 있는 게시판 (토론 또는 칼럼)
+// 운영자 칼럼: 주식 시장 경제 게시판의 '주식 시황'·'주식 강의' 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 최대 2000자 (api/posts.js isColumnCode)
+// 강의는 연재 순서(먼저 쓴 글부터), 시황은 최신 글부터 (latest)
+const OP_BOARDS = {
+  sihwang: { code: 'COLNEWS', name: '주식 시황', unit: '시황', empty: '아직 주식 시황이 없습니다.', latest: true },
+  column: { code: 'COLMKT', name: '주식 강의', unit: '강의', empty: '아직 주식 강의가 없습니다.', latest: false },
+};
+const OP_CODES = { COLNEWS: 'sihwang', COLMKT: 'column' };  // 게시판 코드 → 탭
+const COLUMN_MAX = 2000;
+const isColumnTab = () => Boolean(OP_BOARDS[currentModalTab]) && Boolean(currentStock?.isMarket);
+const opBoard = () => OP_BOARDS[currentModalTab];
+const boardCodeNow = () => isColumnTab() ? opBoard().code : currentStock.code;  // 지금 보고 있는 게시판 (토론 또는 칼럼)
 const postMax = () => isColumnTab() ? COLUMN_MAX : POST_MAX;
 let columnOpenId = null;   // 운영자 칼럼: 목록(제목만)에서 연 글 id, null이면 목록
 // 칼럼 본문 사진: 본문에 [사진:/img/{id}] 로 저장 → 화면에서 그림으로 (사진 주소 형식이 정확할 때만)
 const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
-const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="강의 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
+const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="본문 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
 const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷');
 const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
 let columnPage = 1;
@@ -1161,7 +1167,7 @@ async function renderPosts(keep = false) {
   document.getElementById('discussTab').dataset.board = code;
   el.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
   try {
-    const { posts } = column ? await api({}, { action: 'columnList' }) : await api({ code });
+    const { posts } = column ? await api({}, { action: 'columnList', board: code }) : await api({ code });
     if (currentStock !== s || boardCodeNow() !== code) return;
     currentPosts = posts;
   } catch (e) {
@@ -1199,7 +1205,7 @@ function drawPosts() {
   const el = document.getElementById('postList');
   if (isColumnTab()) return drawColumn(el);
   if (!currentPosts.length) {
-    el.innerHTML = isColumnTab() ? '<p class="empty-msg">아직 주식 강의가 없습니다.</p>' : '<p class="empty-msg">첫 번째 의견을 남겨보세요!</p>';
+    el.innerHTML = '<p class="empty-msg">첫 번째 의견을 남겨보세요!</p>';
     return;
   }
   el.innerHTML = currentPosts.map(p => `
@@ -1237,7 +1243,7 @@ function drawColumn(el) {
       <button class="col-row" data-id="${escHtml(x.id)}" data-act="openColumn">
         <span class="col-title">${escHtml(x.title || stripColumnImgs(x.content).slice(0, 40))}</span>
         <span class="col-meta">${colDate(x.ts)} · ${EYE_ICON}${(x.views || 0).toLocaleString()}</span>
-      </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : '<p class="empty-msg">아직 주식 강의가 없습니다.</p>';
+      </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : `<p class="empty-msg">${opBoard().empty}</p>`;
     return;
   }
   const editing = postAction?.id === p.id && postAction.mode === 'edit';
@@ -1260,10 +1266,10 @@ function drawColumn(el) {
       ${editing ? '' : columnNavHtml(p)}
     </div>`;
 }
-// 글 아래: 이전 글(먼저 쓴 글) · 목록으로 · 다음 글(나중에 쓴 글) — 칼럼 목록은 먼저 쓴 글부터
+// 글 아래: 이전 글(먼저 쓴 글) · 목록으로 · 다음 글(나중에 쓴 글) — 강의 목록은 먼저 쓴 글부터, 시황은 최신 글부터라 반대
 function columnNavHtml(p) {
-  const i = currentPosts.findIndex(x => x.id === p.id);
-  const prev = currentPosts[i - 1], next = currentPosts[i + 1];
+  const i = currentPosts.findIndex(x => x.id === p.id), d = opBoard().latest ? -1 : 1;
+  const prev = currentPosts[i - d], next = currentPosts[i + d];
   const link = (x, label, cls) => x
     ? `<button class="col-nav-btn ${cls}" data-id="${escHtml(x.id)}" data-act="openColumn"><span class="col-nav-label">${label}</span><span class="col-nav-title">${escHtml(x.title || '')}</span></button>`
     : `<span class="col-nav-btn ${cls} disabled"><span class="col-nav-label">${label}</span><span class="col-nav-title">${cls === 'prev' ? '이전 글이 없습니다' : '다음 글이 없습니다'}</span></span>`;
@@ -1275,14 +1281,14 @@ function columnNavHtml(p) {
 }
 const colDate = ts => { const d = new Date(ts); return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`; };
 // 주소창에 지금 보는 칼럼 반영 (공유·새로고침하면 같은 글이 열림), 창을 닫으면 원래 주소로
-const syncColumnUrl = id => { try { history.replaceState(history.state, '', id ? `/?column=${encodeURIComponent(id)}` : location.pathname); } catch {} };
+const syncColumnUrl = id => { try { history.replaceState(history.state, '', id ? `/?${currentModalTab === 'sihwang' ? 'sihwang' : 'column'}=${encodeURIComponent(id)}` : location.pathname); } catch {} };
 function openColumn(id) {
   columnOpenId = id;
   syncColumnUrl(id);
   postAction = null;
   drawPosts();
   scrollColumnTop();  // 글 아래 이전·다음 버튼으로 넘어와도 새 글 맨 위부터
-  if (currentStock) countPostViews(currentStock, currentPosts.filter(p => p.id === id), COLUMN_CODE);
+  if (currentStock) countPostViews(currentStock, currentPosts.filter(p => p.id === id), boardCodeNow());
   loadColumnVotes(id);
 }
 // 칼럼 글을 열면 그 글의 공감·비공감·내가 누른 것만 불러와 채움 (목록은 제목·본문·조회수만 받음)
@@ -1298,9 +1304,22 @@ async function loadColumnVotes(id) {
   } catch {}
 }
 let pendingColumnId = null;  // 칼럼 목록을 불러온 뒤 열 글 (바로가기·작성자 목록에서)
-function openColumnLink(id) {
+function openColumnLink(id, tab = 'column') {
   pendingColumnId = id || null;
-  openModal('SECMKT', 'column');
+  openModal('SECMKT', OP_BOARDS[tab] ? tab : 'column');
+}
+// 홈 지수 칸 아래 한 줄: 주식 시황 최신 글 (없으면 숨김)
+async function loadSihwangLatest() {
+  const el = document.getElementById('sihwangLatest');
+  if (!el) return;
+  try {
+    const { post } = await api({}, { action: 'sihwangLatest' });
+    el.classList.toggle('hidden', !post);
+    if (!post) return el.replaceChildren();
+    el.href = `/sihwang/${encodeURIComponent(post.id)}`;
+    el.dataset.id = post.id;
+    el.innerHTML = `<span class="sl-tag">주식 시황</span><span class="sl-date">${colDate(post.ts).slice(5)}</span><span class="sl-title">${escHtml(post.title)}</span><span class="sl-go" aria-hidden="true">›</span>`;
+  } catch {}
 }
 // 페이지 표시: ‹ 1 2 3 … › (현재 페이지 앞뒤 2개씩, 처음·끝 페이지는 항상)
 function pagerHtml(page, pages, fn) {
@@ -1403,11 +1422,11 @@ const noPassword = p => p.member || p.official;
 function editFormHtml(p) {
   return `
       <div class="post-form">
-        ${p.code === COLUMN_CODE ? `<input id="editTitle" type="text" maxlength="100" placeholder="강의 제목" value="${escHtml(p.title || '')}">` : ''}
+        ${OP_CODES[p.code] ? `<input id="editTitle" type="text" maxlength="100" placeholder="${OP_BOARDS[OP_CODES[p.code]].unit} 제목" value="${escHtml(p.title || '')}">` : ''}
         <textarea id="editContent" maxlength="${postMax()}" rows="4">${escHtml(p.content)}</textarea>
         <div class="post-form-row">
           ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
-          ${p.code === COLUMN_CODE && isAdmin() ? `<button type="button" class="btn-tool btn-col-img" data-act="pickImage" data-target="editContent">🖼 사진 넣기</button>` : ''}
+          ${OP_CODES[p.code] && isAdmin() ? `<button type="button" class="btn-tool btn-col-img" data-act="pickImage" data-target="editContent">🖼 사진 넣기</button>` : ''}
           <button class="btn-submit" data-id="${escHtml(p.id)}" data-act="savePostEdit">저장</button>
           <button class="btn-cancel" data-act="closePostAction">취소</button>
         </div>
@@ -1535,8 +1554,8 @@ async function submitPost() {
       ? { action: 'create', code, content }
       : { action: 'create', code, nick, password, content });
     if (currentStock && boardCodeNow() === code) {
-      if (isColumnTab()) { currentPosts.push(post); columnPage = Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE); }  // 칼럼은 먼저 쓴 글부터라 새 글은 마지막 페이지
-      else currentPosts.unshift(post);
+      if (isColumnTab() && !opBoard().latest) { currentPosts.push(post); columnPage = Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE); }  // 강의는 먼저 쓴 글부터라 새 글은 마지막 페이지
+      else { currentPosts.unshift(post); columnPage = 1; }
     }
     postCounts[code] = (postCounts[code] || 0) + 1;
     document.getElementById('postContent').value = '';
@@ -1571,14 +1590,14 @@ function feedPostHtml(p, showNick) {
     <div class="post-item">
       <div class="post-header">
         ${showNick ? `<button class="post-nick author-link" data-nick="${escHtml(p.nick)}" data-act="openAuthor">${escHtml(p.nick)}</button>` : ''}
-        ${p.code === COLUMN_CODE
-          ? `<button class="author-stock" data-id="${escHtml(p.id)}" data-act="columnLink">주식 강의</button>`
+        ${OP_CODES[p.code]
+          ? `<button class="author-stock" data-id="${escHtml(p.id)}" data-tab="${OP_CODES[p.code]}" data-act="columnLink">${OP_BOARDS[OP_CODES[p.code]].name}</button>`
           : `<button class="author-stock" data-code="${escHtml(p.code)}" data-act="openStock">${escHtml(s ? s.name : p.code)}</button>`}
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
         ${adminDeleteBtnHtml(p)}
       </div>
-      ${p.code === COLUMN_CODE && p.title ? `<div class="feed-col-title">${escHtml(p.title)}</div>` : ''}${postBodyHtml(p.code === COLUMN_CODE ? { ...p, content: stripColumnImgs(p.content) } : p)}
+      ${OP_CODES[p.code] && p.title ? `<div class="feed-col-title">${escHtml(p.title)}</div>` : ''}${postBodyHtml(OP_CODES[p.code] ? { ...p, content: stripColumnImgs(p.content) } : p)}
     </div>`;
 }
 
@@ -1730,9 +1749,10 @@ function renderWriteBox() {
   document.querySelector('.write-box').classList.toggle('hidden', column && (!isAdmin() || Boolean(columnOpenId)));  // 칼럼은 관리자 모드에서만 쓰기
   const ta = document.getElementById('postContent');
   ta.maxLength = postMax();
-  ta.placeholder = column ? '강의 본문을 작성하세요 (최대 2,000자)' : '의견을 남겨보세요...';
+  ta.placeholder = column ? `${opBoard().unit} 본문을 작성하세요 (최대 2,000자)` : '의견을 남겨보세요...';
   ta.rows = column ? 8 : 3;
   document.getElementById('postTitle').classList.toggle('hidden', !column);
+  if (column) document.getElementById('postTitle').placeholder = `${opBoard().unit} 제목 (최대 100자)`;
   document.getElementById('btnColImg').classList.toggle('hidden', !(column && isAdmin()));
   updateCharCount();
   const asMember = Boolean(member) || isAdmin();
@@ -1855,7 +1875,7 @@ async function openStats() {
           <td>${fmtN(d.members)}</td><td>${fmtN(d.posts)}</td></tr>`).join('')}</tbody>
       </table>
       <h3 class="stat-h">게시판별 게시글 TOP ${r.boards.length}</h3>
-      ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" ${b.code === COLUMN_CODE ? 'data-act="openColumnBoard"' : `data-act="openStock" data-code="${escHtml(b.code)}"`}>${b.code === COLUMN_CODE ? '주식 강의' : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
+      ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" ${OP_CODES[b.code] ? `data-act="columnLink" data-tab="${OP_CODES[b.code]}"` : `data-act="openStock" data-code="${escHtml(b.code)}"`}>${OP_CODES[b.code] ? OP_BOARDS[OP_CODES[b.code]].name : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
       <h3 class="stat-h">강의 사진 저장소</h3>
       <div id="imgStats" class="stat-img"><p class="stat-note">불러오는 중...</p></div>
       <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 조회수: 게시판 글 조회수(같은 브라우저·게시판 1시간에 1회, 날짜별은 ${fmtDay(pvSince)}부터 집계) · 게시글: 게시판 글(카드의 '댓글') 수, 삭제된 글 제외 · 날짜는 한국시간</p></div>`;
