@@ -616,6 +616,47 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
 /* 운영자 칼럼 본문 사진 */
 .col-img { display: block; max-width: 100%; height: auto; margin: 12px auto; border-radius: 8px; }
 .col-body .col-img { margin: 14px auto; }
+/* 칼럼 본문 표·그래프 (api/_rich.js가 그린 HTML — 사이트 칼럼 탭 .col-body.rich, 검색용 /column·/sihwang 페이지 .col-page-body) */
+.col-body.rich { white-space: normal; }
+.col-body.rich > p { margin: 0 0 14px; }
+.rich-fig { margin: 16px 0; }
+.rich-cap { margin-bottom: 6px; font-size: 0.86rem; font-weight: 700; color: var(--text-muted); }
+.rich-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: 10px; }
+.rich-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; line-height: 1.4; font-variant-numeric: tabular-nums; }
+.rich-table th, .rich-table td { padding: 7px 10px; border-bottom: 1px solid var(--border); text-align: right; white-space: nowrap; }
+.rich-table thead th { background: var(--surface2); color: var(--text-muted); font-size: 0.8rem; font-weight: 700; text-align: right; }
+.rich-table tr > :first-child { text-align: left; }
+.rich-table tbody th { font-weight: 600; }
+.rich-table tbody tr:last-child > * { border-bottom: 0; }
+.rich-table td.up, .rich-bar-val.up, .rich-line-meta b.up { color: var(--up); }
+.rich-table td.down, .rich-bar-val.down, .rich-line-meta b.down { color: var(--down); }
+.rich-bars { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
+.rich-bar-row { display: grid; grid-template-columns: minmax(64px, 28%) 1fr auto; align-items: center; gap: 8px; font-size: 0.84rem; }
+.rich-bar-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rich-bar-track { position: relative; height: 14px; border-radius: 4px; background: var(--surface2); }
+.rich-bar-track.mixed::after { content: ''; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--border); }
+.rich-bar { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+.rich-bar.up { background: var(--up); }
+.rich-bar.down { background: var(--down); }
+.rich-bar-val { min-width: 56px; text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rich-line-box { padding: 10px 12px 8px; border: 1px solid var(--border); border-radius: 10px; }
+.rich-line { display: block; width: 100%; height: 160px; }
+.rich-line.up { color: var(--up); }
+.rich-line.down { color: var(--down); }
+.rich-line-path { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
+.rich-line-area { fill: currentColor; opacity: .1; }
+.rich-line-dot { fill: currentColor; }
+.rich-line-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 0.74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+@media (max-width: 480px) { .rich-line { height: 130px; } .rich-line-meta span:nth-child(2) { display: none; } .rich-table { font-size: 0.82rem; } .rich-table th, .rich-table td { padding: 6px 8px; } }
+/* 주식 시황 초안 카드 (관리자 모드, 주식 시황 탭 맨 위) */
+.draft-card { display: flex; flex-direction: column; gap: 6px; margin: 12px 16px 6px; padding: 12px 14px; border: 1px dashed var(--hot); border-radius: 10px; background: rgba(255,140,66,.08); }
+.draft-card.empty { border-color: var(--border); background: none; }
+.draft-meta { font-size: 0.78rem; color: var(--text-muted); }
+.draft-title { font-size: 0.98rem; line-height: 1.4; }
+.draft-btns { display: flex; flex-wrap: wrap; gap: 6px; }
+.draft-btns .btn-submit { padding: 5px 12px; font-size: 0.82rem; }
+.draft-preview { margin-top: 6px; padding-top: 8px; border-top: 1px solid var(--border); max-height: 70vh; overflow-y: auto; }
+.draft-preview .col-body { margin-top: 0; }
 .btn-col-img { margin-right: auto; }
 .btn-col-img:disabled { opacity: .6; }
 .stat-img .stat-grid.small { grid-template-columns: repeat(3, minmax(0, 1fr)); }

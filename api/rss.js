@@ -4,6 +4,7 @@
 import { STOCKS, SECTORS, STOCKS_AS_OF } from './_stocks.js';
 import { redis, dbReady } from './_redis.js';
 import { HIDDEN_NAME, DROPPED, needsPosts, isStockBoard, indexableAll } from './_public.js';
+import { stripRich } from './_rich.js';
 
 const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
@@ -45,7 +46,7 @@ export default async function handler(req, res) {
     if (p.code === COLUMN_BOARD || p.code === SIHWANG_BOARD) {
       const [path, label] = p.code === COLUMN_BOARD ? ['/column', '주식 강의'] : ['/sihwang', '주식 시황'];
       const link = `${SITE}${path}/${encodeURIComponent(p.id)}`;
-      const text = String(p.content).replace(/\[사진:[^\]]*\]/g, ' ').replace(/\s+/g, ' ').trim();
+      const text = stripRich(p.content).replace(/\s+/g, ' ').trim();
       return { title: `[${label}] ${p.title || text.slice(0, 40)}`, link, guid: link, desc: text.slice(0, 300), date: new Date(p.editedTs || p.ts), category: label };
     }
     const extra = DROPPED.get(p.code) || (HIDDEN_NAME.has(p.code) ? { code: p.code, name: HIDDEN_NAME.get(p.code) } : null);

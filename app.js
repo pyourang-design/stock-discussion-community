@@ -71,6 +71,9 @@ const ACTIONS = {
   deletePost: el => deletePost(el.dataset.id),
   reportPost: el => reportPost(el.dataset.id),
   openColumn: el => openColumn(el.dataset.id),
+  draftPreview: el => { el.closest('.draft-card')?.querySelector('.draft-preview')?.classList.toggle('hidden'); },
+  draftLoad: () => loadDraftIntoWriteBox(),
+  draftDiscard: () => discardSihwangDraft(),
   closeColumn: () => closeColumn(),
   goColumnPage: el => goColumnPage(Number(el.dataset.page)),
   toggleAdminForm: () => toggleAdminForm(),
@@ -1042,7 +1045,7 @@ let columnOpenId = null;   // 운영자 칼럼: 목록(제목만)에서 연 글 
 // 칼럼 본문 사진: 본문에 [사진:/img/{id}] 로 저장 → 화면에서 그림으로 (사진 주소 형식이 정확할 때만)
 const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
 const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="본문 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
-const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷');
+const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷').replace(/^\[(표|막대|선)(?::[^\]\n]*)?\]\n[\s\S]*?\n\[\/\1\]$/gm, '📊');  // 표·그래프 블록 (api/_rich.js)
 const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
 // 강의 시리즈 이름 (api/_colorder.js COLUMN_SERIES, columnList 응답으로 받음): 연재 순서 10편씩 = 목록 한 페이지
 let columnSeries = [];
@@ -1167,6 +1170,7 @@ async function renderPosts(keep = false) {
   postAction = null;
   columnOpenId = null;
   columnPage = 1;
+  if (!keep) sihwangDraft = undefined;  // 시황 탭을 새로 열 때마다 초안을 다시 받음
   const column = isColumnTab(), code = boardCodeNow();
   document.getElementById('discussTab').dataset.board = code;
   el.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
@@ -1244,11 +1248,13 @@ function drawColumn(el) {
     const pages = Math.max(1, Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE));
     columnPage = Math.min(Math.max(1, columnPage), pages);
     const shown = currentPosts.slice((columnPage - 1) * COLUMN_PAGE_SIZE, columnPage * COLUMN_PAGE_SIZE);
-    el.innerHTML = currentPosts.length ? `${seriesBandHtml(seriesOf((columnPage - 1) * COLUMN_PAGE_SIZE), shown.length)}<div class="col-list">${shown.map(x => `
+    const draft = isAdmin() && currentModalTab === 'sihwang' ? '<div id="draftCard"></div>' : '';  // 관리자: 루틴이 쓴 오늘 초안
+    if (draft) setTimeout(drawSihwangDraft);
+    el.innerHTML = draft + (currentPosts.length ? `${seriesBandHtml(seriesOf((columnPage - 1) * COLUMN_PAGE_SIZE), shown.length)}<div class="col-list">${shown.map(x => `
       <button class="col-row" data-id="${escHtml(x.id)}" data-act="openColumn">
         <span class="col-title">${escHtml(x.title || stripColumnImgs(x.content).slice(0, 40))}</span>
         <span class="col-meta">${colDate(x.ts)} · ${EYE_ICON}${(x.views || 0).toLocaleString()}</span>
-      </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : `<p class="empty-msg">${opBoard().empty}</p>`;
+      </button>`).join('')}</div>${pagerHtml(columnPage, pages, 'goColumnPage')}` : `<p class="empty-msg">${opBoard().empty}</p>`);
     return;
   }
   const editing = postAction?.id === p.id && postAction.mode === 'edit';
@@ -1261,7 +1267,7 @@ function drawColumn(el) {
         <span class="post-time">${colDate(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
       </div>
-      ${editing ? editFormHtml(p) : p.content == null ? '<p class="empty-msg">불러오는 중...</p>' : `<div class="post-body col-body">${columnBodyHtml(p.content)}</div>`}
+      ${editing ? editFormHtml(p) : p.content == null ? '<p class="empty-msg">불러오는 중...</p>' : p.html != null ? `<div class="post-body col-body rich">${p.html}</div>` : `<div class="post-body col-body">${columnBodyHtml(p.content)}</div>`}
       <div class="post-tools">
         ${p.editedTs ? `<span class="post-edited">수정됨 · ${timeAgo(p.editedTs)}</span>` : ''}
         ${canManage(p) && p.content != null ? `<button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="edit">수정</button>
@@ -1314,6 +1320,43 @@ let pendingColumnId = null;  // 칼럼 목록을 불러온 뒤 열 글 (바로�
 function openColumnLink(id, tab = 'column') {
   pendingColumnId = id || null;
   openModal('SECMKT', OP_BOARDS[tab] ? tab : 'column');
+}
+// ── 주식 시황 초안 (관리자): 예약 실행 루틴이 매일 장 마감 후 써 두는 초안 (functions/api/sihwang.js) → 보고 고쳐서 등록 ──
+let sihwangDraft;        // undefined: 아직 안 받음, null: 없음, { title, content, ts, html }
+let draftLoaded = false;  // 글쓰기 칸에 초안을 불러왔는지 (등록하면 서버가 초안을 지움)
+async function drawSihwangDraft() {
+  const box = document.getElementById('draftCard');
+  if (!box || !isAdmin()) return;
+  if (sihwangDraft === undefined) {
+    box.innerHTML = '<div class="draft-card"><span class="draft-meta">시황 초안 확인 중...</span></div>';
+    try { sihwangDraft = (await api({}, { action: 'sihwangDraft', adminKey })).draft; } catch (e) { box.innerHTML = `<div class="draft-card"><span class="draft-meta">초안을 불러오지 못했습니다. (${escHtml(e.message)})</span></div>`; return; }
+  }
+  const d = sihwangDraft, el = document.getElementById('draftCard');
+  if (!el) return;
+  const at = d && new Date(d.ts);
+  el.innerHTML = d ? `<div class="draft-card">
+      <span class="draft-meta">📝 시황 초안 · ${colDate(d.ts).slice(5)} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')} · ${d.content.length.toLocaleString()}자 · 방문자에게는 안 보임</span>
+      <strong class="draft-title">${escHtml(d.title)}</strong>
+      <div class="draft-btns"><button class="btn-tool" data-act="draftPreview">미리보기</button><button class="btn-submit" data-act="draftLoad">글쓰기 칸에 불러오기</button><button class="btn-tool" data-act="draftDiscard">버리기</button></div>
+      <div class="draft-preview hidden"><div class="post-body col-body rich">${d.html}</div></div>
+    </div>` : '<div class="draft-card empty"><span class="draft-meta">📝 시황 초안 없음 — 거래일 16:30쯤 자동으로 만들어집니다</span></div>';
+}
+function loadDraftIntoWriteBox() {
+  const d = sihwangDraft;
+  if (!d) return;
+  const ta = document.getElementById('postContent');
+  if (ta.value.trim() && !confirm('글쓰기 칸에 쓰던 내용을 초안으로 바꿀까요?')) return;
+  document.getElementById('postTitle').value = d.title;
+  ta.value = d.content;
+  draftLoaded = true;
+  updateCharCount();
+  document.querySelector('.write-box').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  ta.focus();
+}
+async function discardSihwangDraft() {
+  if (!confirm('오늘 시황 초안을 버릴까요? 되돌릴 수 없습니다.')) return;
+  try { sihwangDraft = (await api({}, { action: 'sihwangDraft', adminKey, discard: true })).draft; draftLoaded = false; drawSihwangDraft(); }
+  catch (e) { alert(`버리지 못했습니다: ${e.message}`); }
 }
 // 홈 지수 칸 아래 한 줄: 주식 시황 최신 글 (없으면 숨김)
 async function loadSihwangLatest() {
@@ -1556,10 +1599,11 @@ async function submitPost() {
   const code = boardCodeNow();
   try {
     const { post } = await api({}, isAdmin()
-      ? { action: 'create', code, ...(isColumnTab() ? { title } : {}), content, asOperator: true, adminKey }
+      ? { action: 'create', code, ...(isColumnTab() ? { title } : {}), content, asOperator: true, adminKey, ...(code === 'COLNEWS' && draftLoaded ? { fromDraft: true } : {}) }
       : member
       ? { action: 'create', code, content }
       : { action: 'create', code, nick, password, content });
+    if (code === 'COLNEWS' && draftLoaded) { draftLoaded = false; sihwangDraft = null; }  // 초안으로 올렸으면 서버가 초안을 지움
     if (currentStock && boardCodeNow() === code) {
       if (isColumnTab() && !opBoard().latest) { currentPosts.push(post); columnPage = Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE); }  // 강의는 먼저 쓴 글부터라 새 글은 마지막 페이지
       else { currentPosts.unshift(post); columnPage = 1; }

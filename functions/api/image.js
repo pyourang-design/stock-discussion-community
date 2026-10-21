@@ -1,5 +1,6 @@
 // POST /api/image → 운영자 칼럼 본문 사진 업로드 (관리자 모드 전용)
 // 본문 = 사진 파일 그대로, Content-Type: image/webp|jpeg|png|gif, X-Admin-Key: 관리자 세션 토큰(adm_…)
+//   또는 X-Draft-Key: 주식 시황 초안 열쇠(SIHWANG_DRAFT_KEY, 예약 실행 루틴 — functions/api/sihwang.js)
 // 사진은 Workers KV(IMAGES)에 img:{id} 로 저장, 응답 { url: '/img/{id}.{확장자}' } → 본문에 [사진:/img/…] 으로 넣음
 // (functions/api/[name].js 보다 이 파일이 우선 적용됨)
 import { redis, dbReady } from '../../api/_redis.js';
@@ -13,16 +14,25 @@ const MAGIC = {
   png: b => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47,
   gif: b => b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46,
 };
+function sameKey(a, b) {
+  if (!a || !b || a.length !== b.length) return false;
+  let d = 0;
+  for (let i = 0; i < a.length; i++) d |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return d === 0;
+}
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
 export async function onRequestPost({ request, env }) {
   try {
     for (const [k, v] of Object.entries(env || {})) if (typeof v === 'string') process.env[k] = v;
     if (!env.IMAGES || !dbReady()) return json({ error: '사진 저장소가 연결되지 않았습니다' }, 503);
-    const token = request.headers.get('X-Admin-Key') || '';
-    if (!/^adm_[0-9a-f]{48}$/.test(token)) return json({ error: '관리자 모드에서만 사진을 올릴 수 있습니다' }, 403);
-    const [ok] = await redis([['EXISTS', `admsess:${token}`]]);
-    if (!Number(ok)) return json({ error: '관리자 로그인이 만료되었습니다. 관리자 비밀번호로 다시 로그인해주세요' }, 401);
+    const draftKey = request.headers.get('X-Draft-Key') || '';
+    if (!(env.SIHWANG_DRAFT_KEY && sameKey(draftKey, env.SIHWANG_DRAFT_KEY))) {
+      const token = request.headers.get('X-Admin-Key') || '';
+      if (!/^adm_[0-9a-f]{48}$/.test(token)) return json({ error: '관리자 모드에서만 사진을 올릴 수 있습니다' }, 403);
+      const [ok] = await redis([['EXISTS', `admsess:${token}`]]);
+      if (!Number(ok)) return json({ error: '관리자 로그인이 만료되었습니다. 관리자 비밀번호로 다시 로그인해주세요' }, 401);
+    }
 
     const type = (request.headers.get('Content-Type') || '').split(';')[0].trim();
     const ext = TYPES[type];

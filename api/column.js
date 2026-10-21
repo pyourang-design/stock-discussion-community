@@ -5,6 +5,7 @@
 import { redis, dbReady } from './_redis.js';
 import { layout, esc, kst, SITE, NAME } from './page.js';
 import { COLUMN_ORDER_KEY, SERIES_SIZE, seriesOf, sortColumns } from './_colorder.js';
+import { renderRich, stripRich } from './_rich.js';
 
 // 운영자 게시판 두 개: 주식 강의(연재 순서) · 주식 시황(최신 글부터)
 const BOARDS = {
@@ -18,9 +19,7 @@ const BOARDS = {
 const LIST_MAX = 200;
 const PAGE_SIZE = 10;  // 목록 한 페이지 칼럼 수
 const isPostId = id => /^[0-9a-z]{6,20}$/.test(id || '');
-// 본문 사진: [사진:/img/{id}] (관리자 칼럼 글쓰기에서 넣음)
-const IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
-const noImgs = text => String(text || '').replace(IMG_RE, ' ');
+const noImgs = text => stripRich(text);  // 요약용: 사진 빼고 표·그래프는 [표: 제목]처럼
 
 // 칼럼 목록 (강의는 연재 순서, 시황은 최신 글부터, 삭제·블라인드 제외)
 async function loadColumns(B) {
@@ -33,9 +32,8 @@ async function loadColumns(B) {
   return B.latest ? posts.sort((a, b) => b.ts - a.ts) : sortColumns(posts, order);
 }
 
-// 본문: 빈 줄로 문단을 나누고, 문단 안 줄바꿈은 그대로
-const paragraphs = text => String(text || '').split(/\n\s*\n/).map(p => p.trim()).filter(Boolean)
-  .map(p => `<p>${esc(p).replace(IMG_RE, '<img class="col-img" src="$1" alt="본문 사진" loading="lazy">').replace(/\n/g, '<br>')}</p>`).join('\n');
+// 본문: 빈 줄로 문단을 나누고, 문단 안 줄바꿈은 그대로 · 표·그래프·사진 (api/_rich.js)
+const paragraphs = renderRich;
 const summary = (text, n = 150) => { const t = noImgs(text).replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n) + '…' : t; };
 const day = ts => kst(ts).slice(0, 10);
 const listHtml = (cols, B) => `<ul class="col-page-list">${cols.map(c => `

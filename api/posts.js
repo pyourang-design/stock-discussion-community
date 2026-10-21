@@ -22,6 +22,8 @@
 // POST /api/posts { action: 'columnList',    cid, board? } 운영자 칼럼 목록 (누구나 읽기, board: COLMKT 기본 | COLNEWS) — 제목·날짜·조회수만, 본문 없음 (명령 3개, colmeta)
 // POST /api/posts { action: 'columnPost',    cid, id } 칼럼 한 편의 본문·공감·비공감 (글을 열 때)
 // POST /api/posts { action: 'sihwangLatest', cid } 주식 시황 최신 글 한 편 (홈 지수 칸 아래 한 줄) → { post: { id, title, ts } | null }
+// POST /api/posts { action: 'sihwangDraft',  cid, adminKey, discard? } 예약 실행 루틴이 쓴 시황 초안 보기 / 버리기 (functions/api/sihwang.js)
+//   칼럼 글(columnPost·create·edit 응답)에는 html(본문 표·그래프를 그린 것, api/_rich.js)이 붙음
 // POST /api/posts { action: 'adminImages',   cid, adminKey, cleanup? } 칼럼 사진 저장소 현황 / 안 쓰는 사진 정리
 //   운영자 칼럼(COLUMN_CODE): 주식 시장 경제 게시판의 칼럼 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 제목(최대 100자) + 본문(최대 2000자)
 //   (2026-10-14부터 공개: RSS·작성자 목록(author:운영자)에도 포함, 바로가기 /?column={id})
@@ -71,6 +73,7 @@
 //   게시글의 uid(회원 아이디)는 서버에서만 쓰고 응답에서는 member: true 로만 표시
 import crypto from 'crypto';
 import { COLUMN_ORDER_KEY, COLUMN_SERIES, sortColumns } from './_colorder.js';
+import { renderRich } from './_rich.js';
 import { redis, dbReady } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 
@@ -85,6 +88,8 @@ const columnMax = code => code === SIHWANG_CODE ? SIHWANG_MAX : COLUMN_MAX;
 // 글쓰기·수정·삭제 때 함께 바꾸고, 없는 글(2026-10-21 이전 글)은 목록을 열 때 한 번 채움
 const colMetaKey = code => `colmeta:${code}`;
 const colMeta = p => JSON.stringify({ id: p.id, title: p.title || '', ts: p.ts });
+const SIHWANG_DRAFT_KEY = 'sihwang:draft';  // 루틴이 쓴 초안 (functions/api/sihwang.js)
+const withHtml = p => isColumnCode(p.code) && !p.blind ? { ...p, html: renderRich(p.content) } : p;  // 칼럼 본문 표·그래프
 const COLUMN_TITLE_MAX = 100;
 // 칼럼 본문 사진 [사진:/img/{id}] → 사진 저장소(Workers KV, 키 img:{id}) 정리용
 const IMG_TAG_RE = /\[사진:\/img\/([0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
@@ -668,7 +673,15 @@ async function handlePost(b, env = {}) {
     if (!isPostId(id)) throw new BadRequest('게시글 id가 올바르지 않습니다');
     const [post] = await loadPosts([id], b.cid);
     if (!post || !isColumnCode(post.code)) throw new BadRequest('글이 없습니다');
-    return { post };
+    return { post: withHtml(post) };
+  }
+
+  if (b.action === 'sihwangDraft') {
+    await checkAdmin(b.adminKey, b._ip);
+    if (b.discard === true) { await redis([['DEL', SIHWANG_DRAFT_KEY]]); return { draft: null }; }
+    const [raw] = await redis([['GET', SIHWANG_DRAFT_KEY]]);
+    const d = raw ? JSON.parse(raw) : null;
+    return { draft: d ? { ...d, html: renderRich(d.content) } : null };
   }
 
   if (b.action === 'adminImages') {
@@ -738,8 +751,9 @@ async function handlePost(b, env = {}) {
       ['LPUSH', `author:${nick}`, id],
       ['HINCRBY', 'postcount', b.code, 1],
       column ? ['HSET', colMetaKey(b.code), id, colMeta(post)] : ['ECHO', ''],
+      official && b.code === SIHWANG_CODE && b.fromDraft === true ? ['DEL', SIHWANG_DRAFT_KEY] : ['ECHO', ''],  // 초안을 불러와 올렸으면 초안은 지움
     ]);
-    return { post: { ...publicPost(post), likes: 0, dislikes: 0, liked: false, disliked: false } };
+    return { post: withHtml({ ...publicPost(post), likes: 0, dislikes: 0, liked: false, disliked: false }) };
   }
 
   if (b.action === 'edit') {
@@ -754,7 +768,7 @@ async function handlePost(b, env = {}) {
     if (saved !== 'OK') throw new BadRequest('게시글이 없습니다');
     if (isColumnCode(post.code)) await redis([['HSET', colMetaKey(post.code), post.id, colMeta(post)]]);
     if (oldImages.size) { const now = imagesIn(post.content); await deleteImages(env, [...oldImages].filter(x => !now.has(x))).catch(e => console.error('column image delete', e)); }
-    return { post: { ...publicPost(post), ...voteFields(await redis(voteCmds(post.id, b.cid))) } };
+    return { post: withHtml({ ...publicPost(post), ...voteFields(await redis(voteCmds(post.id, b.cid))) }) };
   }
 
   if (b.action === 'delete') {
