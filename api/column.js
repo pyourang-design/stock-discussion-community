@@ -4,7 +4,7 @@
 // 검색 로봇이 자바스크립트 없이 제목·본문을 읽을 수 있도록 글자로 내보냄 (홈 화면의 칼럼 탭 /?column={id}는 같은 글의 토론 화면)
 import { redis, dbReady } from './_redis.js';
 import { layout, esc, kst, SITE, NAME } from './page.js';
-import { COLUMN_ORDER_KEY, sortColumns } from './_colorder.js';
+import { COLUMN_ORDER_KEY, SERIES_SIZE, seriesOf, sortColumns } from './_colorder.js';
 
 // 운영자 게시판 두 개: 주식 강의(연재 순서) · 주식 시황(최신 글부터)
 const BOARDS = {
@@ -41,6 +41,12 @@ const day = ts => kst(ts).slice(0, 10);
 const listHtml = (cols, B) => `<ul class="col-page-list">${cols.map(c => `
   <li><a href="${B.path}/${esc(c.id)}">${esc(c.title || summary(c.content, 40))}</a><span>${day(c.ts)}</span></li>`).join('')}
 </ul>`;
+
+// 강의 목록 페이지 맨 위 띠 (10편 = 한 시리즈 = 한 페이지, api/_colorder.js)
+const seriesBand = (B, start, count) => {
+  const s = !B.latest && PAGE_SIZE === SERIES_SIZE ? seriesOf(start) : null;
+  return s ? `<div class="col-series"><span class="col-series-no">주식 초보 탈출 ${s.n}편</span><span class="col-series-name">${esc(s.name)}</span><span class="col-series-count">강의 ${count}편</span></div>` : '';
+};
 
 export default async function handler(req, res) {
   const B = req.query.board === 'sihwang' ? BOARDS.sihwang : BOARDS.column;
@@ -79,7 +85,7 @@ export default async function handler(req, res) {
   <nav class="sp-sub"><a href="/">홈</a> › ${B.name}</nav>
   <h1>${B.name}</h1>
   <p class="sp-intro">${B.intro} ${B.unit} ${cols.length}편.</p>
-  <section class="sp-section">${cols.length ? listHtml(shown, B) + pager : `<p>아직 ${B.name}${B.josa} 없습니다.</p>`}</section>
+  <section class="sp-section">${cols.length ? seriesBand(B, (page - 1) * PAGE_SIZE, shown.length) + listHtml(shown, B) + pager : `<p>아직 ${B.name}${B.josa} 없습니다.</p>`}</section>
   <p class="sp-section"><a class="btn-submit sp-cta" href="/?${B.app}=list">${B.name} 게시판 가기 (공감·의견)</a></p>`;
     const jsonld = {
       '@context': 'https://schema.org', '@type': 'CollectionPage', name: B.name, url: canonical,
@@ -108,6 +114,7 @@ export default async function handler(req, res) {
   const body = `
   <nav class="sp-sub"><a href="/">홈</a> › <a href="${B.path}">${B.name}</a></nav>
   <article class="col-page no-copy">
+    ${(s => s ? `<p class="col-series-tag">주식 초보 탈출 ${s.n}편 · ${esc(s.name)}</p>` : '')(B.latest ? null : seriesOf(i))}
     <h1>${esc(c.title || '')}</h1>
     <p class="sp-sub">운영자 · ${day(c.ts)}${c.editedTs ? ` · 수정 ${day(c.editedTs)}` : ''}</p>
     <div class="col-page-body">

@@ -70,7 +70,7 @@
 //   postviews          게시글 id → 조회수 (hash)
 //   게시글의 uid(회원 아이디)는 서버에서만 쓰고 응답에서는 member: true 로만 표시
 import crypto from 'crypto';
-import { COLUMN_ORDER_KEY, sortColumns } from './_colorder.js';
+import { COLUMN_ORDER_KEY, COLUMN_SERIES, sortColumns } from './_colorder.js';
 import { redis, dbReady } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 
@@ -652,7 +652,7 @@ async function handlePost(b, env = {}) {
     }
     const posts = ids.map((id, i) => metas[i] ? { ...JSON.parse(metas[i]), views: Number(views?.[i]) || 0 } : null).filter(Boolean);
     // 강의: 연재 순서(colorder) → 없으면 먼저 쓴 글부터 (api/_colorder.js) / 시황: 최신 글부터 (LPUSH 순서 그대로)
-    return { posts: board === COLUMN_CODE ? sortColumns(posts, order) : posts };
+    return board === COLUMN_CODE ? { posts: sortColumns(posts, order), series: COLUMN_SERIES } : { posts };  // series: 강의 시리즈 이름 (10편씩)
   }
 
   if (b.action === 'sihwangLatest') {

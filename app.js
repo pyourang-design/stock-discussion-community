@@ -1044,6 +1044,11 @@ const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
 const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="본문 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
 const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷');
 const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
+// 강의 시리즈 이름 (api/_colorder.js COLUMN_SERIES, columnList 응답으로 받음): 연재 순서 10편씩 = 목록 한 페이지
+let columnSeries = [];
+const seriesOf = i => !opBoard()?.latest && i >= 0 && columnSeries[Math.floor(i / COLUMN_PAGE_SIZE)] ? { n: Math.floor(i / COLUMN_PAGE_SIZE) + 1, name: columnSeries[Math.floor(i / COLUMN_PAGE_SIZE)] } : null;
+// 목록 페이지 맨 위 띠: [주식 초보 탈출 N편] 시리즈 이름 · 10편
+const seriesBandHtml = (s, count) => s ? `<div class="col-series"><span class="col-series-no">주식 초보 탈출 ${s.n}편</span><span class="col-series-name">${escHtml(s.name)}</span><span class="col-series-count">강의 ${count}편</span></div>` : '';
 let columnPage = 1;
 const POST_PREVIEW = 120, POST_PREVIEW_LINES = 4;  // 이보다 길면 4줄로 접고 '더 보기' (실제로 4줄 안이면 버튼 숨김)
 const NICK_RE = /^[가-힣]{1,10}$/;  // 닉네임: 한글만, 최대 10자
@@ -1166,9 +1171,10 @@ async function renderPosts(keep = false) {
   document.getElementById('discussTab').dataset.board = code;
   el.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
   try {
-    const { posts } = column ? await api({}, { action: 'columnList', board: code }) : await api({ code });
+    const { posts, series } = column ? await api({}, { action: 'columnList', board: code }) : await api({ code });
     if (currentStock !== s || boardCodeNow() !== code) return;
     currentPosts = posts;
+    if (series) columnSeries = series;
   } catch (e) {
     if (currentStock === s) el.innerHTML = `<p class="empty-msg">게시글을 불러오지 못했습니다. (${escHtml(e.message)})</p>`;
     return;
@@ -1238,7 +1244,7 @@ function drawColumn(el) {
     const pages = Math.max(1, Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE));
     columnPage = Math.min(Math.max(1, columnPage), pages);
     const shown = currentPosts.slice((columnPage - 1) * COLUMN_PAGE_SIZE, columnPage * COLUMN_PAGE_SIZE);
-    el.innerHTML = currentPosts.length ? `<div class="col-list">${shown.map(x => `
+    el.innerHTML = currentPosts.length ? `${seriesBandHtml(seriesOf((columnPage - 1) * COLUMN_PAGE_SIZE), shown.length)}<div class="col-list">${shown.map(x => `
       <button class="col-row" data-id="${escHtml(x.id)}" data-act="openColumn">
         <span class="col-title">${escHtml(x.title || stripColumnImgs(x.content).slice(0, 40))}</span>
         <span class="col-meta">${colDate(x.ts)} · ${EYE_ICON}${(x.views || 0).toLocaleString()}</span>
@@ -1249,7 +1255,7 @@ function drawColumn(el) {
   el.innerHTML = `
     <div class="col-article${isAdmin() ? '' : ' no-copy'}">
       <button class="btn-tool col-back" data-act="closeColumn">← 목록</button>
-      ${editing ? '' : `<h3 class="col-article-title">${escHtml(p.title || '')}</h3>`}
+      ${editing ? '' : `${(s => s ? `<p class="col-series-tag">주식 초보 탈출 ${s.n}편 · ${escHtml(s.name)}</p>` : '')(seriesOf(currentPosts.indexOf(p)))}<h3 class="col-article-title">${escHtml(p.title || '')}</h3>`}
       <div class="post-header">
         <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
         <span class="post-time">${colDate(p.ts)}</span>${viewsHtml(p)}
