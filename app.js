@@ -622,7 +622,7 @@ function openModal(code, tab = 'discuss') {
   document.getElementById('modal').classList.toggle('fav-mode', !!s.isFav);  // 관심 종목 모아보기: 토론 탭·가격 없음
   delete document.getElementById('discussTab').dataset.board;
   document.getElementById('modal').classList.toggle('us-mode', !!s.us);  // 미국 종목: 보고서·공시 탭 없음
-  document.querySelector('.modal-tabs .tab[data-tab="news"]').textContent = s.isMarket ? '실시간 시장 뉴스' : s.isSector ? '실시간 업종 뉴스' : '실시간 종목 뉴스';
+  document.querySelector('.modal-tabs .tab[data-tab="news"]').textContent = s.isMarket ? '실시간 뉴스' : s.isSector ? '실시간 업종 뉴스' : '실시간 종목 뉴스';
   document.querySelector('.modal-tabs .tab[data-tab="discuss"]').textContent = s.isMarket ? '시장 토론' : s.isSector ? '업종 토론' : '종목 토론';
   document.getElementById('modalStockName').textContent = s.isMarket ? '주식 시장 경제 토론 게시판' : s.isSector ? `${s.name} 게시판` : s.name;
   document.getElementById('modalStockCode').textContent = s.isMarket ? '시장·경제 전체 토론' : s.isSector ? '업종 전체 토론' : s.isFav ? `관심 종목 ${favs.size}개` : s.us ? `${s.ticker} · ${s.market.toUpperCase()}${s.etf ? ' ETF' : ''}` : s.code;
