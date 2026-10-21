@@ -1045,7 +1045,7 @@ let columnOpenId = null;   // 운영자 칼럼: 목록(제목만)에서 연 글 
 // 칼럼 본문 사진: 본문에 [사진:/img/{id}] 로 저장 → 화면에서 그림으로 (사진 주소 형식이 정확할 때만)
 const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
 const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="본문 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
-const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷').replace(/^\[(표|막대|선)(?::[^\]\n]*)?\]\n[\s\S]*?\n\[\/\1\]$/gm, '📊');  // 표·그래프 블록 (api/_rich.js)
+const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷').replace(/^\[(표|막대|선|봉)(?::[^\]\n]*)?\]\n[\s\S]*?\n\[\/\1\]$/gm, '📊');  // 표·그래프 블록 (api/_rich.js)
 const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
 // 강의 시리즈 이름 (api/_colorder.js COLUMN_SERIES, columnList 응답으로 받음): 연재 순서 10편씩 = 목록 한 페이지
 let columnSeries = [];

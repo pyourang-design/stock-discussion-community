@@ -3,6 +3,7 @@
 // + 주식 시장 뉴스 제목(/api/news?sector=market) + 오늘 모인 공시(ai:disc:{날짜})
 import { redis } from './_redis.js';
 import { buildMorning, buildMarketClose, isTradingDay } from './_aiMarket.js';
+import { candlesAndTa } from './_ta.js';
 
 const HEADERS = { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36', Referer: 'https://m.stock.naver.com/', Accept: 'application/json' };
 const getJson = async url => { const r = await fetch(url, { headers: HEADERS }); if (!r.ok) throw new Error(`HTTP ${r.status} ${url}`); return r.json(); };
@@ -29,10 +30,10 @@ async function indices() {
   return (j.datas || []).map(d => { const rate = num(d.fluctuationsRatio); const diff = Math.abs(num(d.compareToPreviousClosePrice) ?? 0); return { name: d.itemCode === 'KOSPI' ? '코스피' : '코스닥', close: num(d.closePrice), diff: rate < 0 ? -diff : diff, rate, status: d.marketStatus }; });
 }
 
-// 지수 최근 20거래일 종가 (꺾은선 그래프용)
-async function indexDays(code) {
+// 지수 일봉(최근 40개, 봉 차트용) + 기술적 지표(이동평균·RSI·고점/저점·거래량 비율·교차) — api/_ta.js
+async function indexChart(code) {
   const j = await getJson(`https://api.stock.naver.com/chart/domestic/index/${code}?periodType=dayCandle`);
-  return (j.priceInfos || []).slice(-20).map(p => ({ date: p.localDate, close: p.closePrice }));
+  return candlesAndTa(j.priceInfos);
 }
 
 // 거래소 업종지수 (사이트 업종 탭 평균이 아닌 KRX 공식 업종 분류) — 다음 금융 API, 등락률 큰 순
@@ -60,9 +61,9 @@ export async function sihwangData(now, origin) {
   const day = ymd(now);
   const [discRaw] = await redis([['HVALS', `ai:disc:${day}`]]);
   const settle = p => p.then(v => v, e => ({ error: String(e.message || e) }));
-  const [close, us, mac, kospi20, kosdaq20, capK, capQ, upK, downK, upQ, downQ, news, secK, secQ, idx] = await Promise.all([
+  const [close, us, mac, kospiChart, kosdaqChart, capK, capQ, upK, downK, upQ, downQ, news, secK, secQ, idx] = await Promise.all([
     settle(buildMarketClose(now, {})), settle(buildMorning(now)), settle(macro()),
-    settle(indexDays('KOSPI')), settle(indexDays('KOSDAQ')),
+    settle(indexChart('KOSPI')), settle(indexChart('KOSDAQ')),
     settle(stocks('marketValue', 'KOSPI', 10)), settle(stocks('marketValue', 'KOSDAQ', 5)),
     settle(stocks('up', 'KOSPI', 8)), settle(stocks('down', 'KOSPI', 8)), settle(stocks('up', 'KOSDAQ', 8)), settle(stocks('down', 'KOSDAQ', 8)),
     settle(fetch(new URL('/api/news?sector=market', origin)).then(r => r.json()).then(j => (j.data || []).slice(0, 40).map(n => ({ title: n.title, press: n.press || n.source, time: n.datetime, url: n.url })))),
@@ -76,7 +77,7 @@ export async function sihwangData(now, origin) {
     krxSectors: { KOSPI: secK, KOSDAQ: secQ },  // 거래소 업종지수: name, close(지수), diff, rate(%), aggregate(묶음 지수) — 등락률 큰 순
     macro: mac,  // 환율·WTI·브렌트·금·한국 3년/10년·미국 10년 (price, diff, rate %)
     usOvernight: us?.tables ? { summary: us.summary, tables: us.tables } : us,  // 간밤 미국 증시·빅테크
-    indexDays: { KOSPI: kospi20, KOSDAQ: kosdaq20 },  // 최근 20거래일 종가
+    indexChart: { KOSPI: kospiChart, KOSDAQ: kosdaqChart },  // candles: 최근 40일 일봉(date MM/DD, open, high, low, close, volume), ta: 기술적 지표
     stocks: { capTopKOSPI: capK, capTopKOSDAQ: capQ, upKOSPI: upK, downKOSPI: downK, upKOSDAQ: upQ, downKOSDAQ: downQ },
     news,  // 주식 시장 뉴스 제목 (최신순)
     disclosures: (discRaw || []).map(x => JSON.parse(x)).slice(0, 40),  // 오늘 모인 주요 공시 (16시부터 모으는 중이라 일부)

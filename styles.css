@@ -651,6 +651,18 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
 .rich-line-path { fill: none; stroke: currentColor; stroke-width: 2.5; stroke-linejoin: round; }
 .rich-line-area { fill: currentColor; opacity: .1; }
 .rich-line-dot { fill: currentColor; }
+/* 일봉 차트 (api/_rich.js [봉]): 양봉 빨강·음봉 파랑, 5일선 주황·20일선 보라 */
+.rich-candle { display: block; width: 100%; height: 190px; }
+.rich-candle g.up { color: var(--up); }
+.rich-candle g.down { color: var(--down); }
+.rich-candle line { stroke: currentColor; stroke-width: 1; vector-effect: non-scaling-stroke; }
+.rich-candle rect { fill: currentColor; }
+.rich-candle .ma5, .rich-candle .ma20 { fill: none; stroke-width: 1.5; }
+.rich-candle .ma5, .rich-candle-legend .ma5 { stroke: #f59e0b; background: #f59e0b; }
+.rich-candle .ma20, .rich-candle-legend .ma20 { stroke: #8b5cf6; background: #8b5cf6; }
+.rich-candle-legend { display: flex; align-items: center; gap: 4px; justify-content: flex-end; margin-bottom: 4px; font-size: 0.72rem; color: var(--text-muted); }
+.rich-candle-legend i { display: inline-block; width: 14px; height: 2px; margin-left: 8px; }
+@media (max-width: 480px) { .rich-candle { height: 160px; } }
 .rich-line-meta { display: flex; justify-content: space-between; gap: 8px; margin-top: 4px; font-size: 0.74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
 @media (max-width: 480px) { .rich-line { height: 130px; } .rich-line-meta span:nth-child(2) { display: none; } .rich-table { font-size: 0.82rem; } .rich-table th, .rich-table td { padding: 6px 8px; } }
 /* 주식 시황 초안 카드 (관리자 모드, 주식 시황 탭 맨 위) */
