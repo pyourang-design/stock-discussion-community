@@ -310,7 +310,7 @@
 <!-- 하단 메뉴 (모든 페이지 공통: 정책 페이지·api/page.js에도 같은 모양, 주식 시황·강의는 다른 페이지에선 /?sihwang=list · /?column=list) -->
 <nav class="bottom-nav" aria-label="하단 메뉴">
   <button class="view-toggle" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.5"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.5"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.5"/></svg><span>카드 보기</span></button>
-  <a href="/?sihwang=list" data-act="columnLink" data-tab="sihwang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg><span>주식 시황</span></a>
+  <a class="nav-sihwang" href="/?sihwang=list" data-act="columnLink" data-tab="sihwang"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="M7 15l4-4 3 3 6-7"/></svg><span>주식 시황</span></a>
   <a href="/" class="active"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h5v-6h4v6h5V10"/></svg><span>Home</span></a>
   <a class="nav-lecture" href="/?column=list" data-act="columnLink"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 4h7a3 3 0 013 3v13a2 2 0 00-2-2H2z"/><path d="M22 4h-7a3 3 0 00-3 3v13a2 2 0 012-2h8z"/></svg><span>주식 강의</span></a>
   <button class="theme-toggle" type="button"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12.8A9 9 0 1111.2 3a7 7 0 009.8 9.8z"/></svg><span class="nav-label">Dark</span></button>

@@ -694,8 +694,8 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 .bottom-nav > a, .bottom-nav > .theme-toggle, .bottom-nav > .view-toggle { flex: 1; max-width: 160px; width: auto; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 0 2px; border: 0; border-radius: 0; background: none; color: var(--text-muted); font-size: 0.74rem; font-weight: 600; line-height: 1.2; white-space: nowrap; letter-spacing: -0.02em; }
 .bottom-nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .bottom-nav > a.active { color: var(--accent); }
-.bottom-nav > a.nav-lecture { color: #e02f4b; }  /* 주식 강의는 예전 상단 버튼처럼 빨강으로 강조 */
-@media (hover: hover) { .bottom-nav > a:hover, .bottom-nav > .theme-toggle:hover, .bottom-nav > .view-toggle:hover { color: var(--accent); } .bottom-nav > a.nav-lecture:hover { color: #ff6a5c; } }
+.bottom-nav > a.nav-lecture, .bottom-nav > a.nav-sihwang { color: #e02f4b; }  /* 주식 강의·주식 시황은 빨강으로 강조 */
+@media (hover: hover) { .bottom-nav > a:hover, .bottom-nav > .theme-toggle:hover, .bottom-nav > .view-toggle:hover { color: var(--accent); } .bottom-nav > a.nav-lecture:hover, .bottom-nav > a.nav-sihwang:hover { color: #ff6a5c; } }
 .admin-badge { bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom) + 12px); }
 /* 홈 지수 칸 아래 주식 시황 최신 글 한 줄 (누르면 그 글) */
 .sihwang-latest { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 0.9rem; min-width: 0; }
