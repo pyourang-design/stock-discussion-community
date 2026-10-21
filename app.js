@@ -1030,15 +1030,14 @@ const POST_MAX = 1000;     // 게시글 최대 글자 수
 // 운영자 칼럼: 주식 시장 경제 게시판의 '주식 시황'·'주식 강의' 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 최대 2000자 (api/posts.js isColumnCode)
 // 강의는 연재 순서(먼저 쓴 글부터), 시황은 최신 글부터 (latest)
 const OP_BOARDS = {
-  sihwang: { code: 'COLNEWS', name: '주식 시황', unit: '시황', empty: '아직 주식 시황이 없습니다.', latest: true },
-  column: { code: 'COLMKT', name: '주식 강의', unit: '강의', empty: '아직 주식 강의가 없습니다.', latest: false },
-};
+  sihwang: { code: 'COLNEWS', name: '주식 시황', unit: '시황', empty: '아직 주식 시황이 없습니다.', latest: true, max: 3000 },
+  column: { code: 'COLMKT', name: '주식 강의', unit: '강의', empty: '아직 주식 강의가 없습니다.', latest: false, max: 2000 },
+};  // max: 본문 글자 수 (api/posts.js columnMax)
 const OP_CODES = { COLNEWS: 'sihwang', COLMKT: 'column' };  // 게시판 코드 → 탭
-const COLUMN_MAX = 2000;
 const isColumnTab = () => Boolean(OP_BOARDS[currentModalTab]) && Boolean(currentStock?.isMarket);
 const opBoard = () => OP_BOARDS[currentModalTab];
 const boardCodeNow = () => isColumnTab() ? opBoard().code : currentStock.code;  // 지금 보고 있는 게시판 (토론 또는 칼럼)
-const postMax = () => isColumnTab() ? COLUMN_MAX : POST_MAX;
+const postMax = () => isColumnTab() ? opBoard().max : POST_MAX;
 let columnOpenId = null;   // 운영자 칼럼: 목록(제목만)에서 연 글 id, null이면 목록
 // 칼럼 본문 사진: 본문에 [사진:/img/{id}] 로 저장 → 화면에서 그림으로 (사진 주소 형식이 정확할 때만)
 const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
@@ -1256,10 +1255,10 @@ function drawColumn(el) {
         <span class="post-time">${colDate(p.ts)}</span>${viewsHtml(p)}
         ${likeBtnHtml(p)}
       </div>
-      ${editing ? editFormHtml(p) : `<div class="post-body col-body">${columnBodyHtml(p.content)}</div>`}
+      ${editing ? editFormHtml(p) : p.content == null ? '<p class="empty-msg">불러오는 중...</p>' : `<div class="post-body col-body">${columnBodyHtml(p.content)}</div>`}
       <div class="post-tools">
         ${p.editedTs ? `<span class="post-edited">수정됨 · ${timeAgo(p.editedTs)}</span>` : ''}
-        ${canManage(p) ? `<button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="edit">수정</button>
+        ${canManage(p) && p.content != null ? `<button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="edit">수정</button>
         <button class="btn-tool" data-id="${escHtml(p.id)}" data-act="postAction" data-mode="delete">삭제</button>` : ''}
       </div>
       ${postAction?.id === p.id && postAction.mode === 'delete' ? deleteFormHtml(p) : ''}
@@ -1289,19 +1288,21 @@ function openColumn(id) {
   drawPosts();
   scrollColumnTop();  // 글 아래 이전·다음 버튼으로 넘어와도 새 글 맨 위부터
   if (currentStock) countPostViews(currentStock, currentPosts.filter(p => p.id === id), boardCodeNow());
-  loadColumnVotes(id);
+  loadColumnPost(id);
 }
-// 칼럼 글을 열면 그 글의 공감·비공감·내가 누른 것만 불러와 채움 (목록은 제목·본문·조회수만 받음)
-async function loadColumnVotes(id) {
+// 칼럼 글을 열면 그 글의 본문·공감·비공감·내가 누른 것을 불러와 채움 (목록은 제목·날짜·조회수만 받음)
+async function loadColumnPost(id) {
   const p = currentPosts.find(x => x.id === id);
-  if (!p || p.likes != null) return;  // 이미 받았으면 생략
+  if (!p || (p.content != null && p.likes != null)) return;  // 이미 받았으면 생략 (방금 쓴 글 등)
   try {
     const { post } = await api({}, { action: 'columnPost', id });
     const cur = currentPosts.find(x => x.id === id);
     if (!cur) return;
-    Object.assign(cur, { likes: post.likes, dislikes: post.dislikes, liked: post.liked, disliked: post.disliked });
-    if (columnOpenId === id) document.querySelectorAll(`.vote-btns[data-id="${id}"]`).forEach(box => { box.outerHTML = likeBtnHtml(cur); });
-  } catch {}
+    Object.assign(cur, post, { views: Math.max(cur.views || 0, post.views || 0) });
+    if (columnOpenId === id && !postAction) drawPosts();
+  } catch (e) {
+    if (columnOpenId === id) document.querySelector('#postList .col-article .empty-msg')?.replaceChildren(`글을 불러오지 못했습니다. (${e.message})`);
+  }
 }
 let pendingColumnId = null;  // 칼럼 목록을 불러온 뒤 열 글 (바로가기·작성자 목록에서)
 function openColumnLink(id, tab = 'column') {
@@ -1749,7 +1750,7 @@ function renderWriteBox() {
   document.querySelector('.write-box').classList.toggle('hidden', column && (!isAdmin() || Boolean(columnOpenId)));  // 칼럼은 관리자 모드에서만 쓰기
   const ta = document.getElementById('postContent');
   ta.maxLength = postMax();
-  ta.placeholder = column ? `${opBoard().unit} 본문을 작성하세요 (최대 2,000자)` : '의견을 남겨보세요...';
+  ta.placeholder = column ? `${opBoard().unit} 본문을 작성하세요 (최대 ${opBoard().max.toLocaleString()}자)` : '의견을 남겨보세요...';
   ta.rows = column ? 8 : 3;
   document.getElementById('postTitle').classList.toggle('hidden', !column);
   if (column) document.getElementById('postTitle').placeholder = `${opBoard().unit} 제목 (최대 100자)`;
