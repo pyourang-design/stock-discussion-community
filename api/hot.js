@@ -28,11 +28,11 @@ function mergeSnaps(snaps) {
 }
 
 async function livePrices(codes) {
-  const out = {};
-  for (let i = 0; i < codes.length; i += 50) {
-    const j = await getJson(`https://polling.finance.naver.com/api/realtime/domestic/stock/${codes.slice(i, i + 50).join(',')}`).catch(() => null);
-    for (const d of j?.datas || []) { const p = pickPrice(d); if (p.price) out[d.itemCode] = { p: p.price, r: p.changeRate }; }
-  }
+  // 50종목씩 동시에 (차례로 부르면 해외 Cloudflare 서버에서 몇 초씩 걸림)
+  const out = {}, chunks = [];
+  for (let i = 0; i < codes.length; i += 50) chunks.push(codes.slice(i, i + 50));
+  const res = await Promise.all(chunks.map(c => getJson(`https://polling.finance.naver.com/api/realtime/domestic/stock/${c.join(',')}`).catch(() => null)));
+  for (const j of res) for (const d of j?.datas || []) { const p = pickPrice(d); if (p.price) out[d.itemCode] = { p: p.price, r: p.changeRate }; }
   return out;
 }
 
@@ -41,22 +41,32 @@ export default async function handler(req, res) {
   if (!dbReady()) return res.status(503).json({ error: 'DB 연결 없음' });
   try {
     const now = Date.now(), hm = Number(new Date(now + 9 * 3600e3).toISOString().slice(11, 16).replace(':', ''));
-    const [latest, dates] = await redis([['GET', 'hot:latest'], ['LRANGE', 'hot:dates', 0, W - 1]]);
-    const keys = [`hot:day:${latest}`, ...(dates || []).map(d => `hot:snap:${d}`)];
-    const [dayRaw, ...snapRaw] = latest ? await redis([['MGET', ...keys]]).then(r => r[0]) : [null];
-    const day = dayRaw ? JSON.parse(dayRaw) : { hits: { d: {}, w: {}, m: {} }, stocks: {} };
-    const snaps = snapRaw.filter(Boolean).map(x => JSON.parse(x));
+    // 장중·장 마감 후 '오늘'은 네이버 실시간 순위 — DB 읽기와 동시에 받기 시작
+    const livePromise = period === 'd' && isTradingDay(now) && hm >= 900 ? liveRanks().catch(() => null) : null;
+    // DB는 한 번에: 기간별 묶음 hot:cur:{기간}(scripts/hot-daily.mjs가 장 마감 결과 + 최근 사진을 저장) + 오늘 공시
+    const [cur, disc] = await redis([['GET', `hot:cur:${period}`], period === 'd' ? ['HVALS', `ai:disc:${kstYmd(now)}`] : ['ECHO', '']]);
+    let day, snaps;
+    if (cur) {
+      const c = JSON.parse(cur);
+      day = { date: c.date, hits: { [period]: c.hits }, stocks: c.stocks };
+      snaps = c.snaps;
+    } else {  // 묶음이 아직 없을 때(예전 저장 방식)
+      const [latest, dates] = await redis([['GET', 'hot:latest'], ['LRANGE', 'hot:dates', 0, W - 1]]);
+      const keys = [`hot:day:${latest}`, ...(dates || []).map(d => `hot:snap:${d}`)];
+      const [dayRaw, ...snapRaw] = latest ? await redis([['MGET', ...keys]]).then(r => r[0]) : [null];
+      day = dayRaw ? JSON.parse(dayRaw) : { hits: { d: {}, w: {}, m: {} }, stocks: {} };
+      snaps = snapRaw.filter(Boolean).map(x => JSON.parse(x));
+    }
 
     const hits = { ...day.hits[period] };
     const info = { ...day.stocks };
     let live = null;
     if (period === 'd') {
       // 장중·장 마감 후: 네이버 실시간 순위, 장 시작 전·휴장일: 마지막 장 마감 사진
-      if (isTradingDay(now) && hm >= 900) live = await liveRanks().catch(() => null);
+      live = livePromise ? await livePromise : null;
       if (live?.traded) { for (const k of LIVE_KEYS) hits[k] = live.hits[k]; Object.assign(info, live.info); }
       else { live = null; for (const k of LIVE_KEYS) if (snaps[0]?.[k]) hits[k] = snaps[0][k]; }
       // 공시: 오늘 모인 것 (16시 이후 api/_aiMarket.js가 모음) — 없으면 마지막 사진
-      const [disc] = await redis([['HVALS', `ai:disc:${kstYmd(now)}`]]);
       const today = (disc || []).map(x => JSON.parse(x)).filter(x => HOT_DISC.has(x.label));
       hits.disc = today.length ? today.map(x => [x.code, x.label, 1]) : snaps[0]?.disc || [];
       if (snaps[0]?.news) hits.news = snaps[0].news;
@@ -85,7 +95,7 @@ export default async function handler(req, res) {
       return { ...r, name: i.n || st?.name || r.code, price: p.p ?? i.p ?? null, rate: p.r ?? i.r ?? null };
     }).sort((a, b) => Object.keys(b.hits).length - Object.keys(a.hits).length || Math.abs(b.rate || 0) - Math.abs(a.rate || 0));
 
-    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=120');
+    res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=600');  // 1분 뒤엔 10분까지 이전 결과를 바로 주고 뒤에서 새로 계산
     res.json({ period, asOf: { date: day.date || null, live: Boolean(live), snapDays: Math.min(snaps.length, W) }, groups: HOT_GROUPS, conds: HOT_CONDS, rows: out });
   } catch (e) {
     console.error('hot', e);

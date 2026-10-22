@@ -1432,15 +1432,24 @@ const HOT_DESC = {
 };
 let hotPeriod = 'd', hotGroup = 'all', hotPicking = false;  // hotPicking: '+ 조건 추가' 목록이 열림
 const hotChips = new Set();  // 고른 조건 (첫 번째는 묶음 칩, 나머지는 '+ 조건 추가'로 더한 것 — 모두 만족하는 종목만)
-const hotCache = {};  // 기간 → { at, data } (1분)
-async function fetchHot(period) {
-  const c = hotCache[period];
-  if (c && Date.now() - c.at < 60000) return c.data;
-  const r = await fetch(`${API_BASE}/api/hot?period=${period}`);
-  const data = await r.json().catch(() => ({}));
-  if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
-  hotCache[period] = { at: Date.now(), data };
-  return data;
+const hotCache = {};    // 기간 → { at, data } — 1분 안이면 새로 받지 않음
+const hotLoading = {};  // 기간 → 받는 중 (같은 기간을 겹쳐 받지 않게)
+const HOT_STORE = 'hotData:';  // 브라우저 기억: 창을 열면 지난번 목록을 바로 보여 주고 뒤에서 새로 받음
+const hotStored = period => { try { return JSON.parse(localStorage.getItem(HOT_STORE + period) || 'null'); } catch { return null; } };
+const hotShown = period => hotCache[period]?.data || hotStored(period);  // 지금 바로 보여 줄 수 있는 목록
+const hotFresh = period => Boolean(hotCache[period] && Date.now() - hotCache[period].at < 60000);
+function fetchHot(period) {
+  if (hotFresh(period)) return Promise.resolve(hotCache[period].data);
+  return hotLoading[period] ||= (async () => {
+    try {
+      const r = await fetch(`${API_BASE}/api/hot?period=${period}`);
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+      hotCache[period] = { at: Date.now(), data };
+      try { localStorage.setItem(HOT_STORE + period, JSON.stringify(data)); } catch {}
+      return data;
+    } finally { delete hotLoading[period]; }
+  })();
 }
 function openHot() {
   const wasOpen = isOpen('hotOverlay');
@@ -1461,11 +1470,16 @@ function hideHot() {
 }
 async function renderHot() {
   document.getElementById('hotPeriod').innerHTML = HOT_PERIODS.map(([p, t]) => `<button class="hot-tab${p === hotPeriod ? ' on' : ''}" role="tab" aria-selected="${p === hotPeriod}" data-act="hotPeriod" data-p="${p}">${t}</button>`).join('');
-  const list = document.getElementById('hotList');
-  if (!hotCache[hotPeriod]) list.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
-  let data;
-  try { data = await fetchHot(hotPeriod); } catch (e) { list.innerHTML = `<p class="empty-msg">Hot 종목을 불러오지 못했습니다. (${escHtml(e.message)})</p>`; return; }
-  if (data.period === hotPeriod) drawHot(data);
+  const list = document.getElementById('hotList'), period = hotPeriod;
+  // 받아 둔 목록(또는 브라우저에 기억한 지난 목록)을 바로 그리고, 1분 지났으면 새로 받아 바꿈
+  const shown = hotShown(period);
+  if (shown) drawHot(shown); else list.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
+  if (!hotFresh(period)) {
+    let data;
+    try { data = await fetchHot(period); } catch (e) { if (!shown && hotPeriod === period) list.innerHTML = `<p class="empty-msg">Hot 종목을 불러오지 못했습니다. (${escHtml(e.message)})</p>`; return; }
+    if (hotPeriod === period && isOpen('hotOverlay')) { const top = list.scrollTop; drawHot(data); list.scrollTop = top; }
+  }
+  for (const [p] of HOT_PERIODS) if (p !== period && !hotFresh(p)) fetchHot(p).catch(() => {});  // 주간·월간도 미리 받아 둠 (탭을 누르면 바로)
 }
 const hotMd = d => d ? `${Number(d.slice(4, 6))}/${Number(d.slice(6, 8))}` : '';
 function drawHot(data) {
@@ -1512,7 +1526,7 @@ function drawHot(data) {
 // 종목 누르기 → 종목 창 뉴스 탭 (업종 탭에 없는 종목은 상장 종목 목록에서 찾음)
 async function openHotStock(code) {
   if (!stockOf(code)) await loadHidden();
-  const row = hotCache[hotPeriod]?.data.rows.find(r => r.code === code);
+  const row = hotShown(hotPeriod)?.rows.find(r => r.code === code);
   // 상장 종목 목록(listed.json)에 아직 없는 새내기 종목: 이 자리에서 숨은 종목으로 만들어 엶
   if (!stockOf(code) && HIDDEN && row) HIDDEN.set(code, { code, name: row.name, market: '', cap: '', price: 0, change: 0, sectors: {}, hidden: true });
   const s = stockOf(code);

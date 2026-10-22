@@ -194,6 +194,18 @@ if (snap.disc) cmds.push(['SET', `hot:snap:${date}`, JSON.stringify(snap), 'EX',
 cmds.push(['SET', 'hot:latest', date]);
 const dry = process.argv.includes('--dry');  // 저장하지 않고 결과만 보기
 if (!dry) await redis(cmds);
+// 화면용 기간별 묶음 hot:cur:{d|w|m} — api/hot.js가 DB를 한 번만 읽도록 (그 기간 조건 + 쓰이는 종목 정보 + 최근 사진 W개)
+if (!dry) {
+  const [recent] = await redis([['LRANGE', 'hot:dates', 0, 19]]);
+  const snapRaw = recent?.length ? (await redis([['MGET', ...recent.map(d => `hot:snap:${d}`)]]))[0] : [];
+  const snapsAll = snapRaw.filter(Boolean).map(x => JSON.parse(x));
+  await redis(Object.entries(WINDOWS).map(([w, W]) => {
+    const sn = snapsAll.slice(0, W);
+    const used = new Set([...Object.values(hits[w]).flat(), ...sn.flatMap(s => Object.values(s).filter(Array.isArray).flat())].map(h => h[0]));
+    const st = Object.fromEntries([...used].filter(c => stocks[c]).map(c => [c, stocks[c]]));
+    return ['SET', `hot:cur:${w}`, JSON.stringify({ date, hits: hits[w], stocks: st, snaps: sn }), 'EX', 40 * 86400];
+  }));
+}
 if (process.argv.includes("--show")) for (const [k, v] of Object.entries(hits.d)) console.log("  d", k, v.slice(0, 3).map(([c, t]) => `${stocks[c]?.n}: ${t}`).join(" / "));
 const size = JSON.stringify(day).length;
 console.log(`${dry ? '(저장 안 함) ' : '저장: '}hot:day:${date} (${(size / 1024).toFixed(0)}KB)${snap.disc ? ` + hot:snap:${date}` : ' (장 마감 전이라 사진 없음)'}`);
