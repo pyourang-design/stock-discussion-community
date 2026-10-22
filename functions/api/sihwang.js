@@ -6,10 +6,10 @@
 import { redis, dbReady } from '../../api/_redis.js';
 import { sihwangData } from '../../api/_sihwangData.js';
 import { usData } from '../../api/_usData.js';
-import { renderRich } from '../../api/_rich.js';
+import { renderRich, richTextLength } from '../../api/_rich.js';
 
 const DRAFT_KEYS = { kr: 'sihwang:draft', us: 'sihwang:draft:us' };  // api/posts.js SIHWANG_DRAFT_KEYS와 같음
-const TITLE_MAX = 100, CONTENT_MAX = 3000;  // api/posts.js checkTitle · SIHWANG_MAX와 같음
+const TITLE_MAX = 100, CONTENT_MAX = 3000, RAW_MAX = 12000;  // api/posts.js checkTitle · SIHWANG_MAX · SIHWANG_RAW_MAX와 같음 (CONTENT_MAX는 표·그래프 블록을 뺀 글자 수)
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' } });
 
 function sameKey(a, b) {
@@ -30,11 +30,13 @@ export async function onRequestPost({ request, env }) {
     if (b.op === 'save') {
       const title = String(b.title ?? '').trim(), content = String(b.content ?? '').replace(/\r\n/g, '\n').trim();
       if (!title || title.length > TITLE_MAX) return json({ error: `제목은 1~${TITLE_MAX}자` }, 400);
-      if (!content || content.length > CONTENT_MAX) return json({ error: `본문은 1~${CONTENT_MAX}자 (지금 ${content.length}자)` }, 400);
+      const chars = richTextLength(content);
+      if (!chars || chars > CONTENT_MAX) return json({ error: `표·그래프를 뺀 본문은 1~${CONTENT_MAX}자 (지금 ${chars}자)` }, 400);
+      if (content.length > RAW_MAX) return json({ error: `표·그래프까지 합친 본문은 ${RAW_MAX}자까지 (지금 ${content.length}자)` }, 400);
       const draft = { title, content, ts: Date.now() };
       await redis([['SET', DRAFT_KEYS[market], JSON.stringify(draft), 'EX', 7 * 86400]]);
       // 저장한 그대로의 화면용 HTML을 돌려줌 (표·그래프 문법이 제대로 그려졌는지 루틴이 확인)
-      return json({ saved: true, chars: content.length, html: renderRich(content) });
+      return json({ saved: true, chars, rawChars: content.length, html: renderRich(content) });
     }
     return json({ error: 'unknown op' }, 400);
   } catch (err) {

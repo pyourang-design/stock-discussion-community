@@ -775,7 +775,6 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 /* 홈 지수 칸 아래 주식 시황 최신 글 한 줄 (누르면 그 글) */
 .sihwang-latest { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 9px 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font-size: 0.9rem; min-width: 0; }
 .sihwang-latest .sl-tag { flex: 0 0 auto; padding: 1px 8px; border-radius: 10px; background: rgba(240,68,82,.12); color: #e02f4b; font-size: 0.76rem; font-weight: 700; }
-.sihwang-latest .sl-date { flex: 0 0 auto; color: var(--text-muted); font-size: 0.8rem; }
 .sihwang-latest .sl-title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
 .sihwang-latest .sl-go { flex: 0 0 auto; color: var(--text-muted); font-size: 1.1rem; line-height: 1; }
 @media (hover: hover) { .sihwang-latest:hover { border-color: var(--accent); } }
@@ -971,3 +970,57 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
   .sihwang-latest { margin-bottom: 6px; }
   .tab-bar { margin-bottom: 8px; }
 }
+
+/* ── 핫이슈 종목 (app.js openHot · 하단 메뉴 핫이슈 · 홈 한 줄) — 토론 창(200)보다 아래, 하단 메뉴(120)보다 위 ── */
+.bottom-nav > a.nav-hot { color: #f05a00; }
+@media (hover: hover) { .bottom-nav > a.nav-hot:hover { color: #ff8a3d; } }
+.hot-latest .sl-tag { background: rgba(255,106,0,.13); color: #f05a00; }
+.hot-latest .sl-title em { font-style: normal; font-weight: 500; color: var(--text-muted); font-size: .92em; }
+.hot-overlay { z-index: 150; align-items: stretch; }
+.hot-overlay .hot-modal { max-width: none; height: 100%; max-height: none; border-radius: 0; animation: none; }  /* 전체 화면 */
+.hot-overlay .hot-modal .modal-header { align-items: center; padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: 8px; }
+.hot-overlay .hot-modal .modal-close { min-height: 30px; padding: 0 12px; }
+.hot-overlay .hot-list { padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+.hot-controls { display: flex; flex-direction: column; gap: 8px; padding: 10px 16px 8px; border-bottom: 1px solid var(--border); }
+.hot-period { display: inline-flex; align-self: flex-start; padding: 2px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface2); }
+.hot-tab { padding: 5px 16px; border: 0; border-radius: 16px; background: none; color: var(--text-muted); font-size: .86rem; font-weight: 700; }
+.hot-tab.on { background: var(--accent); color: #fff; }
+.hot-groups, .hot-chips { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+.hot-groups::-webkit-scrollbar, .hot-chips::-webkit-scrollbar { display: none; }
+.hot-group { flex: 0 0 auto; padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--text-muted); font-size: .92rem; font-weight: 700; }
+.hot-group.on { border-bottom-color: var(--accent); color: var(--text); }
+.hot-chips:empty { display: none; }
+.hot-chip { flex: 0 0 auto; padding: 4px 11px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); color: var(--text); font-size: .82rem; }
+/* 조건 버튼은 모두 같은 높이(29px), 글자 가운데 */
+.hot-chip, .hot-add { display: inline-flex; align-items: center; justify-content: center; height: 29px; padding-top: 0; padding-bottom: 0; line-height: 1; text-align: center; }
+.hot-chip.on { border-color: var(--accent); background: rgba(91,140,255,.14); color: var(--accent); font-weight: 700; }
+.hot-overlay .modal-header { flex-wrap: wrap; row-gap: 2px; }
+.hot-asof { flex: 0 0 100%; margin: 0; overflow: hidden; color: var(--text-muted); font-size: .76rem; white-space: nowrap; text-overflow: ellipsis; }
+.hot-picked:empty { display: none; }
+.hot-picked-row, .hot-picker-group { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.hot-picked-label { color: var(--text-muted); font-size: .76rem; font-weight: 700; }
+.hot-add { padding: 4px 11px; border: 1px dashed var(--accent); border-radius: 14px; background: none; color: var(--accent); font-size: .82rem; font-weight: 700; }
+.hot-add.on { background: rgba(91,140,255,.14); border-style: solid; }
+.hot-picker-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+/* 휴대폰: 묶음 이름은 위에, 조건은 한 줄 (넘치면 옆으로 밀기) */
+@media (max-width: 600px) {
+  .hot-picker-group { flex-direction: column; align-items: flex-start; gap: 4px; }
+  .hot-picker-chips { flex-wrap: nowrap; max-width: 100%; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+  .hot-picker-chips::-webkit-scrollbar { display: none; }
+  .hot-controls .hot-picker { padding: 8px; }
+  .hot-picker-chips .hot-chip { padding: 0 7px; font-size: .72rem; letter-spacing: -0.02em; white-space: nowrap; }
+}
+.hot-picker { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; padding: 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface2); }
+.hot-desc { margin: 0; color: var(--text-muted); font-size: .78rem; line-height: 1.4; }
+.hot-list { flex: 1; overflow-y: auto; padding-bottom: 12px; }
+.hot-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 16px; border: 0; border-bottom: 1px solid var(--border); background: none; color: var(--text); text-align: left; }
+@media (hover: hover) { .hot-row:hover { background: var(--surface2); } }
+.hot-rank { flex: 0 0 22px; color: var(--text-muted); font-size: .85rem; font-weight: 700; text-align: center; }
+.hot-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.hot-name { overflow: hidden; font-size: .95rem; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+.hot-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+.hot-badge { padding: 1px 7px; border-radius: 8px; background: var(--surface2); color: var(--text-muted); font-size: .74rem; white-space: nowrap; }
+.hot-badge.on { background: rgba(255,106,0,.13); color: #e85d00; font-weight: 700; }
+.hot-price { flex: 0 0 auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; font-size: .88rem; }
+.hot-note { margin: 12px 16px 0; color: var(--text-muted); font-size: .74rem; line-height: 1.5; }
+@media (max-width: 600px) { .hot-controls { padding: 8px 12px 6px; gap: 6px; } .hot-row { padding: 9px 12px; gap: 8px; } }

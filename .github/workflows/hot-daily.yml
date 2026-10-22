@@ -1,0 +1,20 @@
+# 핫이슈 종목 장 마감 계산 (scripts/hot-daily.mjs) — 평일 18:30 KST (투자자별 매매·공시가 모인 뒤), 휴장일은 스크립트가 건너뜀
+# 필요한 저장소 Secrets: KV_REST_API_URL, KV_REST_API_TOKEN (Upstash — .dev.vars와 같은 값)
+name: hot-daily
+on:
+  schedule:
+    - cron: '30 9 * * 1-5'
+  workflow_dispatch:
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/hot-daily.mjs
+        env:
+          KV_REST_API_URL: ${{ secrets.KV_REST_API_URL }}
+          KV_REST_API_TOKEN: ${{ secrets.KV_REST_API_TOKEN }}

@@ -6,6 +6,7 @@ const HANDLERS = {
   chart: () => import('../api/chart.js'),
   column: () => import('../api/column.js'),
   detail: () => import('../api/detail.js'),
+  hot: () => import('../api/hot.js'),
   market: () => import('../api/market.js'),
   news: () => import('../api/news.js'),
   page: () => import('../api/page.js'),
@@ -15,7 +16,7 @@ const HANDLERS = {
   stock: () => import('../api/stock.js'),
 };
 
-const CACHE_PARAMS = ['code', 'codes', 'sector', 'type', 'kind', 'id', 'counts', 'page', 'google'];
+const CACHE_PARAMS = ['code', 'codes', 'sector', 'type', 'kind', 'id', 'counts', 'page', 'google', 'period'];
 
 export async function runVercelHandler(name, context, extraQuery = {}) {
   const load = HANDLERS[name];

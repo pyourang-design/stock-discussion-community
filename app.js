@@ -21,6 +21,7 @@ document.addEventListener('DOMContentLoaded', () => {
   openFromUrl();
   countVisit();
   loadSihwangLatest();
+  loadHotLatest();
   document.getElementById('postContent').addEventListener('input', updateCharCount);
   document.getElementById('searchInput').addEventListener('input', searchStocks);
 });
@@ -32,6 +33,16 @@ const ACTIONS = {
   closePdf: () => closePdf(),
   filterTab: el => filterTab(el.dataset.key, el),
   columnLink: (el, e) => { e.preventDefault(); el.blur(); openColumnLink(el.dataset.id || null, el.dataset.tab); },
+  openHot: (el, e) => { e.preventDefault(); el.blur(); openHot(); },
+  hotOverlay: (el, e) => closeHot(e),
+  hotClose: () => closeHot(),
+  hotPeriod: el => { hotPeriod = el.dataset.p; renderHot(); },
+  hotGroup: el => { hotGroup = el.dataset.g; hotChips.clear(); hotPicking = false; renderHot(); },
+  hotChip: el => { const k = el.dataset.k, only = hotChips.size === 1 && hotChips.has(k); hotChips.clear(); if (!only) hotChips.add(k); hotPicking = false; renderHot(); },
+  hotPick: () => { hotPicking = !hotPicking; renderHot(); },
+  hotAdd: el => { hotChips.add(el.dataset.k); hotPicking = false; renderHot(); },
+  hotRemove: el => { hotChips.delete(el.dataset.k); renderHot(); },
+  hotStock: el => openHotStock(el.dataset.code),
   doSearch: () => doSearch(),
   openFeed: () => openFeed(),
   toggleLogin: () => toggleLogin(),
@@ -130,6 +141,7 @@ function openFromUrl() {
     const code = q.get('stock');
     loadHidden().then(() => { if (HIDDEN?.has(code)) openModal(code); });
   }
+  if (location.pathname === '/hot') { history.replaceState(null, '', '/'); openHot(); }
   if (q.get('tab') === 'fav') { history.replaceState(null, '', '/'); openFavTab(); }
   if (q.get('app') === '1') { history.replaceState(null, '', '/'); setTimeout(addToHome, 600); }  // 다른 페이지 하단 메뉴 '앱 다운' (설치 창 이벤트를 잠깐 기다림)
   const tab = q.has('sihwang') ? 'sihwang' : 'column', col = q.get(tab);
@@ -673,7 +685,7 @@ function hideModal() {
   if (q.has('column') || q.has('sihwang')) syncColumnUrl(null);
   currentStock = null;
   loadSihwangLatest();  // 시황을 쓰거나 지웠으면 홈 한 줄도 바뀜
-  document.body.classList.remove('no-scroll');
+  if (!isOpen('hotOverlay')) document.body.classList.remove('no-scroll');
   stopNewsRefresh();
 }
 
@@ -692,7 +704,8 @@ window.addEventListener('popstate', () => {
   const layer = history.state?.layer;
   if (layer !== 'pdf' && isOpen('pdfOverlay')) closePdf(true);  // 리포트 보기 → 뒤로 가기: 보기 창만 닫힘
   if (layer !== 'author' && isOpen('authorOverlay')) document.getElementById('authorOverlay').classList.add('hidden');
-  if (!layer && isOpen('modalOverlay')) hideModal();
+  if ((!layer || layer === 'hot') && isOpen('modalOverlay')) hideModal();
+  if (!layer && isOpen('hotOverlay')) hideHot();
 });
 // 창이 열린 채 새로고침한 경우 남은 기록 상태 정리
 if (history.state?.layer) history.replaceState(null, '');
@@ -1033,19 +1046,22 @@ const POST_MAX = 1000;     // 게시글 최대 글자 수
 // 운영자 칼럼: 주식 시장 경제 게시판의 '주식 시황'·'주식 강의' 탭 — 관리자 모드에서만 쓰기, 누구나 읽기, 최대 2000자 (api/posts.js isColumnCode)
 // 강의는 연재 순서(먼저 쓴 글부터), 시황은 최신 글부터 (latest)
 const OP_BOARDS = {
-  sihwang: { code: 'COLNEWS', name: '주식 시황', unit: '시황', empty: '아직 주식 시황이 없습니다.', latest: true, max: 3000 },
+  sihwang: { code: 'COLNEWS', name: '주식 시황', unit: '시황', empty: '아직 주식 시황이 없습니다.', latest: true, max: 3000, rawMax: 12000 },
   column: { code: 'COLMKT', name: '주식 강의', unit: '강의', empty: '아직 주식 강의가 없습니다.', latest: false, max: 2000 },
-};  // max: 본문 글자 수 (api/posts.js columnMax)
+};  // max: 본문 글자 수 — rawMax가 있으면 max는 표·그래프 블록을 뺀 글자 수, rawMax는 블록까지 합친 길이 (api/posts.js checkColumn)
 const OP_CODES = { COLNEWS: 'sihwang', COLMKT: 'column' };  // 게시판 코드 → 탭
 const isColumnTab = () => Boolean(OP_BOARDS[currentModalTab]) && Boolean(currentStock?.isMarket);
 const opBoard = () => OP_BOARDS[currentModalTab];
 const boardCodeNow = () => isColumnTab() ? opBoard().code : currentStock.code;  // 지금 보고 있는 게시판 (토론 또는 칼럼)
 const postMax = () => isColumnTab() ? opBoard().max : POST_MAX;
+const postRawMax = () => isColumnTab() ? (opBoard().rawMax || opBoard().max) : POST_MAX;  // 입력 칸 maxlength
+const RICH_BLOCK_RE = /^\[(표|막대|선|봉)(?::[^\]\n]*)?\]\n[\s\S]*?\n\[\/\1\]$/gm;  // 표·그래프 블록 (api/_rich.js)
+const richLen = text => isColumnTab() && opBoard().rawMax ? String(text).replace(RICH_BLOCK_RE, '').trim().length : String(text).length;
 let columnOpenId = null;   // 운영자 칼럼: 목록(제목만)에서 연 글 id, null이면 목록
 // 칼럼 본문 사진: 본문에 [사진:/img/{id}] 로 저장 → 화면에서 그림으로 (사진 주소 형식이 정확할 때만)
 const COLUMN_IMG_RE = /\[사진:(\/img\/[0-9a-f]{24}\.(?:webp|jpg|png|gif))\]/g;
 const columnBodyHtml = text => escHtml(text).replace(COLUMN_IMG_RE, '<img class="col-img" src="$1" alt="본문 사진" loading="lazy">').replace(/\n*(<img class="col-img"[^>]*>)\n*/g, '$1');  // 사진 앞뒤 빈 줄은 없앰 (사진 자체 여백으로 띄움)
-const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷').replace(/^\[(표|막대|선|봉)(?::[^\]\n]*)?\]\n[\s\S]*?\n\[\/\1\]$/gm, '📊');  // 표·그래프 블록 (api/_rich.js)
+const stripColumnImgs = text => String(text || '').replace(COLUMN_IMG_RE, '📷').replace(RICH_BLOCK_RE, '📊');
 const COLUMN_PAGE_SIZE = 10;  // 칼럼 목록 한 페이지 글 수
 // 강의 시리즈 이름 (api/_colorder.js COLUMN_SERIES, columnList 응답으로 받음): 연재 순서 10편씩 = 목록 한 페이지
 let columnSeries = [];
@@ -1373,7 +1389,132 @@ async function loadSihwangLatest() {
     if (!post) return el.replaceChildren();
     el.href = `/sihwang/${encodeURIComponent(post.id)}`;
     el.dataset.id = post.id;
-    el.innerHTML = `<span class="sl-tag">주식 시황</span><span class="sl-date">${colDate(post.ts).slice(5)}</span><span class="sl-title">${escHtml(post.title)}</span><span class="sl-go" aria-hidden="true">›</span>`;
+    el.innerHTML = `<span class="sl-tag">주식 시황</span><span class="sl-title">${escHtml(post.title)}</span><span class="sl-go" aria-hidden="true">›</span>`;
+  } catch {}
+}
+// ── 핫이슈 종목 (하단 메뉴 핫이슈·홈 한 줄·/hot 주소) — api/hot.js, 장 마감 계산 scripts/hot-daily.mjs ──
+const HOT_PERIODS = [['d', '오늘'], ['w', '주간'], ['m', '월간']];
+// 조건 설명 (scripts/hot-daily.mjs · api/_hot.js 기준) — 칩 하나를 고르면 목록 위에 한 줄로
+const HOT_DESC = {
+  surge: { d: '상한가 또는 +15% 이상 (시장 전체)', w: '5거래일 동안 +10% 이상 오른 종목', m: '20거래일 동안 +20% 이상 오른 종목' },
+  gap: '시가가 전날 고가보다 높고 +5% 이상으로 출발',
+  big: '몸통 +7% 이상 양봉이면서 거래량이 20일 평균의 2배 이상',
+  breakout: '종가가 직전 20일(또는 60일) 최고가를 처음 넘음',
+  golden: { d: '최근 3거래일 안 5일선이 20일선을 위로 돌파', w: '20일선이 60일선을 위로 돌파', m: '20일선이 60일선을 위로 돌파' },
+  align: '5 > 20 > 60 > 120일선 배열이 처음 만들어짐',
+  streak: '5거래일 이상 연속 상승',
+  high52: '52주 최고가 경신', low52: '52주 최저가 경신',
+  rsi: 'RSI(14)가 30 아래에서 위로 올라옴',
+  rebound: '최근 60거래일 안에 52주 최저가를 찍고 그 저점보다 20% 이상 회복',
+  ma60: '60일선 ±2% 안에서 양봉으로 반등',
+  value: { d: '거래대금 순위 (시장 전체)', w: '5거래일 하루 평균 거래대금 순위', m: '20거래일 하루 평균 거래대금 순위' },
+  volume: { d: '거래량이 20일 평균의 3배 이상', w: '5일 평균 거래량이 그 전 60일 평균의 2배 이상', m: '20일 평균 거래량이 그 전 60일 평균의 2배 이상' },
+  search: { d: '네이버 인기 검색 순위', w: '5거래일 동안 인기 검색에 오른 날 수·순위', m: '20거래일 동안 인기 검색에 오른 날 수·순위' },
+  foreign: { d: '5거래일 이상 연속 순매수, 금액 순 (순매수 수량 × 종가로 추정)', w: '5거래일 이상 연속 순매수, 금액 순 (순매수 수량 × 종가로 추정)', m: '20거래일 중 15일 이상 순매수, 금액 순' },
+  organ: { d: '5거래일 이상 연속 순매수, 금액 순 (순매수 수량 × 종가로 추정)', w: '5거래일 이상 연속 순매수, 금액 순 (순매수 수량 × 종가로 추정)', m: '20거래일 중 15일 이상 순매수, 금액 순' },
+  fhold: { d: '외국인 보유율이 하루 +0.2%p 이상', w: '5거래일 동안 +0.5%p 이상', m: '20거래일 동안 +1%p 이상' },
+  disc: '공급계약·자사주·무상증자·실적 공시',
+  news: '오늘 기사 수가 평소 하루 평균의 3배 이상 (5건 이상)',
+  report: { d: '오늘 증권사 리포트 2건 이상', w: '5거래일 동안 리포트 3건 이상', m: '20거래일 동안 리포트 5건 이상' },
+};
+let hotPeriod = 'd', hotGroup = 'all', hotPicking = false;  // hotPicking: '+ 조건 추가' 목록이 열림
+const hotChips = new Set();  // 고른 조건 (첫 번째는 묶음 칩, 나머지는 '+ 조건 추가'로 더한 것 — 모두 만족하는 종목만)
+const hotCache = {};  // 기간 → { at, data } (1분)
+async function fetchHot(period) {
+  const c = hotCache[period];
+  if (c && Date.now() - c.at < 60000) return c.data;
+  const r = await fetch(`${API_BASE}/api/hot?period=${period}`);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok || data.error) throw new Error(data.error || `HTTP ${r.status}`);
+  hotCache[period] = { at: Date.now(), data };
+  return data;
+}
+function openHot() {
+  const wasOpen = isOpen('hotOverlay');
+  document.getElementById('hotOverlay').classList.remove('hidden');
+  document.body.classList.add('no-scroll');
+  if (!wasOpen) history.pushState({ layer: 'hot' }, '', '/hot');  // 주소창에 /hot (공유용), 뒤로 가기로 닫힘
+  renderHot();
+}
+function closeHot(e) {
+  if (e && e.target !== document.getElementById('hotOverlay')) return;
+  if (!isOpen('hotOverlay')) return;
+  hideHot();
+  leaveLayer();
+}
+function hideHot() {
+  document.getElementById('hotOverlay').classList.add('hidden');
+  if (!isOpen('modalOverlay')) document.body.classList.remove('no-scroll');
+}
+async function renderHot() {
+  document.getElementById('hotPeriod').innerHTML = HOT_PERIODS.map(([p, t]) => `<button class="hot-tab${p === hotPeriod ? ' on' : ''}" role="tab" aria-selected="${p === hotPeriod}" data-act="hotPeriod" data-p="${p}">${t}</button>`).join('');
+  const list = document.getElementById('hotList');
+  if (!hotCache[hotPeriod]) list.innerHTML = '<p class="empty-msg">불러오는 중...</p>';
+  let data;
+  try { data = await fetchHot(hotPeriod); } catch (e) { list.innerHTML = `<p class="empty-msg">Hot 종목을 불러오지 못했습니다. (${escHtml(e.message)})</p>`; return; }
+  if (data.period === hotPeriod) drawHot(data);
+}
+const hotMd = d => d ? `${Number(d.slice(4, 6))}/${Number(d.slice(6, 8))}` : '';
+function drawHot(data) {
+  const label = Object.fromEntries(data.conds.map(([k, t]) => [k, t])), groupOf = Object.fromEntries(data.conds.map(([k, , g]) => [k, g]));
+  const inGroup = k => hotGroup === 'all' || groupOf[k] === hotGroup;
+  document.getElementById('hotAsOf').textContent = (data.period === 'd' && data.asOf.live ? '급등·신고가·거래대금·인기검색 실시간 · ' : '') + (data.asOf.date ? `${hotMd(data.asOf.date)} 장 마감 기준` : '');
+  document.getElementById('hotGroups').innerHTML = [['all', '종합'], ...data.groups].map(([g, t]) => `<button class="hot-group${g === hotGroup ? ' on' : ''}" role="tab" aria-selected="${g === hotGroup}" data-act="hotGroup" data-g="${g}">${t}</button>`).join('');
+  document.getElementById('hotChips').innerHTML = hotGroup === 'all' ? '' : data.conds.filter(([, , g]) => g === hotGroup)
+    .map(([k, t]) => `<button class="hot-chip${hotChips.has(k) ? ' on' : ''}" aria-pressed="${hotChips.has(k)}" data-act="hotChip" data-k="${k}">${t}</button>`).join('');
+  // 고른 조건 줄 + '+ 조건 추가' (모든 묶음의 조건 중에서 더하기)
+  const groupName = Object.fromEntries(data.groups);
+  document.getElementById('hotPicked').innerHTML = !hotChips.size ? '' :
+    `<div class="hot-picked-row">${hotChips.size > 1 ? `<span class="hot-picked-label">선택한 조건</span>${[...hotChips].map(k => `<button class="hot-chip on" data-act="hotRemove" data-k="${k}" aria-label="${label[k]} 빼기">${label[k]} ✕</button>`).join('')}` : ''}<button class="hot-add${hotPicking ? ' on' : ''}" data-act="hotPick" aria-expanded="${hotPicking}">+ 조건 추가</button></div>` +
+    (hotPicking ? `<div class="hot-picker">${data.groups.map(([g]) => {
+      const ks = data.conds.filter(([k, , cg]) => cg === g && !hotChips.has(k));
+      return ks.length ? `<div class="hot-picker-group"><span class="hot-picked-label">${groupName[g]}</span><div class="hot-picker-chips">${ks.map(([k, t]) => `<button class="hot-chip" data-act="hotAdd" data-k="${k}">${t}</button>`).join('')}</div></div>` : '';
+    }).join('')}</div>` : '');
+  const desc = hotChips.size === 1 ? (d => typeof d === 'string' ? d : d[data.period])(HOT_DESC[[...hotChips][0]])
+    : hotChips.size ? `${[...hotChips].map(k => label[k]).join(' + ')} 모두 만족하는 종목`
+    : hotGroup === 'all' ? '여러 조건에 함께 걸린 종목부터 보여 줍니다.'
+    : '조건을 누르면 그 종목만 보여 주고, + 조건 추가로 조건을 더할 수 있습니다.';
+  document.getElementById('hotDesc').textContent = desc;
+
+  let rows = data.rows;
+  if (hotGroup !== 'all') rows = rows.filter(r => Object.keys(r.hits).some(inGroup));
+  if (hotChips.size) rows = rows.filter(r => [...hotChips].every(k => r.hits[k]));
+  if (hotChips.size) { const k = [...hotChips][0]; rows = [...rows].sort((a, b) => b.hits[k][1] - a.hits[k][1]); }  // 첫 조건 순서
+  else if (hotGroup !== 'all') rows = [...rows].sort((a, b) => Object.keys(b.hits).filter(inGroup).length - Object.keys(a.hits).filter(inGroup).length || Math.abs(b.rate || 0) - Math.abs(a.rate || 0));
+  rows = rows.slice(0, 100);
+  const on = k => hotChips.size ? hotChips.has(k) : hotGroup !== 'all' && inGroup(k);  // 강조할 배지
+  document.getElementById('hotList').innerHTML = (rows.length ? rows.map((r, i) => {
+    const badges = Object.entries(r.hits).sort(([a], [b]) => on(b) - on(a))
+      .map(([k, [t]]) => `<span class="hot-badge${on(k) ? ' on' : ''}" title="${escHtml(label[k] || '')}">${escHtml(t)}</span>`).join('');
+    const up = (r.rate || 0) >= 0;
+    return `<button class="hot-row" data-act="hotStock" data-code="${escHtml(r.code)}">
+      <span class="hot-rank">${i + 1}</span>
+      <span class="hot-main"><span class="hot-name">${escHtml(r.name)}</span><span class="hot-badges">${badges}</span></span>
+      <span class="hot-price">${r.price ? `<b>${Number(r.price).toLocaleString()}</b>` : ''}${r.rate != null ? `<span class="${up ? 'up' : 'down'}">${up ? '+' : ''}${Number(r.rate).toFixed(2)}%</span>` : ''}</span>
+    </button>`;
+  }).join('') : '<p class="empty-msg">조건에 맞는 종목이 없습니다.</p>') +
+    '<p class="hot-note">※ 조건에 맞는 종목을 자동으로 모은 정보이며 특정 종목의 매수·매도 권유가 아닙니다. 투자 판단과 책임은 투자자 본인에게 있습니다.</p>';
+}
+// 종목 누르기 → 종목 창 뉴스 탭 (업종 탭에 없는 종목은 상장 종목 목록에서 찾음)
+async function openHotStock(code) {
+  if (!stockOf(code)) await loadHidden();
+  const row = hotCache[hotPeriod]?.data.rows.find(r => r.code === code);
+  // 상장 종목 목록(listed.json)에 아직 없는 새내기 종목: 이 자리에서 숨은 종목으로 만들어 엶
+  if (!stockOf(code) && HIDDEN && row) HIDDEN.set(code, { code, name: row.name, market: '', cap: '', price: 0, change: 0, sectors: {}, hidden: true });
+  const s = stockOf(code);
+  if (!s) return;
+  if (s.hidden && row?.price) { s.price = row.price; s.change = row.rate; }
+  openModal(code, 'news');
+}
+// 홈 지수 칸 아래 한 줄: 오늘 핫이슈 상위 3종목 (없으면 숨김)
+async function loadHotLatest() {
+  const el = document.getElementById('hotLatest');
+  if (!el) return;
+  try {
+    const top = (await fetchHot('d')).rows.slice(0, 3);
+    el.classList.toggle('hidden', !top.length);
+    if (!top.length) return el.replaceChildren();
+    el.innerHTML = `<span class="sl-tag">Hot 종목</span><span class="sl-title">${top.map(r => `${escHtml(r.name)} <em>${escHtml(Object.values(r.hits)[0][0])}</em>`).join(' · ')}</span><span class="sl-go" aria-hidden="true">›</span>`;
   } catch {}
 }
 // 페이지 표시: ‹ 1 2 3 … › (현재 페이지 앞뒤 2개씩, 처음·끝 페이지는 항상)
@@ -1478,7 +1619,7 @@ function editFormHtml(p) {
   return `
       <div class="post-form">
         ${OP_CODES[p.code] ? `<input id="editTitle" type="text" maxlength="100" placeholder="${OP_BOARDS[OP_CODES[p.code]].unit} 제목" value="${escHtml(p.title || '')}">` : ''}
-        <textarea id="editContent" maxlength="${postMax()}" rows="4">${escHtml(p.content)}</textarea>
+        <textarea id="editContent" maxlength="${postRawMax()}" rows="4">${escHtml(p.content)}</textarea>
         <div class="post-form-row">
           ${noPassword(p) ? '' : `<input id="actionPassword" type="password" placeholder="비밀번호" maxlength="${PW_MAX}" autocomplete="off">`}
           ${OP_CODES[p.code] && isAdmin() ? `<button type="button" class="btn-tool btn-col-img" data-act="pickImage" data-target="editContent">🖼 사진 넣기</button>` : ''}
@@ -1804,8 +1945,8 @@ function renderWriteBox() {
   const column = isColumnTab();
   document.querySelector('.write-box').classList.toggle('hidden', column && (!isAdmin() || Boolean(columnOpenId)));  // 칼럼은 관리자 모드에서만 쓰기
   const ta = document.getElementById('postContent');
-  ta.maxLength = postMax();
-  ta.placeholder = column ? `${opBoard().unit} 본문을 작성하세요 (최대 ${opBoard().max.toLocaleString()}자)` : '의견을 남겨보세요...';
+  ta.maxLength = postRawMax();
+  ta.placeholder = column ? `${opBoard().unit} 본문을 작성하세요 (최대 ${opBoard().max.toLocaleString()}자${opBoard().rawMax ? ', 표·그래프 제외' : ''})` : '의견을 남겨보세요...';
   ta.rows = column ? 8 : 3;
   document.getElementById('postTitle').classList.toggle('hidden', !column);
   if (column) document.getElementById('postTitle').placeholder = `${opBoard().unit} 제목 (최대 100자)`;
@@ -1981,7 +2122,7 @@ function closeAuthor(e) {
 }
 
 function updateCharCount() {
-  const len = document.getElementById('postContent').value.length;
+  const len = richLen(document.getElementById('postContent').value);
   document.getElementById('charCount').textContent = `${len}/${postMax()}`;
 }
 
@@ -2336,6 +2477,7 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Escape') {
     if (isOpen('pdfOverlay')) return closePdf();
     if (!document.getElementById('authorOverlay').classList.contains('hidden')) return closeAuthor();
+    if (!isOpen('modalOverlay') && isOpen('hotOverlay')) return closeHot();
     closeModal(null);
     closeDropdowns();
   }

@@ -73,7 +73,7 @@
 //   게시글의 uid(회원 아이디)는 서버에서만 쓰고 응답에서는 member: true 로만 표시
 import crypto from 'crypto';
 import { COLUMN_ORDER_KEY, COLUMN_SERIES, sortColumns } from './_colorder.js';
-import { renderRich } from './_rich.js';
+import { renderRich, richTextLength } from './_rich.js';
 import { redis, dbReady } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 
@@ -82,8 +82,15 @@ const COLUMN_CODE = 'COLMKT';  // 주식 강의
 const SIHWANG_CODE = 'COLNEWS';  // 주식 시황
 const isColumnCode = c => c === COLUMN_CODE || c === SIHWANG_CODE;  // 운영자만 쓰는 게시판 (제목 + 2000자, 사진)
 const COLUMN_MAX = 2000;  // 주식 강의 본문
-const SIHWANG_MAX = 3000;  // 주식 시황 본문
-const columnMax = code => code === SIHWANG_CODE ? SIHWANG_MAX : COLUMN_MAX;
+const SIHWANG_MAX = 3000;  // 주식 시황 본문 (표·그래프 블록은 빼고 셈, api/_rich.js richTextLength)
+const SIHWANG_RAW_MAX = 12000;  // 주식 시황 블록까지 합친 전체 길이
+const checkColumn = (code, content) => {
+  if (code !== SIHWANG_CODE) return checkContent(content, COLUMN_MAX);
+  content = checkContent(content, SIHWANG_RAW_MAX);
+  const n = richTextLength(content);
+  if (n > SIHWANG_MAX) throw new BadRequest(`표·그래프를 뺀 본문은 최대 ${SIHWANG_MAX}자까지입니다 (지금 ${n}자)`);
+  return content;
+};
 // 칼럼 목록용 제목·날짜 (hash colmeta:{게시판} = 글 id → {id,title,ts}) — 목록을 열 때 본문(최대 3000자 × 200편)을 DB에서 읽지 않게
 // 글쓰기·수정·삭제 때 함께 바꾸고, 없는 글(2026-10-21 이전 글)은 목록을 열 때 한 번 채움
 const colMetaKey = code => `colmeta:${code}`;
@@ -735,7 +742,7 @@ async function handlePost(b, env = {}) {
     const column = isColumnCode(b.code);
     if (column && !official) throw new BadRequest(`${b.code === SIHWANG_CODE ? '주식 시황' : '주식 강의'}는 관리자 모드에서만 쓸 수 있습니다`);
     const title = column ? checkTitle(b.title) : null;
-    const content = checkContent(b.content, column ? columnMax(b.code) : MAX_CONTENT);
+    const content = column ? checkColumn(b.code, b.content) : checkContent(b.content, MAX_CONTENT);
     const sentiment = SENTIMENTS.includes(b.sentiment) ? b.sentiment : 'neutral';
 
     // 도배 방지: 같은 브라우저에서 5초에 1건
@@ -761,7 +768,7 @@ async function handlePost(b, env = {}) {
     if (post.blind) throw new BadRequest('블라인드 처리된 글은 수정할 수 없습니다');
     const oldImages = isColumnCode(post.code) ? imagesIn(post.content) : new Set();
     if (isColumnCode(post.code)) post.title = checkTitle(b.title);
-    post.content = checkContent(b.content, isColumnCode(post.code) ? columnMax(post.code) : MAX_CONTENT);
+    post.content = isColumnCode(post.code) ? checkColumn(post.code, b.content) : checkContent(b.content, MAX_CONTENT);
     if (SENTIMENTS.includes(b.sentiment)) post.sentiment = b.sentiment;
     post.editedTs = Date.now();
     const [saved] = await redis([['SET', `post:${post.id}`, JSON.stringify(post), 'XX']]);

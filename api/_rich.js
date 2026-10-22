@@ -97,6 +97,9 @@ export function renderRich(text) {
   }).join('\n');
 }
 
+// 주식 시황 글자 수: 그림 블록(표·막대·선·봉)은 빼고 셈 (api/posts.js · functions/api/sihwang.js · app.js richLen)
+export const richTextLength = text => String(text || '').replace(/\r\n/g, '\n').replace(BLOCK_RE, '').trim().length;
+
 // 요약·RSS·설명용 글자만: 사진은 빼고 그림 블록은 [표: 제목]처럼 한 마디로
 export const stripRich = text => String(text || '').replace(/\r\n/g, '\n')
   .replace(BLOCK_RE, (_, kind, title) => ` [${kind}${title ? `: ${title.trim()}` : ''}] `)
