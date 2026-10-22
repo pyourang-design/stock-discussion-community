@@ -1500,11 +1500,12 @@ function drawHot(data) {
     const badges = Object.entries(r.hits).sort(([a], [b]) => on(b) - on(a))
       .map(([k, [t]]) => `<span class="hot-badge${on(k) ? ' on' : ''}" title="${escHtml(label[k] || '')}">${escHtml(t)}</span>`).join('');
     const up = (r.rate || 0) >= 0;
-    return `<button class="hot-row" data-act="hotStock" data-code="${escHtml(r.code)}">
+    // 줄을 누르면 종목 창, 이름 옆 ☆는 관심 종목 (줄 안에 버튼을 넣으려고 줄은 div role=button — Enter는 keydown에서)
+    return `<div class="hot-row" role="button" tabindex="0" data-act="hotStock" data-code="${escHtml(r.code)}">
       <span class="hot-rank">${i + 1}</span>
-      <span class="hot-main"><span class="hot-name">${escHtml(r.name)}</span><span class="hot-badges">${badges}</span></span>
+      <span class="hot-main"><span class="hot-name-row"><span class="hot-name">${escHtml(r.name)}</span><button class="fav-star hot-star${favs.has(r.code) ? ' on' : ''}" title="관심 종목" aria-label="${escHtml(r.name)} 관심 종목" data-code="${escHtml(r.code)}" data-act="toggleFav">${favs.has(r.code) ? '★' : '☆'}</button></span><span class="hot-badges">${badges}</span></span>
       <span class="hot-price">${r.price ? `<b>${Number(r.price).toLocaleString()}</b>` : ''}${r.rate != null ? `<span class="${up ? 'up' : 'down'}">${up ? '+' : ''}${Number(r.rate).toFixed(2)}%</span>` : ''}</span>
-    </button>`;
+    </div>`;
   }).join('') : '<p class="empty-msg">조건에 맞는 종목이 없습니다.</p>') +
     '<p class="hot-note">※ 조건에 맞는 종목을 자동으로 모은 정보이며 특정 종목의 매수·매도 권유가 아닙니다. 투자 판단과 책임은 투자자 본인에게 있습니다.</p>';
 }
@@ -2292,6 +2293,12 @@ function refreshStars() {
     star.classList.toggle('on', on);
     star.textContent = on ? '★' : '☆';
   });
+  // Hot 종목 목록의 ☆
+  document.querySelectorAll('.hot-star[data-code]').forEach(star => {
+    const on = favs.has(star.dataset.code);
+    star.classList.toggle('on', on);
+    star.textContent = on ? '★' : '☆';
+  });
 }
 
 async function toggleFav(e, code) {
@@ -2490,6 +2497,7 @@ function renderIndexCard(d) {
 
 // ── 키보드 ESC 닫기 ───────────────────────────────────
 document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.target.classList?.contains('hot-row')) return openHotStock(e.target.dataset.code);  // Hot 종목 줄(div role=button)
   if (e.key === 'Escape') {
     if (isOpen('pdfOverlay')) return closePdf();
     if (!document.getElementById('authorOverlay').classList.contains('hidden')) return closeAuthor();
