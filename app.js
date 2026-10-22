@@ -20,8 +20,7 @@ document.addEventListener('DOMContentLoaded', () => {
   checkMember();
   openFromUrl();
   countVisit();
-  loadSihwangLatest();
-  loadHotLatest();
+  loadHomeStrips();
   document.getElementById('postContent').addEventListener('input', updateCharCount);
   document.getElementById('searchInput').addEventListener('input', searchStocks);
 });
@@ -1234,7 +1233,8 @@ function drawPosts() {
     return;
   }
   el.innerHTML = currentPosts.map(p => `
-    <div class="post-item">
+    <div class="post-item${p.pinned ? ' pinned' : ''}">
+      ${p.pinned ? '<div class="pin-badge">📌 상단 고정</div>' : ''}
       <div class="post-header">
         <span class="post-nick">${escHtml(p.nick)}</span>${memberBadgeHtml(p)}
         <span class="post-time">${timeAgo(p.ts)}</span>${viewsHtml(p)}
@@ -1381,16 +1381,29 @@ async function discardSihwangDraft(kind) {
 }
 // 홈 지수 칸 아래 한 줄: 주식 시황 최신 글 (없으면 숨김)
 async function loadSihwangLatest() {
+  try { drawSihwangLatest((await api({}, { action: 'sihwangLatest' })).post); } catch {}
+}
+function drawSihwangLatest(post) {
   const el = document.getElementById('sihwangLatest');
   if (!el) return;
-  try {
-    const { post } = await api({}, { action: 'sihwangLatest' });
-    el.classList.toggle('hidden', !post);
-    if (!post) return el.replaceChildren();
-    el.href = `/sihwang/${encodeURIComponent(post.id)}`;
-    el.dataset.id = post.id;
-    el.innerHTML = `<span class="sl-tag">주식 시황</span><span class="sl-title">${escHtml(post.title)}</span><span class="sl-go" aria-hidden="true">›</span>`;
-  } catch {}
+  el.classList.toggle('hidden', !post);
+  if (!post) return el.replaceChildren();
+  el.href = `/sihwang/${encodeURIComponent(post.id)}`;
+  el.dataset.id = post.id;
+  el.innerHTML = `<span class="sl-tag">주식 시황</span><span class="sl-title">${escHtml(post.title)}</span><span class="sl-go" aria-hidden="true">›</span>`;
+}
+// 홈 두 줄(주식 시황·Hot 종목)을 함께 그림: 지난번 내용(브라우저 기억)을 페이지와 같이 바로 그리고, 새 내용은 둘 다 받은 뒤 한 번에 바꿈 (따로 늦게 끼어들며 화면이 밀리지 않게)
+const HOME_STRIPS_KEY = 'homeStrips';
+async function loadHomeStrips() {
+  try { const c = JSON.parse(localStorage.getItem(HOME_STRIPS_KEY) || 'null'); if (c) { drawSihwangLatest(c.sihwang); drawHotLatest(c.hot); } } catch {}
+  const [sih, hot] = await Promise.allSettled([api({}, { action: 'sihwangLatest' }), fetchHot('d')]);
+  const next = {
+    sihwang: sih.status === 'fulfilled' ? sih.value.post && { id: sih.value.post.id, title: sih.value.post.title } : undefined,
+    hot: hot.status === 'fulfilled' ? hotTop(hot.value) : undefined,
+  };
+  if (next.sihwang !== undefined) drawSihwangLatest(next.sihwang);
+  if (next.hot !== undefined) drawHotLatest(next.hot);
+  try { if (next.sihwang !== undefined && next.hot !== undefined) localStorage.setItem(HOME_STRIPS_KEY, JSON.stringify(next)); } catch {}
 }
 // ── 핫이슈 종목 (하단 메뉴 핫이슈·홈 한 줄·/hot 주소) — api/hot.js, 장 마감 계산 scripts/hot-daily.mjs ──
 const HOT_PERIODS = [['d', '오늘'], ['w', '주간'], ['m', '월간']];
@@ -1506,16 +1519,14 @@ async function openHotStock(code) {
   if (s.hidden && row?.price) { s.price = row.price; s.change = row.rate; }
   openModal(code, 'news');
 }
-// 홈 지수 칸 아래 한 줄: 오늘 핫이슈 상위 3종목 (없으면 숨김)
-async function loadHotLatest() {
+// 홈 지수 칸 아래 한 줄: 오늘 Hot 종목 상위 3종목 (없으면 숨김, loadHomeStrips)
+const hotTop = data => data.rows.slice(0, 3).map(r => ({ name: r.name, text: Object.values(r.hits)[0][0] }));
+function drawHotLatest(top) {
   const el = document.getElementById('hotLatest');
   if (!el) return;
-  try {
-    const top = (await fetchHot('d')).rows.slice(0, 3);
-    el.classList.toggle('hidden', !top.length);
-    if (!top.length) return el.replaceChildren();
-    el.innerHTML = `<span class="sl-tag">Hot 종목</span><span class="sl-title">${top.map(r => `${escHtml(r.name)} <em>${escHtml(Object.values(r.hits)[0][0])}</em>`).join(' · ')}</span><span class="sl-go" aria-hidden="true">›</span>`;
-  } catch {}
+  el.classList.toggle('hidden', !top?.length);
+  if (!top?.length) return el.replaceChildren();
+  el.innerHTML = `<span class="sl-tag">Hot 종목</span><span class="sl-title">${top.map(r => `${escHtml(r.name)} <em>${escHtml(r.text)}</em>`).join(' · ')}</span><span class="sl-go" aria-hidden="true">›</span>`;
 }
 // 페이지 표시: ‹ 1 2 3 … › (현재 페이지 앞뒤 2개씩, 처음·끝 페이지는 항상)
 function pagerHtml(page, pages, fn) {
@@ -1752,7 +1763,12 @@ async function submitPost() {
     if (code === 'COLNEWS' && draftLoaded) { if (sihwangDraft) sihwangDraft[draftLoaded] = null; draftLoaded = false; }  // 초안으로 올렸으면 서버가 그 초안을 지움
     if (currentStock && boardCodeNow() === code) {
       if (isColumnTab() && !opBoard().latest) { currentPosts.push(post); columnPage = Math.ceil(currentPosts.length / COLUMN_PAGE_SIZE); }  // 강의는 먼저 쓴 글부터라 새 글은 마지막 페이지
-      else { currentPosts.unshift(post); columnPage = 1; }
+      else {
+        // 새 글은 상단 고정 글(운영자 종목 체크포인트) 바로 아래, 새 글이 체크포인트면 맨 위에 고정 (api/_pin.js와 같은 기준)
+        const pin = post.official && !post.ai && String(post.content).startsWith('[운영자 종목 체크포인트]');
+        currentPosts.splice(pin ? 0 : currentPosts.filter(p => p.pinned).length, 0, pin ? { ...post, pinned: true } : post);
+        columnPage = 1;
+      }
     }
     postCounts[code] = (postCounts[code] || 0) + 1;
     document.getElementById('postContent').value = '';

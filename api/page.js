@@ -5,6 +5,7 @@ import { STOCKS, SECTORS, STOCKS_AS_OF, US_AS_OF } from './_stocks.js';
 import { redis, dbReady } from './_redis.js';
 import { pickPrice } from './_price.js';
 import { needsPosts, publicExtra, indexable } from './_public.js';
+import { pinKey, pinFirst } from './_pin.js';
 
 const SITE = 'https://upjong.com';
 const NAME = '주식 업종 종목 토론방';
@@ -91,11 +92,13 @@ function aiPostHtml(p) {
 async function posts(code, page = 1) {
   if (!dbReady()) return { list: [], total: 0 };
   const from = (page - 1) * POSTS_SHOWN;
-  const [ids, total] = await redis([['LRANGE', `posts:${code}`, from, from + POSTS_SHOWN - 1], ['LLEN', `posts:${code}`]]);
-  if (!ids?.length) return { list: [], total: Number(total) || 0 };
-  const raws = await redis(ids.map(id => ['GET', `post:${id}`]));
-  const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content, ...(p.ai && !p.blind ? { ai: true, headline: p.headline, summary: p.summary, tables: p.tables, src: p.src } : {}) }));
-  return { list, total: Number(total) || list.length };
+  const [ids, total, pins] = await redis([['LRANGE', `posts:${code}`, from, from + POSTS_SHOWN - 1], ['LLEN', `posts:${code}`], ['SMEMBERS', pinKey(code)]]);
+  // 첫 쪽은 운영자 종목 체크포인트(고정 글)를 맨 위에 (api/_pin.js), 다른 쪽은 원래 자리 그대로
+  const all = page === 1 ? [...new Set([...(pins || []), ...(ids || [])])] : ids || [];
+  if (!all.length) return { list: [], total: Number(total) || 0 };
+  const raws = await redis(all.map(id => ['GET', `post:${id}`]));
+  const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content, ...(p.blind ? { blind: true } : {}), ...(p.ai && !p.blind ? { ai: true, headline: p.headline, summary: p.summary, tables: p.tables, src: p.src } : {}) }));
+  return { list: page === 1 ? pinFirst(list) : list, total: Number(total) || list.length };
 }
 
 // image 없으면(종목 페이지·사진 없는 칼럼) 사이트 공유 이미지 /og-image.png (카카오톡·SNS 미리보기, 원본 scripts/og/og.html)
@@ -123,6 +126,9 @@ function layout({ title, desc, canonical, body, jsonld, status = 200, image = nu
   <meta name="apple-mobile-web-app-title" content="업종닷컴" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="/styles.css" />
+  <!-- 구글 애드센스 (게시자 pub-5199893565082802) — 허용 주소는 functions/_middleware.js HTML_CSP -->
+  <meta name="google-adsense-account" content="ca-pub-5199893565082802" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5199893565082802" crossorigin="anonymous"></script>
 </head>
 <body>
 <header class="site-header">
@@ -197,7 +203,7 @@ export default async function handler(req, res) {
   for (const n of nums) { if (n - last > 1) numHtml += '<span class="pager-gap">…</span>'; numHtml += n === page ? `<span class="pager-btn on" aria-current="page">${n}</span>` : `<a class="pager-btn" href="${pageUrl(n)}">${n}</a>`; last = n; }
   const pager = pages > 1 ? `<nav class="pager" aria-label="토론글 페이지">${page > 1 ? `<a class="pager-btn" href="${pageUrl(page - 1)}" rel="prev" aria-label="이전 페이지">‹</a>` : '<span class="pager-btn disabled">‹</span>'}${numHtml}${page < pages ? `<a class="pager-btn" href="${pageUrl(page + 1)}" rel="next" aria-label="다음 페이지">›</a>` : '<span class="pager-btn disabled">›</span>'}</nav>` : '';
   const postsHtml = postList.length ? `<ul class="sp-posts">${postList.map(p => `
-      <li><div class="sp-post-head"><b>${esc(p.nick)}</b>${p.ai ? ' <span class="member-badge ai">🤖 자동</span>' : p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
+      <li${p.pinned ? ' class="sp-pinned"' : ''}><div class="sp-post-head">${p.pinned ? '<span class="pin-badge">📌 상단 고정</span> ' : ''}<b>${esc(p.nick)}</b>${p.ai ? ' <span class="member-badge ai">🤖 자동</span>' : p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
       ${p.ai ? aiPostHtml(p) : `<p class="sp-clamp">${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p>`}</li>`).join('')}
     </ul>` : `<p class="sp-empty">아직 ${esc(s.name)} 토론글이 없습니다. 첫 번째 의견을 남겨보세요.</p>`;
 

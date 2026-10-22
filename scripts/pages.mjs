@@ -43,6 +43,9 @@ const page = (p, body, extraScript = '') => `<!DOCTYPE html>
   <meta name="apple-mobile-web-app-title" content="업종닷컴" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- 구글 애드센스 (게시자 pub-5199893565082802) — 허용 주소는 functions/_middleware.js HTML_CSP -->
+  <meta name="google-adsense-account" content="ca-pub-5199893565082802" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5199893565082802" crossorigin="anonymous"></script>
 </head>
 <body>
 

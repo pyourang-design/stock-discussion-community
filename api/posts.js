@@ -74,6 +74,7 @@
 import crypto from 'crypto';
 import { COLUMN_ORDER_KEY, COLUMN_SERIES, sortColumns } from './_colorder.js';
 import { renderRich, richTextLength } from './_rich.js';
+import { pinKey, isPinPost, pinFirst } from './_pin.js';
 import { redis, dbReady } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 
@@ -326,6 +327,7 @@ async function removePost(post, env) {
     ['HDEL', 'postviews', post.id],
     ['LREM', `posts:${post.code}`, 0, post.id],
     ['LREM', `author:${post.nick}`, 0, post.id],
+    ['SREM', pinKey(post.code), post.id],
     ['HINCRBY', 'postcount', post.code, -1],
     isColumnCode(post.code) ? ['HDEL', colMetaKey(post.code), post.id] : ['ECHO', ''],
   ]);
@@ -475,8 +477,9 @@ async function handleGet(q) {
 
   if (q.code) {
     if (!isCode(q.code)) throw new BadRequest('종목코드가 올바르지 않습니다');
-    const [ids] = await redis([['LRANGE', `posts:${q.code}`, 0, LIST_LIMIT - 1]]);
-    return { posts: await loadPosts(ids, cid) };
+    // 운영자 종목 체크포인트(고정 글)는 최신 목록에서 밀려나도 함께 불러와 맨 위로 (api/_pin.js)
+    const [ids, pins] = await redis([['LRANGE', `posts:${q.code}`, 0, LIST_LIMIT - 1], ['SMEMBERS', pinKey(q.code)]]);
+    return { posts: pinFirst(await loadPosts([...new Set([...(pins || []), ...(ids || [])])], cid)) };
   }
 
   throw new BadRequest('조회 조건이 없습니다');
@@ -758,6 +761,7 @@ async function handlePost(b, env = {}) {
       ['LPUSH', `author:${nick}`, id],
       ['HINCRBY', 'postcount', b.code, 1],
       column ? ['HSET', colMetaKey(b.code), id, colMeta(post)] : ['ECHO', ''],
+      isPinPost(post) ? ['SADD', pinKey(b.code), id] : ['ECHO', ''],  // 운영자 종목 체크포인트 → 상단 고정
       official && b.code === SIHWANG_CODE && SIHWANG_DRAFT_KEYS[b.fromDraft] ? ['DEL', SIHWANG_DRAFT_KEYS[b.fromDraft]] : ['ECHO', ''],  // 초안을 불러와 올렸으면 그 초안은 지움
     ]);
     return { post: withHtml({ ...publicPost(post), likes: 0, dislikes: 0, liked: false, disliked: false }) };
@@ -773,6 +777,7 @@ async function handlePost(b, env = {}) {
     post.editedTs = Date.now();
     const [saved] = await redis([['SET', `post:${post.id}`, JSON.stringify(post), 'XX']]);
     if (saved !== 'OK') throw new BadRequest('게시글이 없습니다');
+    await redis([[isPinPost(post) ? 'SADD' : 'SREM', pinKey(post.code), post.id]]);  // 체크포인트 머리말을 넣거나 빼면 고정도 따라감
     if (isColumnCode(post.code)) await redis([['HSET', colMetaKey(post.code), post.id, colMeta(post)]]);
     if (oldImages.size) { const now = imagesIn(post.content); await deleteImages(env, [...oldImages].filter(x => !now.has(x))).catch(e => console.error('column image delete', e)); }
     return { post: withHtml({ ...publicPost(post), ...voteFields(await redis(voteCmds(post.id, b.cid))) }) };

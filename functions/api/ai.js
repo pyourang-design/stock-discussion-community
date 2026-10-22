@@ -1,6 +1,6 @@
 // POST /api/ai → AI 운영자 자동 글 (예약 실행 Worker `upjong-ai-cron`이 5분마다 호출)
 // 헤더 X-Cron-Key: CRON_KEY 시크릿과 같아야 함 (Pages·Worker 양쪽에 같은 값)
-// 본문 { op: 'run' }                       소개글(하루 10개)·실적 발표 글 처리 → 한 일 요약
+// 본문 { op: 'run' }                       소개글(하루 15개)·실적 발표 글 처리 → 한 일 요약
 //      { op: 'dart', path, params }        DART 조회 그대로 전달 (점검용)
 //      { op: 'preview', code, kind? }      글을 올리지 않고 만들어 보기만 (점검용)
 // (functions/api/[name].js 보다 이 파일이 우선 적용됨)

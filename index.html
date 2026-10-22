@@ -30,6 +30,9 @@
   <meta name="apple-mobile-web-app-title" content="업종닷컴" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- 구글 애드센스 (게시자 pub-5199893565082802) — 허용 주소는 functions/_middleware.js HTML_CSP -->
+  <meta name="google-adsense-account" content="ca-pub-5199893565082802" />
+  <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-5199893565082802" crossorigin="anonymous"></script>
 </head>
 <body>
 
@@ -94,9 +97,9 @@
     </div>
   </section>
 
-  <!-- 주식 시황 최신 글 한 줄 (app.js loadSihwangLatest, 글이 없으면 숨김) -->
+  <!-- 주식 시황 최신 글 한 줄 (app.js loadHomeStrips, 글이 없으면 숨김) -->
   <a class="sihwang-latest hidden" id="sihwangLatest" href="/sihwang" data-act="columnLink" data-tab="sihwang"></a>
-  <!-- 핫이슈 종목 한 줄 (app.js loadHotLatest, 종목이 없으면 숨김) -->
+  <!-- Hot 종목 한 줄 (app.js loadHomeStrips — 주식 시황 줄과 함께 그림, 종목이 없으면 숨김) -->
   <a class="sihwang-latest hot-latest hidden" id="hotLatest" href="/hot" data-act="openHot"></a>
 
   <!-- 업종 탭 (stocks.js의 SECTORS로 생성) -->

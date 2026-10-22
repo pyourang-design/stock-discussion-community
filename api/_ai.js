@@ -1,5 +1,5 @@
 // AI 운영자 자동 글 — DART 실적 숫자로 표와 설명 글을 만듦 (AI API 없이 규칙으로 문장을 고름)
-//   소개글: 시가총액 큰 순으로 하루 10개 (한국시간 9~20시, 약 1시간 간격)
+//   소개글: 시가총액 큰 순으로 하루 15개 (한국시간 9~20시, 약 40분 간격)
 //   실적 발표 글: 오늘 제출된 정기보고서(분기·반기·사업보고서)를 훑어 우리 종목이면 그날 올림
 //   숨은 종목(업종 탭에 없는 상장 종목, api/_hidden.js): 회원이 처음 관심 종목으로 담으면 소개글 1번,
 //     실적 글은 관심 종목으로 담은 회원이 있는 동안만 (api/posts.js countHiddenFav → favhidden·ai:introq)
@@ -20,9 +20,9 @@ import { runMarketTasks } from './_aiMarket.js';
 const DART = 'https://opendart.fss.or.kr/api/';
 const DART_PATHS = new Set(['company.json', 'fnlttSinglAcnt.json', 'list.json']);
 export const AI_NICK = 'AI 운영자';
-const INTRO_PER_DAY = 10;
+const INTRO_PER_DAY = 15;  // 2026-10-22 10 → 15
 const MAX_BODY = 1000;  // 토론글 본문 한도 (posts.js MAX_CONTENT와 같음)
-const INTRO_GAP = 55 * 60e3;
+const INTRO_GAP = 40 * 60e3;  // 하루 15개가 9~20시 안에 들어가도록 (55분이면 최대 13개쯤)
 const JOBS_PER_RUN = 2;
 const SCAN_PAGES_PER_RUN = 2;
 const CORP = new Map(CORP_CODES);
@@ -509,7 +509,7 @@ export async function runOnce(now) {
         }
       }
     }
-    // 소개글: 한국시간 9~20시, 하루 10개, 약 1시간 간격
+    // 소개글: 한국시간 9~20시, 하루 15개, 약 40분 간격
     const hour = kstDate(now).getUTCHours(), dayKey = `ai:intro:${ymd(now)}`;
     const [cnt, last, idx, qlen] = await redis([['GET', dayKey], ['GET', 'ai:intro:last'], ['GET', 'ai:intro:i'], ['LLEN', 'ai:queue']]);
     if (hour >= 9 && hour <= 20 && Number(cnt || 0) < INTRO_PER_DAY && now - Number(last || 0) >= INTRO_GAP && Number(qlen) < 20) {
