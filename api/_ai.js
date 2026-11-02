@@ -16,6 +16,7 @@ import { CORP_CODES, CORP_HIDDEN } from './_corpcodes.js';
 import { HIDDEN } from './_hidden.js';
 import { STOCKS } from './_stocks.js';
 import { runMarketTasks } from './_aiMarket.js';
+import { AI_PAUSE } from './_aiPause.js';
 
 const DART = 'https://opendart.fss.or.kr/api/';
 const DART_PATHS = new Set(['company.json', 'fnlttSinglAcnt.json', 'list.json']);
@@ -490,7 +491,8 @@ export async function runOnce(now) {
       }
     }
     // 숨은 종목 소개글: 회원이 처음 관심 종목으로 담은 종목, 실행마다 1개 (시간·하루 개수 제한 없음)
-    const [introRaw] = await redis([['LPOP', 'ai:introq']]);
+    //   (AI_PAUSE.intro 동안은 대기열을 꺼내지 않고 그대로 둠 → 재개하면 이어서)
+    const [introRaw] = AI_PAUSE.intro ? [null] : await redis([['LPOP', 'ai:introq']]);
     if (introRaw) {
       const job = introRaw.startsWith('{') ? JSON.parse(introRaw) : { code: introRaw };
       const [had] = await redis([['HEXISTS', 'ai:posted', job.code]]);
@@ -512,7 +514,7 @@ export async function runOnce(now) {
     // 소개글: 한국시간 9~20시, 하루 15개, 약 40분 간격
     const hour = kstDate(now).getUTCHours(), dayKey = `ai:intro:${ymd(now)}`;
     const [cnt, last, idx, qlen] = await redis([['GET', dayKey], ['GET', 'ai:intro:last'], ['GET', 'ai:intro:i'], ['LLEN', 'ai:queue']]);
-    if (hour >= 9 && hour <= 20 && Number(cnt || 0) < INTRO_PER_DAY && now - Number(last || 0) >= INTRO_GAP && Number(qlen) < 20) {
+    if (!AI_PAUSE.intro && hour >= 9 && hour <= 20 && Number(cnt || 0) < INTRO_PER_DAY && now - Number(last || 0) >= INTRO_GAP && Number(qlen) < 20) {
       let i = Number(idx || 0);
       for (let tries = 0; tries < 3 && i < CORP_CODES.length; tries++, i++) {
         const code = CORP_CODES[i][0];
@@ -531,7 +533,8 @@ export async function runOnce(now) {
       await redis([['SET', 'ai:intro:i', i]]);
     }
     // 시장·업종 정기 글 (장 시작 전·장 마감·공시 모음)
-    try { await runMarketTasks(now, { dart, savePost }, log); } catch (e) { log.push(`시장글 오류: ${e.message}`); }
+    if (AI_PAUSE.market) log.push('시장·업종 글 일시 정지 (api/_aiPause.js)');
+    else try { await runMarketTasks(now, { dart, savePost }, log); } catch (e) { log.push(`시장글 오류: ${e.message}`); }
   } finally {
     await redis([['DEL', 'ai:lock']]);
   }

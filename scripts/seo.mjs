@@ -12,7 +12,7 @@ vm.runInNewContext(fs.readFileSync(DIR + 'stocks.js', 'utf8') + '\nthis.r = { SE
 const { SECTORS, STOCKS, STOCKS_AS_OF, US_AS_OF } = ctx.r;
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const today = new Date(Date.now() + 9 * 3600e3).toISOString().slice(0, 10);
-const CORE_N = 8;  // api/_public.js CORE_N과 같은 값 (탭마다 시총 상위 몇 개를 항상 검색 노출할지)
+const CORE_N = 0;  // (2026-11-02 8 → 0, 애드센스 승인 후 되돌림) api/_public.js CORE_N과 같은 값 (탭마다 시총 상위 몇 개를 항상 검색 노출할지)
 const CORE = new Set(SECTORS.flatMap(({ key }) => STOCKS.filter(s => s.sectors[key]).sort((a, b) => a.sectors[key].order - b.sectors[key].order).slice(0, CORE_N).map(s => s.code)));
 const stockUrl = code => `${SITE}stock/${encodeURIComponent(code)}`;
 

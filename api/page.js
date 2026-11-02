@@ -77,28 +77,34 @@ async function news(s) {
   })).filter(n => n.title && !/(\.\.\.|…)$/.test(n.title)).slice(0, NEWS_SHOWN);
 }
 
-// AI 운영자 실적 글: 제목·표·본문 전체·출처 (검색엔진이 표 숫자를 읽도록 서버에서 그림)
+// AI 운영자 실적 글 표 (검색엔진이 표 숫자를 읽도록 서버에서 그림)
 const aiChgClass = t => /^(\+|흑자)/.test(t) ? 'up' : /^(−|적자)/.test(t) ? 'down' : '';
 const aiCellHtml = c => c && typeof c === 'object' ? (/^https:\/\/dart\.fss\.or\.kr\//.test(c.u) ? `<a href="${esc(c.u)}" target="_blank" rel="noopener nofollow">${esc(c.t)}</a>` : esc(c.t)) : esc(c);
-function aiPostHtml(p) {
+// 종목 페이지 '실적 요약' 칸 (2026-11-02~): AI 운영자 글 중 최신 1건의 제목·요약·표·출처만 — 규칙으로 만든 긴 본문은 넣지 않음
+function aiSummaryHtml(p) {
   const tables = (p.tables || []).map(t => `<div class="ai-table-wrap"><div class="ai-table-title">${esc(t.title)} <span>단위: ${esc(t.unit)}</span></div>
   <table class="ai-table"><thead><tr>${t.cols.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead>
   <tbody>${t.rows.map(r => `<tr>${r.map((c, i) => i === 0 ? `<th>${aiCellHtml(c)}</th>` : `<td class="${i === r.length - 1 && t.cols.at(-1) === '증감' ? aiChgClass(c) : ''}">${aiCellHtml(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`).join('');
-  const summary = p.summary || String(p.content || '').split(/(?<=다\.)\s/)[0];
-  return `<h3 class="ai-headline">${esc(p.headline || '')}</h3><p class="ai-summary">${esc(summary)}</p><details class="ai-more"><summary>더 보기</summary>${tables}<p>${esc(p.content)}</p>${p.src ? `<div class="ai-src">📄 출처: <a href="${esc(p.src.url)}" target="_blank" rel="noopener nofollow">${esc(p.src.label)}</a> · DART 공시 숫자를 프로그램이 정리한 글이며 투자 권유가 아닙니다.</div>` : ''}</details>`;
+  return `<h3 class="ai-headline">${esc(p.headline || '')}</h3>${p.summary ? `<p class="ai-summary">${esc(p.summary)}</p>` : ''}${tables}
+    <p class="sp-note">${p.src ? `📄 출처: <a href="${esc(p.src.url)}" target="_blank" rel="noopener nofollow">${esc(p.src.label)}</a> · ` : ''}DART 공시 숫자를 정리한 표이며 투자 권유가 아닙니다. (${kst(p.ts)})</p>`;
 }
 
 // page: 1부터, POSTS_SHOWN개씩 (2쪽부터 /stock/{코드}?page=N — 지난 토론글도 검색 로봇이 읽도록)
+// 토론글 목록은 사람이 쓴 글만 (운영자 체크포인트는 첫 쪽 맨 위), AI 운영자 글은 최신 1건을 따로 돌려줌(ai) → '실적 요약' 칸
+const SCAN_POSTS = 1000;
 async function posts(code, page = 1) {
-  if (!dbReady()) return { list: [], total: 0 };
+  if (!dbReady()) return { list: [], total: 0, ai: null };
+  const [ids, pins] = await redis([['LRANGE', `posts:${code}`, 0, SCAN_POSTS - 1], ['SMEMBERS', pinKey(code)]]);
+  const all = [...new Set([...(pins || []), ...(ids || [])])];
+  if (!all.length) return { list: [], total: 0, ai: null };
+  const raws = [];
+  for (let i = 0; i < all.length; i += 500) raws.push(...(((await redis([['MGET', ...all.slice(i, i + 500).map(id => `post:${id}`)]]))[0]) || []));
+  const parsed = raws.filter(Boolean).map(r => JSON.parse(r));
+  const ai = parsed.filter(p => p.ai && !p.blind).sort((a, b) => b.ts - a.ts)[0] || null;
+  const human = pinFirst(parsed.filter(p => !p.ai).sort((a, b) => b.ts - a.ts));
   const from = (page - 1) * POSTS_SHOWN;
-  const [ids, total, pins] = await redis([['LRANGE', `posts:${code}`, from, from + POSTS_SHOWN - 1], ['LLEN', `posts:${code}`], ['SMEMBERS', pinKey(code)]]);
-  // 첫 쪽은 운영자 종목 체크포인트(고정 글)를 맨 위에 (api/_pin.js), 다른 쪽은 원래 자리 그대로
-  const all = page === 1 ? [...new Set([...(pins || []), ...(ids || [])])] : ids || [];
-  if (!all.length) return { list: [], total: Number(total) || 0 };
-  const raws = await redis(all.map(id => ['GET', `post:${id}`]));
-  const list = raws.filter(Boolean).map(r => JSON.parse(r)).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content, ...(p.blind ? { blind: true } : {}), ...(p.ai && !p.blind ? { ai: true, headline: p.headline, summary: p.summary, tables: p.tables, src: p.src } : {}) }));
-  return { list: page === 1 ? pinFirst(list) : list, total: Number(total) || list.length };
+  const list = human.slice(from, from + POSTS_SHOWN).map(p => ({ nick: p.nick, member: Boolean(p.uid), official: Boolean(p.official), ts: p.ts, content: p.blind ? BLIND_TEXT : p.content, ...(p.blind ? { blind: true } : {}), ...(p.pinned ? { pinned: true } : {}) }));
+  return { list, total: human.length, ai: page === 1 ? ai : null };
 }
 
 // image 없으면(종목 페이지·사진 없는 칼럼) 사이트 공유 이미지 /og-image.png (카카오톡·SNS 미리보기, 원본 scripts/og/og.html)
@@ -192,7 +198,7 @@ export default async function handler(req, res) {
   const [q, nw, ps] = await Promise.allSettled(page === 1 ? [quote(s), news(s), posts(s.code)] : [null, null, posts(s.code, page)]);
   const qt = q.status === 'fulfilled' ? q.value : null;
   const newsList = nw.status === 'fulfilled' && nw.value ? nw.value : [];
-  const { list: postList, total } = ps.status === 'fulfilled' ? ps.value : { list: [], total: 0 };
+  const { list: postList, total, ai: aiPost } = ps.status === 'fulfilled' ? ps.value : { list: [], total: 0, ai: null };
   const pages = Math.max(1, Math.ceil(total / POSTS_SHOWN));
   if (page > pages && ps.status === 'fulfilled') {  // 없는 쪽 → 마지막 쪽으로
     res.setHeader('Location', pageUrl(pages));
@@ -203,8 +209,8 @@ export default async function handler(req, res) {
   for (const n of nums) { if (n - last > 1) numHtml += '<span class="pager-gap">…</span>'; numHtml += n === page ? `<span class="pager-btn on" aria-current="page">${n}</span>` : `<a class="pager-btn" href="${pageUrl(n)}">${n}</a>`; last = n; }
   const pager = pages > 1 ? `<nav class="pager" aria-label="토론글 페이지">${page > 1 ? `<a class="pager-btn" href="${pageUrl(page - 1)}" rel="prev" aria-label="이전 페이지">‹</a>` : '<span class="pager-btn disabled">‹</span>'}${numHtml}${page < pages ? `<a class="pager-btn" href="${pageUrl(page + 1)}" rel="next" aria-label="다음 페이지">›</a>` : '<span class="pager-btn disabled">›</span>'}</nav>` : '';
   const postsHtml = postList.length ? `<ul class="sp-posts">${postList.map(p => `
-      <li${p.pinned ? ' class="sp-pinned"' : ''}><div class="sp-post-head">${p.pinned ? '<span class="pin-badge">📌 상단 고정</span> ' : ''}<b>${esc(p.nick)}</b>${p.ai ? ' <span class="member-badge ai">🤖 자동</span>' : p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
-      ${p.ai ? aiPostHtml(p) : `<p class="sp-clamp">${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p>`}</li>`).join('')}
+      <li${p.pinned ? ' class="sp-pinned"' : ''}><div class="sp-post-head">${p.pinned ? '<span class="pin-badge">📌 상단 고정</span> ' : ''}<b>${esc(p.nick)}</b>${p.official ? ' <span class="member-badge official">운영자</span>' : p.member ? ' <span class="member-badge">회원</span>' : ' <span class="member-badge guest">비회원</span>'} <time>${kst(p.ts)}</time></div>
+      <p class="sp-clamp">${esc(String(p.content).slice(0, 400))}${String(p.content).length > 400 ? '…' : ''}</p></li>`).join('')}
     </ul>` : `<p class="sp-empty">아직 ${esc(s.name)} 토론글이 없습니다. 첫 번째 의견을 남겨보세요.</p>`;
 
   const keys = Object.keys(s.sectors);
@@ -286,6 +292,11 @@ export default async function handler(req, res) {
     ${pager}
     <a class="sp-more" href="${esc(discussUrl)}">${esc(s.name)} 토론 전체 보기 · 글쓰기 →</a>
   </section>
+
+  ${aiPost ? `<section class="sp-section">
+    <h2>${esc(s.name)} 실적 요약 <span>(DART 공시)</span></h2>
+    ${aiSummaryHtml(aiPost)}
+  </section>` : ''}
 
   ${qt?.infos?.length ? `<section class="sp-section">
     <h2>${esc(s.name)} 종목 정보</h2>

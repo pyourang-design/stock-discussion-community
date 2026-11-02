@@ -33,7 +33,7 @@ async function recentPosts() {
   const ids = lists.flat().filter(Boolean);
   if (!ids.length) return [];
   const raws = await redis(ids.map(id => ['GET', `post:${id}`]));
-  return raws.filter(Boolean).map(r => JSON.parse(r)).filter(p => !p.blind)
+  return raws.filter(Boolean).map(r => JSON.parse(r)).filter(p => !p.blind && !p.ai)  // AI 운영자 자동 글은 RSS에 넣지 않음 (2026-11-02)
     .sort((a, b) => b.ts - a.ts).slice(0, MAX_POSTS);
 }
 

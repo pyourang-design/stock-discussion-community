@@ -2,5 +2,5 @@
 try {
   let id = localStorage.getItem('cid');
   if (!id) { id = crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2); localStorage.setItem('cid', id); }
-  fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'visit', cid: id }) });
+  fetch('/api/posts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'visit', cid: id, ref: document.referrer.slice(0, 300) }) });
 } catch (e) {}

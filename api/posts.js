@@ -11,7 +11,7 @@
 // POST /api/posts { action: 'login',  cid, userId, password }         로그인 → { token, user }
 // POST /api/posts { action: 'me',     cid, token }                    로그인 상태 확인 → { user }
 // POST /api/posts { action: 'logout', cid, token }
-// POST /api/posts { action: 'visit', cid }                     사이트 조회수 +1 (같은 브라우저 30분에 1회) → { today, total }
+// POST /api/posts { action: 'visit', cid, ref? }               사이트 조회수 +1 (같은 브라우저 30분에 1회, ref=document.referrer → 유입 경로 ref:{날짜}) → { today, total }
 // POST /api/posts { action: 'viewBoard', cid, code, ids }       토론 창에 보인 글 조회수 +1 (같은 브라우저·게시판 1시간에 1회) → { views }
 // POST /api/posts { action: 'report', cid, id, reason }        게시글 신고 (서로 다른 브라우저 5건 → 자동 블라인드)
 // POST /api/posts { action: 'contact', cid, type, name, email, message }   연락처 문의
@@ -75,6 +75,7 @@ import crypto from 'crypto';
 import { COLUMN_ORDER_KEY, COLUMN_SERIES, sortColumns } from './_colorder.js';
 import { renderRich, richTextLength } from './_rich.js';
 import { pinKey, isPinPost, pinFirst } from './_pin.js';
+import { AI_PAUSE, isHiddenAiPost } from './_aiPause.js';
 import { redis, dbReady } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 
@@ -253,6 +254,30 @@ async function authorize(id, password, token, adminKey, ip) {
 //   카운터가 생기기 전(2026-10-15) 회원은 처음 통계를 열 때 한 번만 user:*를 훑어 채움(initMemberCounters)
 // 게시글: 게시판별 목록(posts:{코드})의 글 id 앞부분이 작성 시각(Date.now 36진수)이라 날짜별로 셈 (삭제된 글 제외)
 const STATS_DAYS = 14;
+const REF_SINCE = '20261102';  // 유입 경로 집계 시작일
+// 유입 경로: 이전 사이트 주소(referrer) + 앱 안 브라우저(User-Agent)로 이름 하나. 우리 사이트 안 이동은 null (세지 않음)
+const REF_NAMES = [
+  [/(^|\.)search\.naver\.com$/, '네이버 검색'], [/(^|\.)stock\.naver\.com$|(^|\.)finance\.naver\.com$/, '네이버 증권'],
+  [/(^|\.)cafe\.naver\.com$/, '네이버 카페'], [/(^|\.)blog\.naver\.com$/, '네이버 블로그'], [/(^|\.)naver\.(com|me)$/, '네이버 기타'],
+  [/(^|\.)google\.[a-z.]+$/, '구글'], [/(^|\.)daum\.net$/, '다음'], [/(^|\.)kakao\.com$/, '카카오'], [/(^|\.)bing\.com$/, '빙'],
+  [/(^|\.)youtube\.com$|^youtu\.be$/, '유튜브'], [/^t\.co$|(^|\.)x\.com$|(^|\.)twitter\.com$/, 'X(트위터)'],
+  [/(^|\.)facebook\.com$/, '페이스북'], [/(^|\.)instagram\.com$/, '인스타그램'], [/(^|\.)threads\.(net|com)$/, '스레드'],
+];
+const REF_APPS = [[/KAKAOTALK/i, '카카오톡'], [/NAVER\(inapp/i, '네이버 앱'], [/Instagram/, '인스타그램'], [/FBAN|FBAV/, '페이스북'],
+  [/Barcelona/, '스레드'], [/\bLine\//, '라인'], [/BAND\//, '밴드'], [/DaumApps/, '다음 앱']];
+function visitSource(ref, ua = '') {
+  let host = '';
+  try { host = ref ? new URL(ref).hostname.toLowerCase() : ''; } catch {}
+  if (/(^|\.)upjong\.com$|\.pages\.dev$|^localhost$|^127\./.test(host)) return null;
+  if (host) {
+    const hit = REF_NAMES.find(([re]) => re.test(host));
+    if (hit) return hit[1];
+  }
+  const app = REF_APPS.find(([re]) => re.test(ua));
+  if (app) return app[1];
+  if (!host) return '직접 입력·북마크';
+  return /^[a-z0-9.-]{1,60}$/.test(host) ? host.replace(/^(www|m)\./, '') : '기타';
+}
 const kstDayOf = ts => new Date(ts + 9 * 3600e3).toISOString().slice(0, 10).replace(/-/g, '');
 const postTs = id => parseInt(id.slice(0, -6), 36);
 async function initMemberCounters() {
@@ -293,6 +318,20 @@ async function siteStats() {
     ['HGETALL', 'postcount'], ['ZCARD', 'reported'], ['LLEN', 'contacts'], ['HVALS', 'postviews'], ['PFCOUNT', 'uv:total'], ['GET', 'views:total'], ['GET', 'members:total'],
     ...days.flatMap(d => [['GET', `views:${d}`], ['PFCOUNT', `uv:${d}`], ['GET', `members:${d}`], ['GET', `pv:${d}`]]),
   ]);
+  // 유입 경로 TOP 10: 오늘 / 최근 14일 합계
+  const refFlat = await redis(days.map(d => ['HGETALL', `ref:${d}`]));
+  const refSum = {}, refToday = {};
+  refFlat.forEach((flat, i) => {
+    for (let j = 0; j < (flat || []).length; j += 2) {
+      const n = Number(flat[j + 1]) || 0;
+      refSum[flat[j]] = (refSum[flat[j]] || 0) + n;
+      if (i === 0) refToday[flat[j]] = n;
+    }
+  });
+  const refTotal = Object.values(refSum).reduce((a, n) => a + n, 0);
+  const refs = Object.entries(refSum).sort((a, b) => b[1] - a[1]).slice(0, 10)
+    .map(([name, count]) => ({ name, count, today: refToday[name] || 0 }));
+
   const boards = [];
   for (let i = 0; i < (countsFlat || []).length; i += 2) if (Number(countsFlat[i + 1]) > 0) boards.push({ code: countsFlat[i], count: Number(countsFlat[i + 1]) });
   const lists = boards.length ? await redis(boards.map(x => ['LRANGE', `posts:${x.code}`, 0, -1])) : [];
@@ -314,6 +353,7 @@ async function siteStats() {
     pending: { reported: Number(reported) || 0, contacts: Number(contacts) || 0 },
     days: per,
     boards: boards.sort((a, b) => b.count - a.count).slice(0, 10),
+    refs: { since: REF_SINCE, total: refTotal, top: refs },
   };
 }
 
@@ -472,6 +512,23 @@ async function handleGet(q) {
     const [flat] = await redis([['HGETALL', 'postcount']]);
     const counts = {};
     for (let i = 0; i < (flat || []).length; i += 2) counts[flat[i]] = Number(flat[i + 1]);
+    // 업종·시장 게시판 카드의 '댓글 N'에서 숨긴 AI 글 수를 뺌 (api/_aiPause.js) — 게시판별 AI 글 수는 10분 캐시(aihidden)
+    if (AI_PAUSE.market) {
+      const boards = Object.keys(counts).filter(c => /^SEC/.test(c));
+      let [cache] = await redis([['GET', 'aihidden']]);
+      if (!cache && boards.length) {
+        const lists = await redis(boards.map(c => ['LRANGE', `posts:${c}`, 0, LIST_LIMIT - 1]));
+        const ids = lists.flat().filter(Boolean);
+        const raws = [];
+        for (let i = 0; i < ids.length; i += 500) raws.push(...(((await redis([['MGET', ...ids.slice(i, i + 500).map(id => `post:${id}`)]]))[0]) || []));
+        const n = {};
+        for (const r of raws) { if (!r) continue; const p = JSON.parse(r); if (isHiddenAiPost(p)) n[p.code] = (n[p.code] || 0) + 1; }
+        cache = JSON.stringify(n);
+        await redis([['SET', 'aihidden', cache, 'EX', 600]]);
+      }
+      const hid = cache ? JSON.parse(cache) : {};
+      for (const c of boards) counts[c] = Math.max(0, counts[c] - (hid[c] || 0));
+    }
     return { counts };
   }
 
@@ -479,13 +536,13 @@ async function handleGet(q) {
     if (!isCode(q.code)) throw new BadRequest('종목코드가 올바르지 않습니다');
     // 운영자 종목 체크포인트(고정 글)는 최신 목록에서 밀려나도 함께 불러와 맨 위로 (api/_pin.js)
     const [ids, pins] = await redis([['LRANGE', `posts:${q.code}`, 0, LIST_LIMIT - 1], ['SMEMBERS', pinKey(q.code)]]);
-    return { posts: pinFirst(await loadPosts([...new Set([...(pins || []), ...(ids || [])])], cid)) };
+    return { posts: pinFirst((await loadPosts([...new Set([...(pins || []), ...(ids || [])])], cid)).filter(p => !isHiddenAiPost(p))) };  // 업종·시장 AI 글 숨김 (api/_aiPause.js)
   }
 
   throw new BadRequest('조회 조건이 없습니다');
 }
 
-const STRING_FIELDS = ['action', 'cid', 'code', 'id', 'token', 'nick', 'password', 'adminKey', 'content', 'title', 'userId', 'reason', 'message', 'email', 'name', 'type', 'sentiment'];
+const STRING_FIELDS = ['action', 'cid', 'code', 'id', 'token', 'nick', 'password', 'adminKey', 'content', 'title', 'userId', 'reason', 'message', 'email', 'name', 'type', 'sentiment', 'ref'];
 async function handlePost(b, env = {}) {
   if (!b || typeof b !== 'object' || Array.isArray(b)) throw new BadRequest('요청 형식이 올바르지 않습니다');
   for (const k of STRING_FIELDS) if (b[k] != null && typeof b[k] !== 'string') throw new BadRequest(`${k} 값이 올바르지 않습니다`);
@@ -559,7 +616,11 @@ async function handlePost(b, env = {}) {
   if (b.action === 'visit') {
     const day = `views:${kstDay()}`;
     const [ok] = await redis([['SET', `vrl:${b.cid}`, '1', 'NX', 'EX', VISIT_GAP]]);
-    if (ok === 'OK') await redis([['PFADD', `uv:${kstDay()}`, b.cid], ['EXPIRE', `uv:${kstDay()}`, 400 * 86400], ['PFADD', 'uv:total', b.cid]]);
+    if (ok === 'OK') {
+      const src = visitSource(b.ref, b._ua);
+      await redis([['PFADD', `uv:${kstDay()}`, b.cid], ['EXPIRE', `uv:${kstDay()}`, 400 * 86400], ['PFADD', 'uv:total', b.cid],
+        ...(src ? [['HINCRBY', `ref:${kstDay()}`, src, 1], ['EXPIRE', `ref:${kstDay()}`, 400 * 86400]] : [])]);
+    }
     const [today, total] = ok === 'OK'
       ? (await redis([['INCR', day], ['INCR', 'views:total'], ['EXPIRE', day, 400 * 86400]])).slice(0, 2)
       : await redis([['GET', day], ['GET', 'views:total']]);
@@ -836,7 +897,7 @@ async function handlePost(b, env = {}) {
       ['GET', `nickowner:${nick}`],
       me ? ['SISMEMBER', `mfollowing:${me.id.toLowerCase()}`, nick] : ['ECHO', '0'],
     ]);
-    return { nick, member: Boolean(owner) && owner !== '-', withdrawn: owner === '-', posts: await loadPosts(ids, b.cid), followers: Number(followers) || 0, following: Number(following) === 1 };
+    return { nick, member: Boolean(owner) && owner !== '-', withdrawn: owner === '-', posts: (await loadPosts(ids, b.cid)).filter(p => !isHiddenAiPost(p)), followers: Number(followers) || 0, following: Number(following) === 1 };
   }
 
   if (b.action === 'follow' || b.action === 'followingList' || b.action === 'feed') {
@@ -888,6 +949,7 @@ export default async function handler(req, res) {
       body = { ...(body || {}) };
       // 접속 IP (Cloudflare가 넣는 헤더, 클라이언트가 body로 보낸 _ip는 덮어씀) — 도배·잠금 기준
       body._ip = String(req.headers?.['cf-connecting-ip'] || req.headers?.['x-forwarded-for'] || 'unknown').split(',')[0].trim().slice(0, 64);
+      body._ua = String(req.headers?.['user-agent'] || '').slice(0, 300);  // 유입 경로: 카카오톡 등 앱 안 브라우저 구분용
       return res.json(await handlePost(body, req.env));
     }
     res.status(405).json({ error: 'Method Not Allowed' });

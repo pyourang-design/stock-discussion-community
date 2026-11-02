@@ -1,7 +1,8 @@
 // 종목 페이지(/stock/코드) 공개·검색 노출 규칙
 //   1) 업종 탭마다 시가총액 상위 CORE_N개(탭 안 순서 = 시총순, 미국 ETF는 규모순)에 드는 종목: 항상 공개·검색 노출, 사이트맵 포함
-//      (2026-10-20 애드센스 대비 — 같은 틀의 종목 페이지가 너무 많이 색인되지 않게 줄임. scripts/seo.mjs CORE_N과 같은 값)
-//   2) 아래 종목은 페이지는 공개하되, 회원 토론글(AI·운영자·블라인드 제외)이 INDEX_MIN개 이상일 때만 검색 노출
+//      (2026-10-20 애드센스 대비 64 → 8, 2026-11-02 → 0: 사람이 쓴 글이 없는 종목 페이지는 검색에 안 올림. scripts/seo.mjs CORE_N과 같은 값)
+//   2) 아래 종목은 페이지는 공개하되, 운영자 종목 체크포인트(api/_pin.js)가 있거나
+//      회원 토론글(AI·운영자·블라인드 제외)이 INDEX_MIN개 이상일 때만 검색 노출
 //      (그 전엔 noindex, 사이트맵·RSS 제외)
 //      - 업종 탭에 있지만 어느 탭에서도 시총 상위 CORE_N개에 들지 않는 종목
 //      - 개편으로 탭에서 빠진 옛 종목 (이미 검색엔진에 등록된 주소라 404로 끊지 않음, 미국 주식 포함)
@@ -11,11 +12,12 @@ import { redis } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 import { LEGACY } from './_legacy.js';
 import { STOCKS } from './_stocks.js';
+import { pinKey, isPinPost } from './_pin.js';
 
 export const HIDDEN_NAME = new Map(HIDDEN);
 export const PUBLIC_KEY = 'hiddenpublic';
 export const INDEX_MIN = 3;
-export const CORE_N = 8;
+export const CORE_N = 0;  // 애드센스 승인 후 되돌릴 값: 8 → 20 → 64
 const SCAN = 200;  // 종목마다 최근 글 몇 개까지 세는지
 
 const IN_TAB = new Set(STOCKS.map(s => s.code));
@@ -43,37 +45,48 @@ export async function publicExtra(code) {
 // 회원 토론글 수 세기 (검색 노출 기준)
 const isMemberPost = p => p && p.uid && !p.ai && !p.official && !p.blind;
 
-// codes 중 검색 노출 기준을 넘은 종목 → Map(코드 → 가장 최근 회원 글 시각)
+// codes 중 검색 노출 기준을 넘은 종목 → Map(코드 → 가장 최근 회원 글·체크포인트 시각)
 export async function indexable(codes) {
   const out = new Map();
   codes = [...new Set(codes)];
   if (!codes.length) return out;
-  const lists = await redis(codes.map(c => ['LRANGE', `posts:${c}`, 0, SCAN - 1]));
-  const ids = lists.flat().filter(Boolean);
+  const lists = await redis(codes.flatMap(c => [['LRANGE', `posts:${c}`, 0, SCAN - 1], ['SMEMBERS', pinKey(c)]]));
+  const ids = [...new Set(lists.flat().filter(Boolean))];  // 고정 글은 최근 목록에서 밀려나도 함께
   if (!ids.length) return out;
-  const [raws] = await redis([['MGET', ...ids.map(id => `post:${id}`)]]);
+  const raws = [];
+  for (let i = 0; i < ids.length; i += 500) raws.push(...(((await redis([['MGET', ...ids.slice(i, i + 500).map(id => `post:${id}`)]]))[0]) || []));
   const stat = new Map();
-  for (const r of raws || []) {
+  for (const r of raws) {
     if (!r) continue;
     const p = JSON.parse(r);
-    if (!isMemberPost(p)) continue;
-    const s = stat.get(p.code) || { n: 0, ts: 0 };
-    s.n++; s.ts = Math.max(s.ts, p.editedTs || p.ts || 0);
+    const pin = isPinPost(p);
+    if (!pin && !isMemberPost(p)) continue;
+    const s = stat.get(p.code) || { n: 0, pin: false, ts: 0 };
+    if (pin) s.pin = true; else s.n++;
+    s.ts = Math.max(s.ts, p.editedTs || p.ts || 0);
     stat.set(p.code, s);
   }
-  for (const [c, s] of stat) if (s.n >= INDEX_MIN) out.set(c, s.ts);
+  for (const [c, s] of stat) if (s.pin || s.n >= INDEX_MIN) out.set(c, s.ts);
   return out;
 }
 
-// 회원 토론글 기준 대상 전체(탭의 상위 CORE_N 밖 종목·빠진 종목·공개된 숨은 종목) 중 기준을 넘은 것 — 사이트맵·RSS용
+// 기준 대상 전체(탭의 상위 CORE_N 밖 종목·빠진 종목·공개된 숨은 종목) 중 기준을 넘은 것 — 사이트맵·RSS용
 // 글이 하나라도 있는 종목만 세어 봄 (postcount)
 export async function indexableAll() {
   const [flat, pub] = await redis([['HGETALL', 'postcount'], ['SMEMBERS', PUBLIC_KEY]]);
   const pubSet = new Set(pub || []);
+  // 체크포인트가 있는 종목 (pins:{코드} 키) — 글 수가 적어도 대상
+  const pinned = new Set();
+  let cur = '0';
+  do {
+    const [[next, keys]] = await redis([['SCAN', cur, 'MATCH', 'pins:*', 'COUNT', 1000]]);
+    cur = String(next);
+    for (const k of keys || []) pinned.add(k.slice(5));
+  } while (cur !== '0');
   const codes = [];
   for (let i = 0; i < (flat || []).length; i += 2) {
     const c = flat[i];
-    if (Number(flat[i + 1]) < INDEX_MIN) continue;
+    if (Number(flat[i + 1]) < INDEX_MIN && !pinned.has(c)) continue;
     if ((IN_TAB.has(c) && !CORE.has(c)) || DROPPED.has(c) || pubSet.has(c)) codes.push(c);
   }
   return indexable(codes);

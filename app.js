@@ -122,7 +122,7 @@ document.addEventListener('error', e => {
 
 // 사이트 조회수 (같은 브라우저 30분에 1회 집계) — 화면 표시는 2026-10-19 삭제, 관리자 통계용 집계만
 async function countVisit() {
-  try { await api({}, { action: 'visit' }); } catch {}
+  try { await api({}, { action: 'visit', ref: document.referrer.slice(0, 300) }); } catch {}
 }
 
 // 주소로 바로 열기: /?stock=005930 → 그 종목이 속한 업종 탭 + 토론 창, /?sector=bio → 업종 탭 (종목 페이지에서 넘어올 때)
@@ -2077,15 +2077,13 @@ async function openStats() {
     const pvSince = r.posts.viewsSince || '20261015';  // 날짜별 글 조회수 집계 시작일
     const maxViews = Math.max(1, ...r.days.map(d => d.postViews || 0));
     const body = `<div class="stat-wrap">
-      <div class="stat-grid">
+      <div class="stat-grid even">
         ${tile('오늘 방문', fmtN(r.visits.today), `어제 ${fmtN(yday.views)}`)}
         ${tile('누적 방문', fmtN(r.visits.total))}
         ${tile('오늘 신규 회원', fmtN(r.members.today), `어제 ${fmtN(yday.members)}`)}
         ${tile('전체 회원', fmtN(r.members.total))}
         ${tile('오늘 신규 게시글', fmtN(r.posts.today), `어제 ${fmtN(yday.posts)}`)}
         ${tile('누적 게시글', fmtN(r.posts.total))}
-      </div>
-      <div class="stat-grid small">
         ${tile('오늘 순방문자', fmtN(r.visits.todayVisitors), `${since}부터 집계`)}
         ${tile('누적 순방문자', fmtN(r.visits.totalVisitors), `${since}부터 집계`)}
         ${tile('오늘 조회수', fmtN(r.posts.viewsToday), `어제 ${yday.day < pvSince ? '-' : fmtN(yday.postViews)}`)}
@@ -2102,11 +2100,16 @@ async function openStats() {
           <td class="stat-bar-cell">${d.day < pvSince ? '-' : `<span class="stat-bar" style="width:${Math.round((d.postViews || 0) / maxViews * 100)}%"></span><span>${fmtN(d.postViews)}</span>`}</td>
           <td>${fmtN(d.members)}</td><td>${fmtN(d.posts)}</td></tr>`).join('')}</tbody>
       </table>
+      <h3 class="stat-h">유입 경로 TOP 10 <small>최근 ${r.days.length}일 · ${fmtDay(r.refs?.since || '20261102')}부터 집계</small></h3>
+      ${r.refs?.top?.length ? `<table class="stat-table">
+        <thead><tr><th></th><th class="stat-left">경로</th><th>오늘</th><th>${r.days.length}일 합계</th><th>비율</th></tr></thead>
+        <tbody>${r.refs.top.map((x, i) => `<tr><td>${i + 1}</td><td class="stat-left">${escHtml(x.name)}</td><td>${fmtN(x.today)}</td><td>${fmtN(x.count)}</td><td>${(x.count / r.refs.total * 100).toFixed(1)}%</td></tr>`).join('')}</tbody>
+      </table>` : '<p class="empty-msg">아직 집계된 유입 경로가 없습니다.</p>'}
       <h3 class="stat-h">게시판별 게시글 TOP ${r.boards.length}</h3>
       ${r.boards.length ? `<table class="stat-table"><tbody>${r.boards.map((b, i) => `<tr><td>${i + 1}</td><td class="stat-left"><button class="author-stock" ${OP_CODES[b.code] ? `data-act="columnLink" data-tab="${OP_CODES[b.code]}"` : `data-act="openStock" data-code="${escHtml(b.code)}"`}>${OP_CODES[b.code] ? OP_BOARDS[OP_CODES[b.code]].name : escHtml(findStock(b.code)?.name || b.code)}</button></td><td>${fmtN(b.count)}</td></tr>`).join('')}</tbody></table>` : '<p class="empty-msg">게시글이 없습니다.</p>'}
       <h3 class="stat-h">강의 사진 저장소</h3>
       <div id="imgStats" class="stat-img"><p class="stat-note">불러오는 중...</p></div>
-      <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 조회수: 게시판 글 조회수(같은 브라우저·게시판 1시간에 1회, 날짜별은 ${fmtDay(pvSince)}부터 집계) · 게시글: 게시판 글(카드의 '댓글') 수, 삭제된 글 제외 · 날짜는 한국시간</p></div>`;
+      <p class="stat-note">방문: 같은 브라우저의 30분 안 재방문은 1회로 셈 · 순방문자: 브라우저 기준 중복 제외 · 조회수: 게시판 글 조회수(같은 브라우저·게시판 1시간에 1회, 날짜별은 ${fmtDay(pvSince)}부터 집계) · 게시글: 게시판 글(카드의 '댓글') 수, 삭제된 글 제외 · 유입 경로: 방문(30분에 1회)마다 바로 전 사이트 주소로 분류, 사이트 안 이동은 제외, 주소가 안 넘어오면 카카오톡 등 앱 이름 또는 '직접 입력·북마크' · 날짜는 한국시간</p></div>`;
     showAuthorOverlay('📊 화면 정보', `${fmtDay(r.today)} 기준 사이트 통계`, '<button class="btn-tool" data-act="openStats">새로고침</button>', body);
     loadImageStats();
   } catch (e) {

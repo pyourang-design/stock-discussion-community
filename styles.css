@@ -529,6 +529,7 @@ a.logo { color: inherit; text-decoration: none; }
 /* ── 관리자: 화면 정보(사이트 통계) ── */
 .stat-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 0 4px; }
 .stat-grid.small { grid-template-columns: repeat(5, minmax(0, 1fr)); padding-top: 4px; }
+.stat-grid.even { grid-auto-rows: 1fr; }  /* 화면 정보 12칸: 모든 줄 높이를 같게 */
 .stat-tile { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; min-width: 0; }
 .stat-label { font-size: 0.75rem; color: var(--text-muted); font-weight: 600; }
 .stat-value { font-size: 1.35rem; font-weight: 800; margin-top: 2px; font-variant-numeric: tabular-nums; }
