@@ -32,6 +32,7 @@
 // POST /api/posts { action: 'favToggle', cid, token, code, on }  관심 종목 추가(on=true)·해제
 // POST /api/posts { action: 'adminCheck',  cid, adminKey }       관리자 로그인 확인
 // POST /api/posts { action: 'adminDelete', cid, id, adminKey }   관리자 삭제 (ADMIN_PASSWORD 환경변수)
+// POST /api/posts { action: 'adminChangePassword', cid, adminKey, password, newPassword }  관리자 비밀번호 변경 (DB 키 adminpw, 다른 관리자 로그인 해제)
 // POST /api/posts { action: 'like',   cid, id }               공감 토글 (예전 화면 호환)
 // POST /api/posts { action: 'vote',   cid, id, type: 'up'|'down' }   공감·비공감 토글 (둘 중 하나만)
 // 팔로우 (회원 전용: 로그인한 회원이 다른 회원 닉네임을 팔로우)
@@ -386,13 +387,22 @@ async function checkAdmin(key, ip) {
     if (Number(ok)) return;
     throw new BadRequest('관리자 로그인이 만료되었습니다. 관리자 비밀번호로 다시 로그인해주세요');
   }
-  const secret = String(process.env.ADMIN_PASSWORD ?? '').trim();  // 대시보드 입력 시 딸려 들어간 앞뒤 공백·줄바꿈 무시
-  if (!secret) throw new BadRequest('관리자 비밀번호가 설정되지 않았습니다');
+  await checkAdminPassword(key, ip);
+}
+// 관리자 비밀번호 확인: 관리자 화면에서 바꾼 비밀번호(DB 키 adminpw, scrypt 해시)가 있으면 그것만, 없으면 환경변수 ADMIN_PASSWORD
+//   비밀번호를 잊으면 Upstash 콘솔에서 adminpw 키를 지우면 환경변수 비밀번호로 돌아감
+const ADMIN_PW_KEY = 'adminpw';
+const ADMIN_PW_MIN = 10, ADMIN_PW_MAX = 64;
+async function checkAdminPassword(key, ip) {
   const failKey = `adminfail:${ip || 'unknown'}`;
-  const [fails] = await redis([['GET', failKey]]);
+  const [fails, stored] = await redis([['GET', failKey], ['GET', ADMIN_PW_KEY]]);
+  const secret = String(process.env.ADMIN_PASSWORD ?? '').trim();  // 대시보드 입력 시 딸려 들어간 앞뒤 공백·줄바꿈 무시
+  if (!stored && !secret) throw new BadRequest('관리자 비밀번호가 설정되지 않았습니다');
   if (Number(fails) >= PW_FAIL_LIMIT) throw new BadRequest('관리자 비밀번호를 여러 번 틀려 10분간 잠겼습니다');
   const digest = v => crypto.createHash('sha256').update(String(v ?? '')).digest();
-  if (!crypto.timingSafeEqual(digest(String(key ?? '').trim()), digest(secret))) {
+  const input = String(key ?? '').trim();
+  const ok = stored ? samePassword(input, stored) : crypto.timingSafeEqual(digest(input), digest(secret));
+  if (!ok) {
     const [, , global] = await redis([['INCR', failKey], ['EXPIRE', failKey, 600], ['INCR', 'adminfail:global'], ['EXPIRE', 'adminfail:global', 600, 'NX']]);
     if (Number(global) >= ADMIN_FAIL_GLOBAL) console.warn('관리자 비밀번호 실패가 10분 내 ' + global + '회 — 여러 IP에서 대입 시도 가능성');
     throw new BadRequest('관리자 비밀번호가 일치하지 않습니다');
@@ -856,6 +866,27 @@ async function handlePost(b, env = {}) {
     const token = 'adm_' + crypto.randomBytes(24).toString('hex');
     await redis([['SET', `admsess:${token}`, '1', 'EX', ADMIN_SESSION_TTL]]);
     return { admin: true, adminToken: token };
+  }
+
+  // 관리자 비밀번호 변경: 관리자 로그인(세션 토큰) + 현재 비밀번호 다시 확인 → 새 비밀번호 해시를 DB에 저장
+  //   다른 브라우저의 관리자 로그인은 모두 해제, 지금 브라우저 세션만 유지
+  if (b.action === 'adminChangePassword') {
+    if (!(typeof b.adminKey === 'string' && ADMIN_TOKEN_RE.test(b.adminKey))) throw new BadRequest('관리자 로그인 후 바꿀 수 있습니다');
+    await checkAdmin(b.adminKey, b._ip);
+    await checkAdminPassword(b.password, b._ip);
+    const np = String(b.newPassword ?? '').trim();
+    if (np.length < ADMIN_PW_MIN || np.length > ADMIN_PW_MAX) throw new BadRequest(`새 비밀번호는 ${ADMIN_PW_MIN}~${ADMIN_PW_MAX}자로 입력해주세요`);
+    if (np === String(b.password ?? '').trim()) throw new BadRequest('지금 비밀번호와 다른 비밀번호를 입력해주세요');
+    await redis([['SET', ADMIN_PW_KEY, hashPassword(np)], ['DEL', `adminfail:${b._ip || 'unknown'}`]]);
+    const others = [];
+    let cursor = '0';
+    do {
+      const [[next, keys]] = await redis([['SCAN', cursor, 'MATCH', 'admsess:*', 'COUNT', 1000]]);
+      others.push(...(keys || []).filter(k => k !== `admsess:${b.adminKey}`));
+      cursor = String(next);
+    } while (cursor !== '0');
+    if (others.length) await redis([['DEL', ...others]]);
+    return { ok: true, loggedOut: others.length };
   }
 
   if (b.action === 'adminLogout') {

@@ -95,6 +95,8 @@ const ACTIONS = {
   openReports: () => openReports(),
   openContacts: () => openContacts(),
   openStats: () => openStats(),
+  openAdminPw: () => openAdminPw(),
+  adminChangePassword: () => adminChangePassword(),
   cleanupImages: el => cleanupImages(Number(el.dataset.n)),
   changePassword: () => changePassword(),
   withdraw: () => withdraw(),
@@ -1933,7 +1935,7 @@ function toggleAdminForm() {
 
 function renderAdminArea() {
   document.getElementById('adminArea').innerHTML = isAdmin()
-    ? '<p class="admin-tools"><button class="btn-tool" data-act="openReports">🚨 신고된 글</button> <button class="btn-tool" data-act="openContacts">✉️ 문의 내역</button> <button class="btn-tool" data-act="openStats">📊 화면 정보</button></p>'
+    ? '<p class="admin-tools"><button class="btn-tool" data-act="openReports">🚨 신고된 글</button> <button class="btn-tool" data-act="openContacts">✉️ 문의 내역</button> <button class="btn-tool" data-act="openStats">📊 화면 정보</button> <button class="btn-tool" data-act="openAdminPw">🔑 비밀번호 변경</button></p>'
     : '';
   document.getElementById('adminBadge')?.remove();
   if (isAdmin()) document.querySelector('footer').insertAdjacentHTML('beforeend',
@@ -2060,6 +2062,37 @@ async function openContacts() {
   } catch (e) {
     if (overlayStale(seq)) return;
     showAuthorOverlay('✉️ 문의 내역', '', '', `<p class="empty-msg">불러오지 못했습니다. (${escHtml(e.message)})</p>`);
+  }
+}
+
+// ── 관리자: 비밀번호 변경 (현재 비밀번호 확인 → 새 비밀번호 10~64자, 다른 브라우저의 관리자 로그인 해제) ──
+function openAdminPw() {
+  showAuthorOverlay('🔑 관리자 비밀번호 변경', '', '', `
+    <div class="profile-section">
+      <div class="post-form-row">
+        <input id="admCurPw" type="password" placeholder="현재 관리자 비밀번호" maxlength="64" autocomplete="current-password" data-lpignore="true">
+        <input id="admNewPw" type="password" placeholder="새 비밀번호 (10~64자)" maxlength="64" autocomplete="new-password" data-lpignore="true">
+        <input id="admNewPw2" type="password" placeholder="새 비밀번호 확인" maxlength="64" autocomplete="new-password" data-lpignore="true" data-enter="adminChangePassword">
+        <button class="btn-submit" data-act="adminChangePassword">변경</button>
+      </div>
+      <p class="info-sub">변경하면 지금 브라우저를 뺀 다른 곳의 관리자 로그인은 모두 해제됩니다. 다음 로그인부터 새 비밀번호를 쓰세요.</p>
+    </div>`);
+  document.getElementById('admCurPw').focus();
+}
+
+async function adminChangePassword() {
+  const password = document.getElementById('admCurPw').value;
+  const newPassword = document.getElementById('admNewPw').value;
+  const confirmPw = document.getElementById('admNewPw2').value;
+  if (!password) return alert('현재 관리자 비밀번호를 입력해주세요.');
+  if (newPassword.trim().length < 10 || newPassword.trim().length > 64) return alert('새 비밀번호는 10~64자로 입력해주세요.');
+  if (newPassword !== confirmPw) return alert('새 비밀번호와 확인이 다릅니다.');
+  try {
+    await api({}, { action: 'adminChangePassword', adminKey, password, newPassword });
+    closeAuthor();
+    alert('관리자 비밀번호가 변경되었습니다.');
+  } catch (e) {
+    alert(e.message);
   }
 }
 
