@@ -72,14 +72,16 @@ async function latestEarnings(codes) {
 const chgClass = t => /\(\+|흑자/.test(t) ? 'up' : /\(−|\(-|적자/.test(t) ? 'down' : '';
 
 function sectorTable(key, rows, earn, esc) {
+  // 은행·보험처럼 '매출액' 줄이 없는 업종은 매출 칸을 통째로 뺌
+  const showSales = rows.some(s => earn.get(s.code)?.sales);
   const body = rows.map(s => {
     const e = earn.get(s.code);
     return `<tr><th><a href="/stock/${esc(s.code)}">${esc(s.name)}</a></th><td>${esc(s.cap || '-')}</td>${e
-      ? `<td>${esc(e.period)}</td><td class="${chgClass(e.sales)}">${esc(e.sales || '-')}</td><td class="${chgClass(e.op)}">${esc(e.op || '-')}</td>`
-      : '<td colspan="3" class="muted">실적 정리 전</td>'}</tr>`;
+      ? `<td>${esc(e.period)}</td>${showSales ? `<td class="${chgClass(e.sales)}">${esc(e.sales || '-')}</td>` : ''}<td class="${chgClass(e.op)}">${esc(e.op || '-')}</td>`
+      : `<td colspan="${showSales ? 3 : 2}" class="muted">실적 정리 전</td>`}</tr>`;
   }).join('');
   return `<div class="ai-table-wrap"><div class="ai-table-title">${esc(sectorName(key))} 업종 시가총액 상위 ${rows.length}종목 <span>시가총액 ${STOCKS_AS_OF} 기준</span></div>
-  <table class="ai-table col-data-table"><thead><tr><th>종목</th><th>시가총액</th><th>실적 기간</th><th>매출 (전년 대비)</th><th>영업이익 (전년 대비)</th></tr></thead><tbody>${body}</tbody></table>
+  <table class="ai-table col-data-table"><thead><tr><th>종목</th><th>시가총액</th><th>실적 기간</th>${showSales ? '<th>매출 (전년 대비)</th>' : ''}<th>영업이익 (전년 대비)</th></tr></thead><tbody>${body}</tbody></table>
   <p class="col-data-more"><a href="/?sector=${esc(key)}">${esc(sectorName(key))} 업종 게시판에서 전체 종목·토론 보기 →</a></p></div>`;
 }
 
