@@ -3,6 +3,7 @@
 //   칼럼 본문(DB)은 그대로 두고 /column/{id} 화면에서만 덧붙임 — 다른 시리즈도 여기 규칙만 추가하면 됨
 import { redis, dbReady } from './_redis.js';
 import { STOCKS, SECTORS, STOCKS_AS_OF } from './_stocks.js';
+import { etfDataHtml } from './_colEtf.js';
 
 const TOP_N = 8;
 const SCAN_POSTS = 60;  // 종목 게시판 최근 글 중 AI 실적 글을 찾을 범위
@@ -88,6 +89,8 @@ function sectorTable(key, rows, earn, esc) {
 // 칼럼 제목에 맞는 데이터 칸 HTML (해당 없으면 '')
 export async function columnDataHtml(title, esc) {
   title = String(title || '');
+  const etf = etfDataHtml(title, esc);  // ETF 투자 시리즈 (api/_colEtf.js)
+  if (etf) return etf;
   if (isSectorSummary(title)) {
     const items = SECTORS.filter(s => s.key !== 'usa').map(s => `<tr><th><a href="/?sector=${esc(s.key)}">${esc(s.name)}</a></th><td style="text-align:left;white-space:normal">${topOf(s.key, 3).map(x => `<a href="/stock/${esc(x.code)}">${esc(x.name)}</a>`).join(', ')}</td></tr>`).join('');
     return `<section class="sp-section col-data"><h2>업종닷컴 업종 게시판 한눈에 보기</h2>
