@@ -739,6 +739,11 @@ body.admin-mode .site-footer { padding-bottom: 76px; }
 .ai-table tbody th { text-align: left; font-weight: 600; background: var(--surface); }
 .ai-table td.up { color: var(--up); font-weight: 600; }
 .ai-table td.down { color: var(--down); font-weight: 600; }
+/* 주식 강의 '업종닷컴 데이터로 보기' (api/_colData.js) */
+.col-data .ai-table-wrap { margin-top: 12px; }
+.col-data-table td.muted { color: var(--text-muted); text-align: center; font-weight: 400; }
+.col-data-table tbody th a { color: inherit; }
+.col-data-more { margin: 6px 0 0; font-size: 0.84rem; }
 .ai-src { font-size: 0.76rem; color: var(--text-muted); margin-top: 8px; line-height: 1.5; }
 .ai-src a { color: inherit; text-decoration: underline; }
 .ai-detail > .btn-more { display: block; margin-top: 6px; }

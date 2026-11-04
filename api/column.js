@@ -6,6 +6,7 @@ import { redis, dbReady } from './_redis.js';
 import { layout, esc, kst, SITE, NAME } from './page.js';
 import { COLUMN_ORDER_KEY, SERIES_SIZE, seriesOf, sortColumns } from './_colorder.js';
 import { renderRich, stripRich } from './_rich.js';
+import { columnDataHtml } from './_colData.js';
 
 // 운영자 게시판 두 개: 주식 강의(연재 순서) · 주식 시황(최신 글부터)
 const BOARDS = {
@@ -109,6 +110,8 @@ export default async function handler(req, res) {
   const title = `${c.title || summary(c.content, 40)} | ${B.name} | ${NAME}`;
   const desc = summary(c.content, 150);
   const others = cols.filter(x => x.id !== c.id).slice(0, 10);
+  // 업종별 투자 가이드: 업종 탭 실제 종목·DART 실적 표 (api/_colData.js)
+  const dataHtml = B.latest ? '' : await columnDataHtml(c.title, esc).catch(err => { console.error('column data', err); return ''; });
   const body = `
   <nav class="sp-sub"><a href="/">홈</a> › <a href="${B.path}">${B.name}</a></nav>
   <article class="col-page no-copy">
@@ -119,6 +122,7 @@ export default async function handler(req, res) {
 ${paragraphs(c.content)}
     </div>
   </article>
+  ${dataHtml}
   <p class="sp-disclaimer">본 ${B.unit}${B.josa === '가' ? '는' : '은'} 투자 이해를 돕기 위한 일반 정보이며 특정 종목의 매수·매도 권유가 아닙니다. 투자 결정은 본인 책임입니다.</p>
   <p class="sp-section"><a class="btn-submit sp-cta" href="/?${B.app}=${esc(c.id)}">이 ${B.unit}에 공감·의견 남기기 (토론 게시판)</a></p>
   <nav class="col-page-nav">
