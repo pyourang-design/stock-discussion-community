@@ -5,6 +5,7 @@ import { redis, dbReady } from './_redis.js';
 import { STOCKS, SECTORS, STOCKS_AS_OF } from './_stocks.js';
 import { etfDataHtml } from './_colEtf.js';
 import { usDataHtml } from './_colUs.js';
+import { flowDataHtml } from './_colFlow.js';
 
 const TOP_N = 8;
 const SCAN_POSTS = 60;  // 종목 게시판 최근 글 중 AI 실적 글을 찾을 범위
@@ -94,6 +95,8 @@ export async function columnDataHtml(title, esc) {
   if (etf) return etf;
   const us = usDataHtml(title, esc);  // 해외 주식 시리즈 (api/_colUs.js)
   if (us) return us;
+  const flow = await flowDataHtml(title, esc);  // 시장 구조·수급 시리즈 (api/_colFlow.js)
+  if (flow != null) return flow;
   if (isSectorSummary(title)) {
     const items = SECTORS.filter(s => s.key !== 'usa').map(s => `<tr><th><a href="/?sector=${esc(s.key)}">${esc(s.name)}</a></th><td style="text-align:left;white-space:normal">${topOf(s.key, 3).map(x => `<a href="/stock/${esc(x.code)}">${esc(x.name)}</a>`).join(', ')}</td></tr>`).join('');
     return `<section class="sp-section col-data"><h2>업종닷컴 업종 게시판 한눈에 보기</h2>
