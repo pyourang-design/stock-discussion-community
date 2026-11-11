@@ -1,15 +1,15 @@
 // AI 운영자 자동 글 — DART 실적 숫자로 표와 설명 글을 만듦 (AI API 없이 규칙으로 문장을 고름)
-//   소개글: 시가총액 큰 순으로 하루 15개 (한국시간 9~20시, 약 40분 간격)
+//   과거 실적 발표 글: 시가총액 큰 순으로 하루 15개 (한국시간 9~20시, 약 40분 간격)
 //   실적 발표 글: 오늘 제출된 정기보고서(분기·반기·사업보고서)를 훑어 우리 종목이면 그날 올림
-//   숨은 종목(업종 탭에 없는 상장 종목, api/_hidden.js): 회원이 처음 관심 종목으로 담으면 소개글 1번,
+//   숨은 종목(업종 탭에 없는 상장 종목, api/_hidden.js): 회원이 처음 관심 종목으로 담으면 과거 실적 발표 글 1번,
 //     실적 글은 관심 종목으로 담은 회원이 있는 동안만 (api/posts.js countHiddenFav → favhidden·ai:introq)
 // DB 키
-//   ai:intro:i          다음 소개글 순번 (CORP_CODES 인덱스)
-//   ai:intro:{날짜}     그날 올린 소개글 수, ai:intro:last 마지막 소개글 시각
-//   ai:posted           종목코드 → AI 글을 올린 마지막 시각 (hash) — 실적 글이 먼저 나간 종목은 소개글 건너뜀
+//   ai:intro:i          다음 과거 실적 발표 글 순번 (CORP_CODES 인덱스)
+//   ai:intro:{날짜}     그날 올린 과거 실적 발표 글 수, ai:intro:last 마지막 과거 실적 발표 글 시각
+//   ai:posted           종목코드 → AI 글을 올린 마지막 시각 (hash) — 실적 글이 먼저 나간 종목은 과거 실적 발표 글 건너뜀
 //   ai:done             올렸거나 줄에 넣은 실적 보고서 '종목:기간' (set) — 같은 분기 중복 방지
 //   ai:queue            실적 글 대기열 (JSON 목록), ai:scan 공시 훑기 위치(JSON), ai:lock 겹침 방지
-//   ai:introq           숨은 종목 소개글 대기열 (종목코드 또는 JSON {code, tries}), ai:introseen 한 번 넣은 종목 (set)
+//   ai:introq           숨은 과거 실적 발표 글 대기열 (종목코드 또는 JSON {code, tries}), ai:introseen 한 번 넣은 종목 (set)
 //   favhidden           숨은 종목코드 → 관심 종목으로 담은 회원 수 (hash), ai:corp 공시에서 알아낸 숨은 종목 DART 고유번호 (hash)
 import { redis } from './_redis.js';
 import { CORP_CODES, CORP_HIDDEN } from './_corpcodes.js';
@@ -278,7 +278,7 @@ function writeText(name, sit, focus, extra, r, earnings = false) {
     else if (ni < op * 0.5) more.push(fill(pick(NI_GAP.low), v));
   }
   if (more.length) paras.push({ k: 'more', t: more.join(' ') });
-  // 최근 분기 흐름 (소개글에서 누적과 따로)
+  // 최근 분기 흐름 (과거 실적 발표 글에서 누적과 따로)
   if (extra.quarter) paras.push({ k: 'quarter', t: extra.quarter });
   // 3년 추세
   if (extra.trend) {
@@ -407,7 +407,7 @@ export async function buildPost(code, kind = 'intro', report = null) {
 }
 
 // 글 저장 (posts.js 'create'와 같은 키 구조)
-export async function savePost(p, { mark = true } = {}) {  // mark: 종목 소개글 건너뛰기용 ai:posted 기록 (시장·업종 게시판 글은 false)
+export async function savePost(p, { mark = true } = {}) {  // mark: 과거 실적 발표 글 건너뛰기용 ai:posted 기록 (시장·업종 게시판 글은 false)
   const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
   const post = { id, code: p.code, nick: AI_NICK, content: p.content, sentiment: 'neutral', ts: Date.now(), official: true, ai: true, headline: p.headline, summary: p.summary, tables: p.tables, src: p.src };
   await redis([
@@ -490,28 +490,28 @@ export async function runOnce(now) {
         log.push(`실적 ${job.code} 실패(${job.tries}): ${e.message}`);
       }
     }
-    // 숨은 종목 소개글: 회원이 처음 관심 종목으로 담은 종목, 실행마다 1개 (시간·하루 개수 제한 없음)
+    // 숨은 과거 실적 발표 글: 회원이 처음 관심 종목으로 담은 종목, 실행마다 1개 (시간·하루 개수 제한 없음)
     //   (AI_PAUSE.intro 동안은 대기열을 꺼내지 않고 그대로 둠 → 재개하면 이어서)
     const [introRaw] = AI_PAUSE.intro ? [null] : await redis([['LPOP', 'ai:introq']]);
     if (introRaw) {
       const job = introRaw.startsWith('{') ? JSON.parse(introRaw) : { code: introRaw };
       const [had] = await redis([['HEXISTS', 'ai:posted', job.code]]);
-      if (Number(had)) log.push(`숨은 종목 소개 ${job.code} 이미 글 있음`);
+      if (Number(had)) log.push(`숨은 종목 과거 실적 ${job.code} 이미 글 있음`);
       else {
         try {
           const p = await buildPost(job.code, 'intro');
-          if (p.skip) log.push(`숨은 종목 소개 ${job.code} 건너뜀: ${p.skip}`);
-          else { await savePost(p); log.push(`숨은 종목 소개글 ${job.code} ${p.headline}`); }
+          if (p.skip) log.push(`숨은 종목 과거 실적 ${job.code} 건너뜀: ${p.skip}`);
+          else { await savePost(p); log.push(`숨은 과거 실적 발표 글 ${job.code} ${p.headline}`); }
         } catch (e) {
           job.tries = (job.tries || 0) + 1;
           // DART 고유번호를 아직 모르면 다음에 누가 새로 담을 때 다시 (ai:introseen에서 뺌), 일시 오류는 3번까지
           if (/DART 연결 종목이 아닙니다/.test(e.message)) await redis([['SREM', 'ai:introseen', job.code]]);
           else if (job.tries < 3) await redis([['RPUSH', 'ai:introq', JSON.stringify(job)]]);
-          log.push(`숨은 종목 소개 ${job.code} 실패(${job.tries}): ${e.message}`);
+          log.push(`숨은 종목 과거 실적 ${job.code} 실패(${job.tries}): ${e.message}`);
         }
       }
     }
-    // 소개글: 한국시간 9~20시, 하루 15개, 약 40분 간격
+    // 과거 실적 발표 글: 한국시간 9~20시, 하루 15개, 약 40분 간격
     const hour = kstDate(now).getUTCHours(), dayKey = `ai:intro:${ymd(now)}`;
     const [cnt, last, idx, qlen] = await redis([['GET', dayKey], ['GET', 'ai:intro:last'], ['GET', 'ai:intro:i'], ['LLEN', 'ai:queue']]);
     if (!AI_PAUSE.intro && hour >= 9 && hour <= 20 && Number(cnt || 0) < INTRO_PER_DAY && now - Number(last || 0) >= INTRO_GAP && Number(qlen) < 20) {
@@ -522,13 +522,13 @@ export async function runOnce(now) {
         if (Number(had)) continue;
         try {
           const p = await buildPost(code, 'intro');
-          if (p.skip) { log.push(`소개 ${code} 건너뜀: ${p.skip}`); continue; }
+          if (p.skip) { log.push(`과거 실적 ${code} 건너뜀: ${p.skip}`); continue; }
           await savePost(p);
           await redis([['INCR', dayKey], ['EXPIRE', dayKey, 3 * 86400], ['SET', 'ai:intro:last', now]]);
-          log.push(`소개글 ${code} ${p.headline}`);
+          log.push(`과거 실적 발표 글 ${code} ${p.headline}`);
           i++;
           break;
-        } catch (e) { log.push(`소개 ${code} 실패: ${e.message}`); break; }  // 일시 오류면 다음 실행에 같은 종목 다시
+        } catch (e) { log.push(`과거 실적 ${code} 실패: ${e.message}`); break; }  // 일시 오류면 다음 실행에 같은 종목 다시
       }
       await redis([['SET', 'ai:intro:i', i]]);
     }

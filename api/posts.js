@@ -64,7 +64,7 @@
 //   fav:{아이디}        회원 관심 종목코드 집합
 //   favhidden          숨은 종목(업종 탭에 없는 상장 종목, api/_hidden.js)코드 → 관심 종목으로 담은 회원 수 (hash) — AI 운영자 실적 글 대상
 //   hiddenpublic       한 번이라도 관심 종목으로 담긴 숨은 종목 (set) — 종목 페이지 공개 (api/_public.js)
-//   ai:introq          숨은 종목 AI 소개글 대기열 (처음 관심 종목으로 담길 때 넣음, api/_ai.js가 처리), ai:introseen 한 번 넣은 종목 (set)
+//   ai:introq          숨은 종목 AI 과거 실적 발표 글 대기열 (처음 관심 종목으로 담길 때 넣음, api/_ai.js가 처리), ai:introseen 한 번 넣은 종목 (set)
 //   reports:{id}       게시글을 신고한 cid 집합, reportwhy:{id} 신고 사유별 건수(hash)
 //   reported           신고된 게시글 id → 신고 수 (sorted set)
 //   contacts           연락처 문의 JSON 목록 (최신순, 최대 500건)
@@ -186,7 +186,7 @@ function checkBanned(text, label = '내용') {
 }
 
 // 국내 종목코드(6자리) · 미국 종목(네이버 해외주식 코드: TSLA.O, BRKb) · 업종 게시판(SECBIO)
-// 숨은 종목을 관심 종목으로 담은 회원 수 (AI 운영자 실적 글 대상) + 처음 담긴 종목은 AI 소개글 대기열에 (api/_ai.js runOnce)
+// 숨은 종목을 관심 종목으로 담은 회원 수 (AI 운영자 실적 글 대상) + 처음 담긴 종목은 AI 과거 실적 발표 글 대기열에 (api/_ai.js runOnce)
 const HIDDEN_CODES = new Set(HIDDEN.map(h => h[0]));
 async function countHiddenFav(codes, d) {
   const hidden = codes.filter(c => HIDDEN_CODES.has(c));

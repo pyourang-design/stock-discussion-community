@@ -4,7 +4,7 @@
 //   2) listed.json    : 업종 탭(stocks.js)에 없는 숨은 종목 [코드, 이름, 시장, 시총] (스팩 제외, 우선주 포함)
 //      회원 검색 전용 — 검색해서 관심 종목에 넣고 종목 창(뉴스·리포트·공시·토론)을 볼 수 있음 (app.js loadHidden)
 //      /stock/ 페이지·사이트맵에는 넣지 않음 (scripts/seo.mjs는 stocks.js만 사용)
-//   3) api/_hidden.js : 같은 숨은 종목 [코드, 이름] (서버용: AI 운영자 소개글·실적 글, api/_ai.js · api/posts.js)
+//   3) api/_hidden.js : 같은 숨은 종목 [코드, 이름] (서버용: AI 운영자 과거 실적 발표 글·실적 글, api/_ai.js · api/posts.js)
 import fs from 'fs';
 import { STOCKS } from '../api/_stocks.js';
 import { LEGACY } from '../api/_legacy.js';  // 2026-10-19 개편으로 탭에서 빠진 미국 종목도 화면용 숨은 종목에 (관심 종목·종목 창 유지)

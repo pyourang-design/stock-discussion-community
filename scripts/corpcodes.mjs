@@ -3,7 +3,7 @@
 //   CORPCODE.xml은 POST /api/ai {op:'dart', path:'corpCode.xml'} 로 받은 zip을 푼 파일
 import fs from 'fs';
 import { STOCKS } from '../api/_stocks.js';
-import { HIDDEN } from '../api/_hidden.js';  // 숨은 종목 (scripts/listed.mjs) — 관심 종목으로 담기면 AI 소개글·실적 글
+import { HIDDEN } from '../api/_hidden.js';  // 숨은 종목 (scripts/listed.mjs) — 관심 종목으로 담기면 AI 과거 실적 발표 글·실적 글
 
 const xml = fs.readFileSync(process.argv[2], 'utf8');
 const byStock = new Map();
