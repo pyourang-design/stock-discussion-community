@@ -532,9 +532,8 @@ export async function runOnce(now) {
       }
       await redis([['SET', 'ai:intro:i', i]]);
     }
-    // 시장·업종 정기 글 (장 시작 전·장 마감·공시 모음)
-    if (AI_PAUSE.market) log.push('시장·업종 글 일시 정지 (api/_aiPause.js)');
-    else try { await runMarketTasks(now, { dart, savePost }, log); } catch (e) { log.push(`시장글 오류: ${e.message}`); }
+    // 오늘 공시 모으기 (시황 데이터·특징주용 — 업종·시장 게시판 글은 2026-11-11에 없앰)
+    try { await runMarketTasks(now, { dart }, log); } catch (e) { log.push(`공시 모으기 오류: ${e.message}`); }
   } finally {
     await redis([['DEL', 'ai:lock']]);
   }

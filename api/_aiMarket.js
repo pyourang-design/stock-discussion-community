@@ -1,4 +1,4 @@
-// AI 운영자 시장·업종 정기 글 (숫자로 표 + 규칙 기반 문장, AI API 없음) — api/_ai.js runOnce가 5분마다 호출
+// AI 운영자 시장·업종 글 만들기 (숫자로 표 + 규칙 기반 문장, AI API 없음) — 게시판에 올리는 일은 2026-11-11에 없앰, 아래는 미리보기·시황 데이터용
 //   🌅 장 시작 전 체크  (주식 시장 경제 게시판 SECMKT, 거래일 08:30~)  간밤 미국 증시·반도체·빅테크·환율·유가·금리
 //   🔔 업종 장 마감 성적표 (업종 게시판 SEC***, 거래일 15:40~ 한 번에 한 업종)  평균 등락·상승/하락 수·TOP5
 //   🔔 장 마감 시황 (SECMKT, 업종 성적표가 다 나간 뒤)  지수·투자자별 매매·상승/하락 종목 수·업종 순위
@@ -315,45 +315,11 @@ export function buildDisclosurePost(key, items, now) {
   };
 }
 
-// ── 예약 실행: 시간대별로 할 일 한 가지씩 ──
-const MARKET_ON = true;  // 끄려면 false (미리보기는 /api/ai {op:'previewMarket'})
-export async function runMarketTasks(now, { dart, savePost }, log) {
-  if (!MARKET_ON || !isTradingDay(now)) return;
-  const t = kst(now), hm = t.getUTCHours() * 100 + t.getUTCMinutes(), day = ymd(now), k = s => `ai:mk:${day}:${s}`;
-  const once = async (name, fn) => {
-    const [ok] = await redis([['SET', k(name), '1', 'NX', 'EX', 2 * 86400]]);
-    if (ok !== 'OK') return false;
-    try {
-      const p = await fn();
-      if (p && !p.skip) { await savePost(p, { mark: false }); log.push(`시장글 ${p.code} ${p.headline}`); }
-      else log.push(`시장글 ${name} 건너뜀: ${p?.skip || '내용 없음'}`);
-    } catch (e) { await redis([['DEL', k(name)]]); log.push(`시장글 ${name} 실패: ${e.message}`); }  // 다음 실행에 다시
-    return true;
-  };
-  if (hm >= 830 && hm < 900) { await once('am', () => buildMorning(now)); return; }
-  if (hm >= 1540 && hm < 1800) {
-    const [doneRaw, stats] = await redis([['MGET', ...KR_SECTORS.map(s => k(`sec:${s.key}`))], ['HGETALL', k('sec')]]);
-    const statObj = {};
-    for (let i = 0; i < (stats || []).length; i += 2) statObj[stats[i]] = JSON.parse(stats[i + 1]);
-    const next = KR_SECTORS.find((s, i) => !doneRaw[i]);
-    if (next) {
-      let kospiRate = null;
-      try { const p = await getJson('https://polling.finance.naver.com/api/realtime/domestic/index/KOSPI'); if (String(p.datas?.[0]?.localTradedAt || '').slice(0, 10) !== kst(now).toISOString().slice(0, 10)) { log.push('오늘 거래 없음'); return; } kospiRate = num(p.datas[0].fluctuationsRatio); } catch {}
-      await once(`sec:${next.key}`, async () => {
-        const p = await buildSectorClose(next.key, now, kospiRate);
-        if (p.stat) await redis([['HSET', k('sec'), next.key, JSON.stringify(p.stat)], ['EXPIRE', k('sec'), 2 * 86400]]);
-        return p;
-      });
-      return;
-    }
-    if (await once('close', () => buildMarketClose(now, statObj))) return;
-  }
-  if (hm >= 1600 && hm < 1900) { await scanDisclosures(now, dart, log); return; }
-  if (hm >= 1900 && hm < 2200) {
-    const [all] = await redis([['HVALS', `ai:disc:${day}`]]);
-    const items = (all || []).map(x => JSON.parse(x));
-    for (const s of KR_SECTORS) {
-      if (await once(`disc:${s.key}`, async () => buildDisclosurePost(s.key, items, now) || { skip: '공시 없음' })) return;
-    }
-  }
+// ── 예약 실행: 오늘 공시 모으기만 (16~19시, ai:disc:{날짜} → 시황 데이터·특징주가 씀) ──
+// 업종·시장 게시판 자동 글(장 시작 전·업종 성적표·장 마감 시황·공시 모음)은 2026-11-11에 아주 없앰.
+// buildMorning·buildMarketClose는 시황 데이터(api/_sihwangData.js)가, 나머지 build*는 관리자 미리보기(/api/ai previewMarket)가 씀
+export async function runMarketTasks(now, { dart }, log) {
+  if (!isTradingDay(now)) return;
+  const t = kst(now), hm = t.getUTCHours() * 100 + t.getUTCMinutes();
+  if (hm >= 1600 && hm < 1900) await scanDisclosures(now, dart, log);
 }

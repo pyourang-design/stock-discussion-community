@@ -76,7 +76,6 @@ import crypto from 'crypto';
 import { COLUMN_ORDER_KEY, COLUMN_SERIES, sortColumns } from './_colorder.js';
 import { renderRich, richTextLength } from './_rich.js';
 import { pinKey, isPinPost, pinFirst } from './_pin.js';
-import { AI_PAUSE, isHiddenAiPost } from './_aiPause.js';
 import { redis, dbReady } from './_redis.js';
 import { HIDDEN } from './_hidden.js';
 
@@ -522,23 +521,6 @@ async function handleGet(q) {
     const [flat] = await redis([['HGETALL', 'postcount']]);
     const counts = {};
     for (let i = 0; i < (flat || []).length; i += 2) counts[flat[i]] = Number(flat[i + 1]);
-    // 업종·시장 게시판 카드의 '댓글 N'에서 숨긴 AI 글 수를 뺌 (api/_aiPause.js) — 게시판별 AI 글 수는 10분 캐시(aihidden)
-    if (AI_PAUSE.market) {
-      const boards = Object.keys(counts).filter(c => /^SEC/.test(c));
-      let [cache] = await redis([['GET', 'aihidden']]);
-      if (!cache && boards.length) {
-        const lists = await redis(boards.map(c => ['LRANGE', `posts:${c}`, 0, LIST_LIMIT - 1]));
-        const ids = lists.flat().filter(Boolean);
-        const raws = [];
-        for (let i = 0; i < ids.length; i += 500) raws.push(...(((await redis([['MGET', ...ids.slice(i, i + 500).map(id => `post:${id}`)]]))[0]) || []));
-        const n = {};
-        for (const r of raws) { if (!r) continue; const p = JSON.parse(r); if (isHiddenAiPost(p)) n[p.code] = (n[p.code] || 0) + 1; }
-        cache = JSON.stringify(n);
-        await redis([['SET', 'aihidden', cache, 'EX', 600]]);
-      }
-      const hid = cache ? JSON.parse(cache) : {};
-      for (const c of boards) counts[c] = Math.max(0, counts[c] - (hid[c] || 0));
-    }
     return { counts };
   }
 
@@ -546,7 +528,7 @@ async function handleGet(q) {
     if (!isCode(q.code)) throw new BadRequest('종목코드가 올바르지 않습니다');
     // 운영자 종목 체크포인트(고정 글)는 최신 목록에서 밀려나도 함께 불러와 맨 위로 (api/_pin.js)
     const [ids, pins] = await redis([['LRANGE', `posts:${q.code}`, 0, LIST_LIMIT - 1], ['SMEMBERS', pinKey(q.code)]]);
-    return { posts: pinFirst((await loadPosts([...new Set([...(pins || []), ...(ids || [])])], cid)).filter(p => !isHiddenAiPost(p))) };  // 업종·시장 AI 글 숨김 (api/_aiPause.js)
+    return { posts: pinFirst(await loadPosts([...new Set([...(pins || []), ...(ids || [])])], cid)) };
   }
 
   throw new BadRequest('조회 조건이 없습니다');
@@ -928,7 +910,7 @@ async function handlePost(b, env = {}) {
       ['GET', `nickowner:${nick}`],
       me ? ['SISMEMBER', `mfollowing:${me.id.toLowerCase()}`, nick] : ['ECHO', '0'],
     ]);
-    return { nick, member: Boolean(owner) && owner !== '-', withdrawn: owner === '-', posts: (await loadPosts(ids, b.cid)).filter(p => !isHiddenAiPost(p)), followers: Number(followers) || 0, following: Number(following) === 1 };
+    return { nick, member: Boolean(owner) && owner !== '-', withdrawn: owner === '-', posts: await loadPosts(ids, b.cid), followers: Number(followers) || 0, following: Number(following) === 1 };
   }
 
   if (b.action === 'follow' || b.action === 'followingList' || b.action === 'feed') {
