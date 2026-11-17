@@ -83,7 +83,7 @@ const MAX_CONTENT = 1000;
 const COLUMN_CODE = 'COLMKT';  // 주식 강의
 const SIHWANG_CODE = 'COLNEWS';  // 주식 시황
 const isColumnCode = c => c === COLUMN_CODE || c === SIHWANG_CODE;  // 운영자만 쓰는 게시판 (제목 + 2000자, 사진)
-const COLUMN_MAX = 2000;  // 주식 강의 본문
+const COLUMN_MAX = 5000;  // 주식 강의 본문 (2026-11-17 2000→5000, 3000자 이상 보강 칼럼)
 const SIHWANG_MAX = 3000;  // 주식 시황 본문 (표·그래프 블록은 빼고 셈, api/_rich.js richTextLength)
 const SIHWANG_RAW_MAX = 12000;  // 주식 시황 블록까지 합친 전체 길이
 const checkColumn = (code, content) => {

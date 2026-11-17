@@ -1,5 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /api/
+Disallow: /?
 
 Sitemap: https://upjong.com/sitemap.xml

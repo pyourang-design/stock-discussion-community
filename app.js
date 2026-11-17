@@ -1048,7 +1048,7 @@ const POST_MAX = 1000;     // 게시글 최대 글자 수
 // 강의는 연재 순서(먼저 쓴 글부터), 시황은 최신 글부터 (latest)
 const OP_BOARDS = {
   sihwang: { code: 'COLNEWS', name: '주식 시황', unit: '시황', empty: '아직 주식 시황이 없습니다.', latest: true, max: 3000, rawMax: 12000 },
-  column: { code: 'COLMKT', name: '주식 강의', unit: '강의', empty: '아직 주식 강의가 없습니다.', latest: false, max: 2000 },
+  column: { code: 'COLMKT', name: '주식 강의', unit: '강의', empty: '아직 주식 강의가 없습니다.', latest: false, max: 5000 },
 };  // max: 본문 글자 수 — rawMax가 있으면 max는 표·그래프 블록을 뺀 글자 수, rawMax는 블록까지 합친 길이 (api/posts.js checkColumn)
 const OP_CODES = { COLNEWS: 'sihwang', COLMKT: 'column' };  // 게시판 코드 → 탭
 const isColumnTab = () => Boolean(OP_BOARDS[currentModalTab]) && Boolean(currentStock?.isMarket);
