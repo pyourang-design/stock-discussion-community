@@ -7,4 +7,6 @@ compatibility_date = "2025-09-01"
 workers_dev = false
 
 [triggers]
-crons = ["*/30 0-11 * * 1-5"]
+# 2026-11-20: 크론 꺼둠(빈 목록) — AI 글 생성이 정지라 호출해도 얻는 게 없고 Upstash 요청만 씀.
+# 다시 켜기: api/_aiPause.js를 false로 되돌린 뒤 아래를 crons = ["*/30 0-11 * * 1-5"] (원래는 "*/5 * * * *")로 바꾸고 wrangler deploy
+crons = []
