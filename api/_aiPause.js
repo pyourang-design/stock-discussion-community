@@ -3,4 +3,6 @@
 // 업종·시장 게시판 자동 글(🌅 장 시작 전 체크 · 🔔 업종 장 마감 성적표 · 🔔 장 마감 시황 · 📋 업종 주요 공시 모음)은
 //   2026-11-11에 아주 없앰 — DB의 글 285건도 지웠고 다시 쓰지 않음 (api/_aiMarket.js는 공시 모으기만 함)
 // 종목 토론방의 AI 글(과거 실적·실적 발표)은 토론 창에 그대로 보이고, 종목 페이지(/stock/코드)에서는 '실적 요약' 칸에 최신 1건만 (api/page.js)
-export const AI_PAUSE = { intro: true };
+//   earnings: 📢 실적 발표 글 멈춤 (2026-11-18 — 공시 훑기·대기열 처리 모두 멈춤. 재개하면 그 시점 이후 공시부터 다시. 대기열 ai:queue는 그대로 둠)
+//   2026-11-18: 종목 게시판 AI 글 1,023건(📢 786 · 📊 237)을 DB에서 지움 — 백업 scripts/data/ai-backup-1118/
+export const AI_PAUSE = { intro: true, earnings: true };

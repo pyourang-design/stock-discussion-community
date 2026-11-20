@@ -1340,9 +1340,9 @@ function openColumnLink(id, tab = 'column') {
   openModal('SECMKT', OP_BOARDS[tab] ? tab : 'column');
 }
 // ── 주식 시황 초안 (관리자): 예약 실행 루틴이 써 두는 초안 — 국내 장 마감(평일 16시)·미국 장 마감(화~토 아침 8시) (functions/api/sihwang.js) → 보고 고쳐서 등록 ──
-const DRAFT_KINDS = [['kr', '국내 장 마감', '평일 16:00쯤'], ['us', '미국 장 마감', '화~토 08:00쯤']];
-let sihwangDraft;        // undefined: 아직 안 받음, { kr, us }: 각 { title, content, ts, html } 또는 null
-let draftLoaded = false;  // 글쓰기 칸에 불러온 초안 ('kr' | 'us', 등록하면 서버가 그 초안을 지움)
+const DRAFT_KINDS = [['kr', '국내 장 마감', '평일 16:00쯤'], ['us', '미국 장 마감', '화~토 08:00쯤'], ['weekly', '주간 리뷰', '토요일 10:00쯤']];
+let sihwangDraft;        // undefined: 아직 안 받음, { kr, us, weekly }: 각 { title, content, ts, html } 또는 null
+let draftLoaded = false;  // 글쓰기 칸에 불러온 초안 ('kr' | 'us' | 'weekly', 등록하면 서버가 그 초안을 지움)
 async function drawSihwangDraft() {
   const box = document.getElementById('draftCard');
   if (!box || !isAdmin()) return;

@@ -17,7 +17,8 @@ import { pinKey, isPinPost } from './_pin.js';
 export const HIDDEN_NAME = new Map(HIDDEN);
 export const PUBLIC_KEY = 'hiddenpublic';
 export const INDEX_MIN = 3;
-export const CORE_N = 0;  // 애드센스 승인 후 되돌릴 값: 8 → 20 → 64
+export const CORE_N = 15;  // 2026-11-18: 0 → 15 (업종 탭마다 시총 상위 15개 = 200개만 항상 검색 노출). 애드센스 승인 후 되돌릴 값: 64 (scripts/seo.mjs CORE_N도 같이)
+export const PIN_COUNTS = false;  // 2026-11-18: false → 운영자 체크포인트만 있는 종목은 검색 노출 안 함(회원 토론글 INDEX_MIN개 필요). 애드센스 승인 후 true로 되돌리면 체크포인트 종목 전부 노출(428개)
 const SCAN = 200;  // 종목마다 최근 글 몇 개까지 세는지
 
 const IN_TAB = new Set(STOCKS.map(s => s.code));
@@ -66,7 +67,7 @@ export async function indexable(codes) {
     s.ts = Math.max(s.ts, p.editedTs || p.ts || 0);
     stat.set(p.code, s);
   }
-  for (const [c, s] of stat) if (s.pin || s.n >= INDEX_MIN) out.set(c, s.ts);
+  for (const [c, s] of stat) if ((PIN_COUNTS && s.pin) || s.n >= INDEX_MIN) out.set(c, s.ts);
   return out;
 }
 
@@ -86,7 +87,7 @@ export async function indexableAll() {
   const codes = [];
   for (let i = 0; i < (flat || []).length; i += 2) {
     const c = flat[i];
-    if (Number(flat[i + 1]) < INDEX_MIN && !pinned.has(c)) continue;
+    if (Number(flat[i + 1]) < INDEX_MIN && !(PIN_COUNTS && pinned.has(c))) continue;
     if ((IN_TAB.has(c) && !CORE.has(c)) || DROPPED.has(c) || pubSet.has(c)) codes.push(c);
   }
   return indexable(codes);

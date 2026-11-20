@@ -97,7 +97,7 @@ const checkColumn = (code, content) => {
 // 글쓰기·수정·삭제 때 함께 바꾸고, 없는 글(2026-10-21 이전 글)은 목록을 열 때 한 번 채움
 const colMetaKey = code => `colmeta:${code}`;
 const colMeta = p => JSON.stringify({ id: p.id, title: p.title || '', ts: p.ts });
-const SIHWANG_DRAFT_KEYS = { kr: 'sihwang:draft', us: 'sihwang:draft:us' };  // 루틴이 쓴 초안: 국내 장 마감(16시)·미국 장 마감(아침 8시) (functions/api/sihwang.js)
+const SIHWANG_DRAFT_KEYS = { kr: 'sihwang:draft', us: 'sihwang:draft:us', weekly: 'sihwang:draft:weekly' };  // 루틴이 쓴 초안: 국내 장 마감(16시)·미국 장 마감(아침 8시) (functions/api/sihwang.js)
 const withHtml = p => isColumnCode(p.code) && !p.blind ? { ...p, html: renderRich(p.content) } : p;  // 칼럼 본문 표·그래프
 const COLUMN_TITLE_MAX = 100;
 // 칼럼 본문 사진 [사진:/img/{id}] → 사진 저장소(Workers KV, 키 img:{id}) 정리용

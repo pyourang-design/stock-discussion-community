@@ -466,9 +466,9 @@ export async function runOnce(now) {
   if (lock !== 'OK') return { skipped: 'running' };
   const log = [];
   try {
-    await scan(now, log);
+    if (!AI_PAUSE.earnings) await scan(now, log);  // 2026-11-18 실적 발표 글 일시 정지 (api/_aiPause.js)
     // 실적 발표 글
-    for (let i = 0; i < JOBS_PER_RUN; i++) {
+    for (let i = 0; !AI_PAUSE.earnings && i < JOBS_PER_RUN; i++) {
       const [raw] = await redis([['LPOP', 'ai:queue']]);
       if (!raw) break;
       const job = JSON.parse(raw);
