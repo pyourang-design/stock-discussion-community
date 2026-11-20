@@ -961,8 +961,9 @@ export default async function handler(req, res) {
     if (req.method === 'GET') {
       // 게시글 수(counts=1)는 사용자와 무관하고 조금 늦어도 괜찮아서 엣지 캐시 (화면을 열 때마다 DB 전체 해시를 읽던 것 — functions/_adapter.js가 s-maxage를 캐시함)
       // 글 목록(code=)은 '내가 누른 좋아요'가 섞여 있고 글 쓴 직후 바로 보여야 해서 계속 no-store
+      const out = await handleGet(req.query);  // 성공한 뒤에만 캐시 헤더를 붙임 (오류 응답에는 붙지 않게)
       if (req.query.counts) res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
-      return res.json(await handleGet(req.query));
+      return res.json(out);
     }
     if (req.method === 'POST') {
       let body = req.body;
