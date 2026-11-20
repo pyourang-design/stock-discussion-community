@@ -265,6 +265,7 @@ const REF_NAMES = [
 ];
 const REF_APPS = [[/KAKAOTALK/i, '카카오톡'], [/NAVER\(inapp/i, '네이버 앱'], [/Instagram/, '인스타그램'], [/FBAN|FBAV/, '페이스북'],
   [/Barcelona/, '스레드'], [/\bLine\//, '라인'], [/BAND\//, '밴드'], [/DaumApps/, '다음 앱']];
+const BOT_UA = /bot|crawl|spider|slurp|yeti|daumoa|facebookexternalhit|headlesschrome|lighthouse|pagespeed|python-requests|curl\//i;
 function visitSource(ref, ua = '') {
   let host = '';
   try { host = ref ? new URL(ref).hostname.toLowerCase() : ''; } catch {}
@@ -606,6 +607,8 @@ async function handlePost(b, env = {}) {
   }
 
   if (b.action === 'visit') {
+    // 검색 로봇·미리보기·측정 도구는 방문 집계에서 뺌 (DB 요청 절약 — 2026-11-20 Upstash 월 한도 초과 대응)
+    if (BOT_UA.test(b._ua || '')) return { today: 0, total: 0, bot: true };
     const day = `views:${kstDay()}`;
     const [ok] = await redis([['SET', `vrl:${b.cid}`, '1', 'NX', 'EX', VISIT_GAP]]);
     if (ok === 'OK') {
@@ -955,7 +958,12 @@ export default async function handler(req, res) {
   if (!dbReady()) return res.status(503).json({ error: 'DB가 연결되지 않았습니다' });
 
   try {
-    if (req.method === 'GET') return res.json(await handleGet(req.query));
+    if (req.method === 'GET') {
+      // 게시글 수(counts=1)는 사용자와 무관하고 조금 늦어도 괜찮아서 엣지 캐시 (화면을 열 때마다 DB 전체 해시를 읽던 것 — functions/_adapter.js가 s-maxage를 캐시함)
+      // 글 목록(code=)은 '내가 누른 좋아요'가 섞여 있고 글 쓴 직후 바로 보여야 해서 계속 no-store
+      if (req.query.counts) res.setHeader('Cache-Control', 's-maxage=60, stale-while-revalidate=300');
+      return res.json(await handleGet(req.query));
+    }
     if (req.method === 'POST') {
       let body = req.body;
       if (typeof body === 'string') { try { body = JSON.parse(body || '{}'); } catch { throw new BadRequest('요청 형식이 올바르지 않습니다'); } }
