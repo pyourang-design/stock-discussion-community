@@ -1487,22 +1487,22 @@ const hotMd = d => d ? `${Number(d.slice(4, 6))}/${Number(d.slice(6, 8))}` : '';
 function drawHot(data) {
   const label = Object.fromEntries(data.conds.map(([k, t]) => [k, t])), groupOf = Object.fromEntries(data.conds.map(([k, , g]) => [k, g]));
   const inGroup = k => hotGroup === 'all' || groupOf[k] === hotGroup;
-  document.getElementById('hotAsOf').textContent = (data.period === 'd' && data.asOf.live ? '급등·신고가·거래대금·인기검색 실시간 · ' : '') + (data.asOf.date ? `${hotMd(data.asOf.date)} 장 마감 기준` : '');
-  document.getElementById('hotGroups').innerHTML = [['all', '종합'], ...data.groups].map(([g, t]) => `<button class="hot-group${g === hotGroup ? ' on' : ''}" role="tab" aria-selected="${g === hotGroup}" data-act="hotGroup" data-g="${g}">${t}</button>`).join('');
+  document.getElementById('hotAsOf').innerHTML = (data.period === 'd' && data.asOf.live ? '<span class="hot-live">실시간</span>' : '') + (data.asOf.date ? `${hotMd(data.asOf.date)} 장 마감 기준` : '') + ` · 종목 ${data.rows.length}개`;
+  document.getElementById('hotGroups').innerHTML = [['all', '종합'], ...data.groups].map(([g, t]) => { const n = g === 'all' ? data.rows.length : data.rows.filter(r => Object.keys(r.hits).some(k => groupOf[k] === g)).length; return `<button class="hot-group${g === hotGroup ? ' on' : ''}" role="tab" aria-selected="${g === hotGroup}" data-act="hotGroup" data-g="${g}">${t}<i>${n}</i></button>`; }).join('');
   document.getElementById('hotChips').innerHTML = hotGroup === 'all' ? '' : data.conds.filter(([, , g]) => g === hotGroup)
     .map(([k, t]) => `<button class="hot-chip${hotChips.has(k) ? ' on' : ''}" aria-pressed="${hotChips.has(k)}" data-act="hotChip" data-k="${k}">${t}</button>`).join('');
   // 고른 조건 줄 + '+ 조건 추가' (모든 묶음의 조건 중에서 더하기)
   const groupName = Object.fromEntries(data.groups);
   document.getElementById('hotPicked').innerHTML = !hotChips.size ? '' :
-    `<div class="hot-picked-row">${hotChips.size > 1 ? `<span class="hot-picked-label">선택한 조건</span>${[...hotChips].map(k => `<button class="hot-chip on" data-act="hotRemove" data-k="${k}" aria-label="${label[k]} 빼기">${label[k]} ✕</button>`).join('')}` : ''}<button class="hot-add${hotPicking ? ' on' : ''}" data-act="hotPick" aria-expanded="${hotPicking}">+ 조건 추가</button></div>` +
+    `<div class="hot-picked-row">${hotChips.size > 1 ? `<span class="hot-picked-label">선택한 조건</span>${[...hotChips].map(k => `<button class="hot-chip on" data-act="hotRemove" data-k="${k}" aria-label="${label[k]} 빼기">${label[k]} ✕</button>`).join('')}` : ''}<button class="hot-add${hotPicking ? ' on' : ''}" data-act="hotPick" aria-expanded="${hotPicking}">+ 조건 겹쳐 보기</button></div>` +
     (hotPicking ? `<div class="hot-picker">${data.groups.map(([g]) => {
       const ks = data.conds.filter(([k, , cg]) => cg === g && !hotChips.has(k));
       return ks.length ? `<div class="hot-picker-group"><span class="hot-picked-label">${groupName[g]}</span><div class="hot-picker-chips">${ks.map(([k, t]) => `<button class="hot-chip" data-act="hotAdd" data-k="${k}">${t}</button>`).join('')}</div></div>` : '';
     }).join('')}</div>` : '');
   const desc = hotChips.size === 1 ? (d => typeof d === 'string' ? d : d[data.period])(HOT_DESC[[...hotChips][0]])
     : hotChips.size ? `${[...hotChips].map(k => label[k]).join(' + ')} 모두 만족하는 종목`
-    : hotGroup === 'all' ? '여러 조건에 함께 걸린 종목부터 보여 줍니다.'
-    : '조건을 누르면 그 종목만 보여 주고, + 조건 추가로 조건을 더할 수 있습니다.';
+    : hotGroup === 'all' ? '여러 조건에 동시에 걸린 종목일수록 위에 보여 줘요. 위 탭에서 보고 싶은 기준을 골라 보세요.'
+    : '궁금한 조건을 누르면 그 종목만 모아 보여 줘요. "조건 겹쳐 보기"로 조건을 더할 수도 있어요.';
   document.getElementById('hotDesc').textContent = desc;
 
   let rows = data.rows;
@@ -1513,14 +1513,14 @@ function drawHot(data) {
   rows = rows.slice(0, 100);
   const on = k => hotChips.size ? hotChips.has(k) : hotGroup !== 'all' && inGroup(k);  // 강조할 배지
   document.getElementById('hotList').innerHTML = (rows.length ? rows.map((r, i) => {
-    const badges = Object.entries(r.hits).sort(([a], [b]) => on(b) - on(a))
-      .map(([k, [t]]) => `<span class="hot-badge${on(k) ? ' on' : ''}" title="${escHtml(label[k] || '')}">${escHtml(t)}</span>`).join('');
-    const up = (r.rate || 0) >= 0;
+    const entries = Object.entries(r.hits).sort(([a], [b]) => on(b) - on(a)), MAX = 4;
+    const badges = entries.slice(0, MAX).map(([k, [t]]) => `<span class="hot-badge${on(k) ? ' on' : ''}" title="${escHtml(label[k] || '')}">${escHtml(t)}</span>`).join('') + (entries.length > MAX ? `<span class="hot-badge more" title="${escHtml(entries.slice(MAX).map(([, [t]]) => t).join(' · '))}">+${entries.length - MAX}</span>` : '');
+    const up = (r.rate || 0) >= 0, n = entries.length;
     // 줄을 누르면 종목 창, 이름 옆 ☆는 관심 종목 (줄 안에 버튼을 넣으려고 줄은 div role=button — Enter는 keydown에서)
-    return `<div class="hot-row" role="button" tabindex="0" data-act="hotStock" data-code="${escHtml(r.code)}">
+    return `<div class="hot-row${i < 3 ? ' top' : ''}" role="button" tabindex="0" data-act="hotStock" data-code="${escHtml(r.code)}">
       <span class="hot-rank">${i + 1}</span>
-      <span class="hot-main"><span class="hot-name-row"><span class="hot-name">${escHtml(r.name)}</span><button class="fav-star hot-star${favs.has(r.code) ? ' on' : ''}" title="관심 종목" aria-label="${escHtml(r.name)} 관심 종목" data-code="${escHtml(r.code)}" data-act="toggleFav">${favs.has(r.code) ? '★' : '☆'}</button></span><span class="hot-badges">${badges}</span></span>
-      <span class="hot-price">${r.price ? `<b>${Number(r.price).toLocaleString()}</b>` : ''}${r.rate != null ? `<span class="${up ? 'up' : 'down'}">${up ? '+' : ''}${Number(r.rate).toFixed(2)}%</span>` : ''}</span>
+      <span class="hot-main"><span class="hot-name-row"><span class="hot-name">${escHtml(r.name)}</span><button class="fav-star hot-star${favs.has(r.code) ? ' on' : ''}" title="관심 종목" aria-label="${escHtml(r.name)} 관심 종목" data-code="${escHtml(r.code)}" data-act="toggleFav">${favs.has(r.code) ? '★' : '☆'}</button>${n > 1 ? `<span class="hot-heat" title="${n}개 조건에 동시에 해당">🔥${n}</span>` : ''}</span><span class="hot-badges">${badges}</span></span>
+      <span class="hot-price">${r.price ? `<b>${Number(r.price).toLocaleString()}</b>` : ''}${r.rate != null ? `<span class="hot-rate ${up ? 'up' : 'down'}">${up ? '+' : ''}${Number(r.rate).toFixed(2)}%</span>` : ''}</span>
     </div>`;
   }).join('') : '<p class="empty-msg">조건에 맞는 종목이 없습니다.</p>') +
     '<p class="hot-note">※ 조건에 맞는 종목을 자동으로 모은 정보이며 특정 종목의 매수·매도 권유가 아닙니다. 투자 판단과 책임은 투자자 본인에게 있습니다.</p>';

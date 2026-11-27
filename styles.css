@@ -1045,3 +1045,35 @@ body { padding-bottom: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); 
 .post-item.pinned, .sp-posts li.sp-pinned { background: rgba(91,140,255,.07); border-left: 3px solid var(--accent); }
 .pin-badge { display: inline-block; margin-bottom: 6px; padding: 1px 8px; border-radius: 10px; background: rgba(91,140,255,.14); color: var(--accent); font-size: .74rem; font-weight: 700; }
 .sp-post-head .pin-badge { margin: 0 4px 0 0; }
+
+/* ── Hot 종목 화면 개선: 설명 한 줄, 실시간 표시, 묶음별 종목 수, 상위 3개 강조, 등락률 알약 ── */
+.hot-sub { margin: 2px 0 0; color: var(--text-muted); font-size: .8rem; font-weight: 500; }
+.hot-asof { display: flex; align-items: center; gap: 6px; }
+.hot-live { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 9px; background: rgba(255,59,59,.12); color: #e5322d; font-size: .7rem; font-weight: 800; }
+.hot-live::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: hotPulse 1.6s ease-in-out infinite; }
+@keyframes hotPulse { 50% { opacity: .25; } }
+.hot-controls { position: sticky; top: 0; z-index: 2; background: var(--surface); gap: 10px; padding: 12px 16px 10px; }
+.hot-period { display: flex; align-self: stretch; padding: 3px; border: 0; border-radius: 12px; background: var(--surface2); }
+.hot-tab { flex: 1; padding: 8px 0; border-radius: 10px; font-size: .9rem; transition: background .15s, color .15s; }
+.hot-tab.on { background: var(--surface); color: var(--accent); box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.hot-groups { gap: 8px; }
+.hot-group { display: inline-flex; align-items: center; gap: 5px; padding: 7px 13px; border: 1px solid var(--border); border-radius: 18px; background: var(--surface); color: var(--text-muted); font-size: .88rem; }
+.hot-group i { font-style: normal; font-size: .72rem; font-weight: 700; opacity: .75; }
+.hot-group.on { border-color: var(--accent); background: var(--accent); color: #fff; }
+.hot-group.on i { opacity: .9; }
+.hot-chip { height: 32px; padding: 0 13px; border-radius: 16px; }
+.hot-desc { padding: 9px 12px; border-radius: 10px; background: var(--surface2); font-size: .8rem; line-height: 1.5; }
+.hot-desc::before { content: 'ℹ️ '; }
+.hot-row { gap: 12px; padding: 13px 16px; transition: background .12s; }
+.hot-rank { flex: 0 0 26px; height: 26px; line-height: 26px; border-radius: 8px; background: var(--surface2); color: var(--text-muted); font-size: .8rem; }
+.hot-row.top .hot-rank { background: rgba(255,106,0,.14); color: #e85d00; }
+.hot-row.top:nth-child(1) .hot-rank { background: #ff6a00; color: #fff; }
+.hot-name { font-size: 1rem; }
+.hot-heat { flex: 0 0 auto; padding: 1px 6px; border-radius: 9px; background: rgba(255,106,0,.12); color: #e85d00; font-size: .7rem; font-weight: 800; white-space: nowrap; }
+.hot-badge { padding: 2px 8px; border-radius: 10px; }
+.hot-badge.more { background: none; border: 1px dashed var(--border); }
+.hot-price { gap: 4px; }
+.hot-price b { font-size: 1rem; font-variant-numeric: tabular-nums; }
+.hot-rate { padding: 2px 8px; border-radius: 8px; background: rgba(240,66,82,.12); font-size: .82rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+.hot-rate.down { background: rgba(52,133,250,.14); }
+@media (max-width: 600px) { .hot-controls { padding: 10px 12px 8px; gap: 8px; } .hot-row { padding: 11px 12px; gap: 10px; } .hot-group { padding: 6px 11px; } }
