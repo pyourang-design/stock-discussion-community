@@ -1467,6 +1467,7 @@ function closeHot(e) {
   leaveLayer();
 }
 function hideHot() {
+  hotPeriod = 'd'; hotGroup = 'all'; hotPicking = false; hotChips.clear(); document.getElementById('hotList').scrollTop = 0;  // 닫으면 선택값 초기화 — 다시 열면 처음 화면
   document.getElementById('hotOverlay').classList.add('hidden');
   if (!isOpen('modalOverlay')) document.body.classList.remove('no-scroll');
 }
@@ -1494,7 +1495,7 @@ function drawHot(data) {
   // 고른 조건 줄 + '+ 조건 추가' (모든 묶음의 조건 중에서 더하기)
   const groupName = Object.fromEntries(data.groups);
   document.getElementById('hotPicked').innerHTML = !hotChips.size ? '' :
-    `<div class="hot-picked-row">${hotChips.size > 1 ? `<span class="hot-picked-label">선택한 조건</span>${[...hotChips].map(k => `<button class="hot-chip on" data-act="hotRemove" data-k="${k}" aria-label="${label[k]} 빼기">${label[k]} ✕</button>`).join('')}` : ''}<button class="hot-add${hotPicking ? ' on' : ''}" data-act="hotPick" aria-expanded="${hotPicking}">+ 조건 겹쳐 보기</button></div>` +
+    `<div class="hot-picked-row">${hotChips.size > 1 ? `<span class="hot-picked-label">선택한 조건</span>${[...hotChips].map(k => `<button class="hot-chip on" data-act="hotRemove" data-k="${k}" aria-label="${label[k]} 빼기">${label[k]} ✕</button>`).join('')}` : ''}<button class="hot-add${hotPicking ? ' on' : ''}" data-act="hotPick" aria-expanded="${hotPicking}">+ 조건 추가하기</button></div>` +
     (hotPicking ? `<div class="hot-picker">${data.groups.map(([g]) => {
       const ks = data.conds.filter(([k, , cg]) => cg === g && !hotChips.has(k));
       return ks.length ? `<div class="hot-picker-group"><span class="hot-picked-label">${groupName[g]}</span><div class="hot-picker-chips">${ks.map(([k, t]) => `<button class="hot-chip" data-act="hotAdd" data-k="${k}">${t}</button>`).join('')}</div></div>` : '';
@@ -1502,7 +1503,7 @@ function drawHot(data) {
   const desc = hotChips.size === 1 ? (d => typeof d === 'string' ? d : d[data.period])(HOT_DESC[[...hotChips][0]])
     : hotChips.size ? `${[...hotChips].map(k => label[k]).join(' + ')} 모두 만족하는 종목`
     : hotGroup === 'all' ? '여러 조건에 동시에 걸린 종목일수록 위에 보여 줘요. 위 탭에서 보고 싶은 기준을 골라 보세요.'
-    : '궁금한 조건을 누르면 그 종목만 모아 보여 줘요. "조건 겹쳐 보기"로 조건을 더할 수도 있어요.';
+    : '궁금한 조건을 누르면 그 종목만 모아 보여 줘요. "조건 추가하기"로 조건을 더할 수도 있어요.';
   document.getElementById('hotDesc').textContent = desc;
 
   let rows = data.rows;
